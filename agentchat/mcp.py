@@ -34,7 +34,10 @@ TOOLS = [
 
 def kind_of(client_name):
     n = (client_name or "").lower()
-    return "claude" if "claude" in n else "codex" if "codex" in n else "llm"
+    for kind in ("opencode", "claude", "codex"):
+        if kind in n:
+            return kind
+    return "llm"
 
 
 class Session:
@@ -56,7 +59,7 @@ class Session:
                     "unavailable (systemctl --user start agent-chat, then restart the session).")
         if not self.project:
             return None
-        if self.kind == "codex":
+        if self.kind in ("codex", "opencode"):
             return ("This project (%s) has a shared chat with the user and other agents. "
                     "Call chat_join with a short name you pick for yourself (and, if your first "
                     "prompt said \"(start <code>)\", that code as spawn); chat messages "
@@ -71,10 +74,17 @@ class Session:
                 "only those reply. Keep replies short." % self.project["name"])
 
     def tools(self):
-        return TOOLS if self.project else []
+        if not self.project:
+            return []
+        if self.kind == "codex":
+            return TOOLS
+        # only Codex needs the spawn argument; it confuses other models
+        join = dict(TOOLS[0], inputSchema={"type": "object", "required": ["name"],
+                                           "properties": {"name": {"type": "string"}}})
+        return [join] + TOOLS[1:]
 
     def reminder(self):
-        if self.kind == "codex":
+        if self.kind in ("codex", "opencode"):
             return ""  # Codex is woken by codex queue, not by a wait
         agents = self.client.call("GET", "/api/projects/%s/agents" % self.project["id"])[1]["agents"]
         if any(a["name"] == self.name and a["status"] == "waiting" for a in agents):
@@ -103,7 +113,10 @@ class Session:
                 self.name = body["agent"]["name"]
                 recent = "\n".join(fmt(m) for m in body["recent"]) or "(no messages yet)"
                 joined = "Joined %s as %s. " % (self.project["name"], self.name)
-                if self.kind != "codex":
+                if self.kind == "opencode":
+                    how = ("Chat messages for you are typed into this session as they arrive; "
+                           "reply with chat_post.")
+                elif self.kind != "codex":
                     how = ("Run this as a background command now, and again each time it "
                            "exits:\n%s" % self.wait_command())
                 elif join["thread"]:

@@ -262,6 +262,21 @@ class StoreTest(unittest.TestCase):
         self.store.join(self.pid, "alice", "claude")
         self.assertIsNone(next(a for a in self.store.status(self.pid) if a["name"] == "alice")["model"])
 
+    def test_opencode_agents_are_typed_to(self):
+        typed = []
+        self.store.type_in = lambda pid, name, m: typed.append((name, m["text"]))
+        self.store.add_spawned(self.pid, "t", "opencode", "s")
+        self.store.join(self.pid, "kit", "opencode", spawn="t")
+        self.store.post(self.pid, "user", "hello")
+        self.store.post(self.pid, "kit", "@kit me")
+        self.assertEqual(typed, [("kit", "hello")])
+        row = lambda: next(a for a in self.store.status(self.pid) if a["name"] == "kit")
+        self.assertEqual(row()["status"], "waiting")
+        self.store.set_local(self.pid, "kit", busy=True)
+        self.assertEqual(row()["status"], "busy")
+        self.store.set_needs(self.pid, "t", True)
+        self.assertEqual(row()["status"], "needs_you")
+
     def test_remove_and_readd(self):
         self.store.join(self.pid, "alice", "claude")
         self.store.remove(self.pid, "alice")

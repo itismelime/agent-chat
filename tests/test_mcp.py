@@ -27,8 +27,8 @@ class McpTest(unittest.TestCase):
         self.instructions = init["result"].get("instructions", "")
 
     def test_kind_of(self):
-        self.assertEqual([kind_of(n) for n in ("claude-code", "codex-mcp-client", "x", None)],
-                         ["claude", "codex", "llm", "llm"])
+        self.assertEqual([kind_of(n) for n in ("claude-code", "codex-mcp-client", "opencode", "x", None)],
+                         ["claude", "codex", "opencode", "llm", "llm"])
 
     def test_in_project(self):
         self.assertIn("This project (proj) has a shared chat", self.instructions)
@@ -107,6 +107,23 @@ class McpTest(unittest.TestCase):
         text, err = tool(s, "chat_join", {"name": "cody", "spawn": "tok"})
         self.assertFalse(err, text)
         self.assertEqual(self.store.spawned("proj")["tok"]["name"], "cody")
+
+    def test_opencode_session(self):
+        s = Session(Client(self.port), str(self.dir), spawn_token="tok")
+        self.store.add_spawned("proj", "tok", "opencode", "agent-chat-test-no-such-session")
+        init = rpc(s, "initialize", {"clientInfo": {"name": "opencode", "version": "1.18.32"}})
+        self.assertEqual(s.kind, "opencode")
+        self.assertNotIn("chat wait", init["result"]["instructions"])
+        join = next(t for t in rpc(s, "tools/list")["result"]["tools"] if t["name"] == "chat_join")
+        self.assertNotIn("spawn", join["inputSchema"]["properties"])
+        text, err = tool(s, "chat_join", {"name": "kit"})
+        self.assertFalse(err, text)
+        self.assertIn("typed into this session", text)
+        self.assertEqual(self.store.agents("proj")["kit"]["kind"], "opencode")
+        self.assertNotIn("Reminder", tool(s, "chat_post", {"text": "hi"})[0])
+        codex, _ = self.codex(None)
+        cjoin = next(t for t in rpc(codex, "tools/list")["result"]["tools"] if t["name"] == "chat_join")
+        self.assertIn("spawn", cjoin["inputSchema"]["properties"])
 
     def test_name_taken(self):
         self.store.join("proj", "alice", "codex")

@@ -14,7 +14,7 @@ from pathlib import Path
 
 NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 RESERVED = {"user", "all"}
-KINDS = {"claude", "codex", "llm"}
+KINDS = {"claude", "codex", "llm", "opencode"}
 THREAD = re.compile(r"^[0-9A-Za-z-]{1,64}$")
 BUSY_SECONDS = 600
 LINK_SECONDS = 300  # a join links to a start at most this old
@@ -75,6 +75,7 @@ class Store:
         self.needs = set()  # (project id, start token) whose terminal asks the user
         # talk(pid, name, message) wakes a local-model member (talk.Talker); must not block
         self.talk = None
+        self.type_in = None  # type_in(pid, name, message): OpenCode agents (spawn.Spawner)
         self.local = {}  # (project id, name) -> {"busy", "error"} of local-model members
 
     # projects
@@ -170,6 +171,8 @@ class Store:
                     self.deliver(pid, name, a["thread"], m)
                 elif a.get("model") and self.talk:
                     self.talk(pid, name, m)
+                elif a["kind"] == "opencode" and self.type_in:
+                    self.type_in(pid, name, m)
             return m
 
     # agents
@@ -204,7 +207,7 @@ class Store:
             raise StoreError(400, "a name is 1-32 of a-z, 0-9 and '-', starting with a "
                                   "letter or digit, and not 'user' or 'all'")
         if kind not in KINDS:
-            raise StoreError(400, "kind must be one of: claude, codex, llm")
+            raise StoreError(400, "kind must be one of: claude, codex, llm, opencode")
         if thread is not None and not (isinstance(thread, str) and THREAD.match(thread)):
             raise StoreError(400, "thread must be a session id")
         with self.changed:
@@ -383,6 +386,8 @@ class Store:
                     status = "offline" if state.get("error") else "busy" if state.get("busy") else "waiting"
                 elif token and (pid, token) in self.needs:
                     status = "needs_you"
+                elif a["kind"] == "opencode":
+                    status = "busy" if self.local.get((pid, name), {}).get("busy") else "waiting"
                 elif self.waiting.get((pid, name)) or a.get("thread"):
                     status = "waiting"
                 elif time.time() - seen < BUSY_SECONDS:
