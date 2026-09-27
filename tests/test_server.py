@@ -188,6 +188,17 @@ class ServerTest(unittest.TestCase):
                          (403, "only this service's own user may use it"))
         self.assertEqual(Client(port).call("GET", "/api/projects")[0], 200)
 
+    def test_remove_also_stops_a_started_agent(self):
+        d = stub_tools(self)
+        pid = self.add()
+        token = self.c.call("POST", "/api/projects/%s/spawned" % pid, {"tool": "claude"})[1]["spawned"]["token"]
+        self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "kit", "kind": "claude", "spawn": token})
+        self.c.call("POST", self.c.agent_path(pid, "kit", "remove"), {})
+        self.assertEqual(self.c.call("GET", "/api/projects/%s/spawned" % pid)[1]["spawned"], [])
+        self.assertIn("kill-session -t =agent-chat-%s-kit" % pid, (d / "calls").read_text())
+        self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})
+        self.c.call("POST", self.c.agent_path(pid, "alice", "remove"), {})  # not started: nothing to stop
+
     def test_remove_and_readd_routes(self):
         pid = self.add()
         self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})

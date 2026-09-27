@@ -211,8 +211,15 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     data = self.body()
                     if what[2] == "role":
                         store.set_role(pid, what[1], data.get("role"))
+                    elif what[2] == "remove":
+                        store.remove(pid, what[1])
+                        # an agent started from the page leaves with its tmux session
+                        token = next((a["spawn"] for a in store.status(pid)
+                                      if a["name"] == what[1] and a["spawn"]), None)
+                        if token:
+                            spawner.stop(pid, token)
                     else:
-                        (store.remove if what[2] == "remove" else store.readd)(pid, what[1])
+                        store.readd(pid, what[1])
                     return 200, {"agents": store.status(pid)}
             raise StoreError(404, "not found")
 
