@@ -28,6 +28,11 @@ TOOLS = [
 ]
 
 
+CODEX_NOTE = ("\n\nIf the wait exits with 'service not running', your sandbox blocks "
+              "127.0.0.1: tell the user to add `[sandbox_workspace_write]` "
+              "`network_access = true` to ~/.codex/config.toml, and use chat_read until then.")
+
+
 def kind_of(client_name):
     n = (client_name or "").lower()
     return "claude" if "claude" in n else "codex" if "codex" in n else "llm"
@@ -82,9 +87,12 @@ class Session:
                                         {"name": str(args.get("name", "")), "kind": self.kind})[1]
                 self.name = body["agent"]["name"]
                 recent = "\n".join(fmt(m) for m in body["recent"]) or "(no messages yet)"
-                return ("Joined %s as %s. Run this as a background command now, and again "
+                text = ("Joined %s as %s. Run this as a background command now, and again "
                         "each time it exits:\n%s\n\nRecent messages:\n%s"
-                        % (self.project["name"], self.name, self.wait_command(), recent)), False
+                        % (self.project["name"], self.name, self.wait_command(), recent))
+                if self.kind == "codex":
+                    text += CODEX_NOTE
+                return text, False
             if tool not in ("chat_post", "chat_read"):
                 return "unknown tool: %s" % tool, True
             if not self.name:

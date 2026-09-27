@@ -68,6 +68,14 @@ class McpTest(unittest.TestCase):
         self.assertEqual(tool(self.s, "chat_post", {"text": "x"}),
                          ("you were removed from this chat", True))
 
+    def test_codex_join_explains_the_sandbox(self):
+        s = Session(Client(self.port), str(self.dir))
+        rpc(s, "initialize", {"clientInfo": {"name": "codex-mcp-client"}})
+        text, err = tool(s, "chat_join", {"name": "cody"})
+        self.assertFalse(err, text)
+        self.assertIn("network_access = true", text)
+        self.assertNotIn("network_access", tool(self.s, "chat_join", {"name": "alice"})[0])
+
     def test_name_taken(self):
         self.store.join("proj", "alice", "codex")
         text, err = tool(self.s, "chat_join", {"name": "alice"})
