@@ -7,7 +7,9 @@ own specs: install polish (1), starting agents from the page (4), shortcuts
 agent, which deletes its entry and frees its name (user, 2026-09-27); and
 showing a Codex agent started by hand in a terminal as Offline once that
 session ends (today it stays Available: nothing checks that its session log is
-still open by a Codex process) (user, 2026-09-27).
+still open by a Codex process) (user, 2026-09-27); and code formatting in
+the chat: fenced code blocks and inline code rendered in messages (user,
+2026-09-27).
 
 ## Goal
 
