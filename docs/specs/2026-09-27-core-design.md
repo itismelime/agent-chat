@@ -256,3 +256,7 @@ stays as an archive and is not imported.
   post, read, reminder text;
 - `install.sh` and `--uninstall` with a temporary `HOME`, with `claude`
   and `codex` replaced by stub scripts that record their arguments.
+
+## Verified
+
+2026-09-27, live in OpenVIBES: a fresh Claude Code and Codex joined on their first prompt (`join the chat`); Claude was woken by `chat wait`, Codex by `codex queue` (after `install.sh` passed the installer PATH to the service). Reply times to one user message: Codex 2 s, Claude 10 s.
