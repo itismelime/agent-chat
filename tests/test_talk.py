@@ -40,6 +40,7 @@ class PromptTest(unittest.TestCase):
         self.assertEqual(talk.clean_reply("qwen", "  Qwen: hello  "), "hello")
         self.assertEqual(talk.clean_reply("qwen", "hello qwen:"), "hello qwen:")
         self.assertEqual(talk.clean_reply("qwen", "   "), "")
+        self.assertEqual(talk.clean_reply("qwen", "<think>hmm\nlong</think>\nqwen: hello"), "hello")
 
 
 class TalkerTest(unittest.TestCase):
@@ -134,6 +135,34 @@ class TalkerTest(unittest.TestCase):
         t.join()
         self.assertEqual(next(a for a in self.store.status("proj") if a["name"] == "qwen")["status"],
                          "waiting")
+
+    def test_an_unexpected_error_does_not_leave_it_working(self):
+        def boom(*a, **k):
+            raise ConnectionResetError("connection reset by peer")
+        self.models.ollama.chat = boom
+        self.talker.answer("proj", "qwen", self.store.post("proj", "user", "hi"))
+        row = next(a for a in self.store.status("proj") if a["name"] == "qwen")
+        self.assertEqual(row["status"], "offline")
+        self.assertIn("connection reset", row["error"])
+
+    def test_a_later_message_for_others_does_not_drop_its_question(self):
+        m1 = self.store.post("proj", "user", "@qwen what is X?")
+        m2 = self.store.post("proj", "user", "@alice check this")
+        self.talker("proj", "qwen", m1)
+        self.talker("proj", "qwen", m2)
+        self.talker.start()
+        for _ in range(100):
+            if any(f == "qwen" for f, _ in self.texts()):
+                break
+            time.sleep(0.05)
+        self.assertEqual(self.chats()[0]["messages"][-1]["content"], "user: @qwen what is X?")
+
+    def test_a_user_message_for_others_still_resets_the_streak(self):
+        for i in range(3):
+            self.talker.answer("proj", "qwen", self.store.post("proj", "alice", "@qwen %d" % i))
+        self.talker("proj", "qwen", self.store.post("proj", "user", "@alice not for qwen"))
+        self.talker.answer("proj", "qwen", self.store.post("proj", "alice", "@qwen again"))
+        self.assertEqual(len(self.chats()), 4)
 
     def test_catches_up_once(self):
         m1 = self.store.post("proj", "user", "first")

@@ -44,7 +44,9 @@ def build_messages(name, project, others, role, history, num_ctx):
 
 
 def clean_reply(name, text):
-    return re.sub(r"^\s*%s\s*:\s*" % re.escape(name), "", text or "", flags=re.I).strip()
+    """The answer as posted: no inline <think>…</think>, no leading "name:"."""
+    text = re.sub(r"<think>.*?</think>", "", text or "", flags=re.S | re.I)
+    return re.sub(r"^\s*%s\s*:\s*" % re.escape(name), "", text, flags=re.I).strip()
 
 
 class Talker:
@@ -57,8 +59,13 @@ class Talker:
         self.streak = {}   # (pid, name) -> agent messages answered in a row
 
     def __call__(self, pid, name, m):
+        key = (pid, name)
+        to = addressed(m["text"])
         with self.lock:
-            key = (pid, name)
+            if m["from"] == "user":
+                self.streak[key] = 0  # any user message resets the loop guard
+            if m["from"] == name or (to and name not in to):
+                return  # read only: queueing it could replace a question for this member
             first = key not in self.pending
             self.pending[key] = m
             if first:
@@ -111,3 +118,5 @@ class Talker:
             self.store.set_local(pid, name, busy=False, error=None)
         except (OllamaError, StoreError) as e:
             self.store.set_local(pid, name, busy=False, error=str(e))
+        except Exception as e:  # e.g. a connection reset mid-reply: never stay Working
+            self.store.set_local(pid, name, busy=False, error="%s: %s" % (type(e).__name__, e))
