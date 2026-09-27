@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# Start Claude Code with the agent-chat channel, posting as claude-<name>.
-#   claude-chat [name] [claude options...]     e.g. claude-chat alice --continue
-if [[ -z ${1:-} || $1 == -* ]]; then name=main; else name=$1; shift; fi
-AGENT_CHAT_NAME=claude-$name exec claude \
-    --dangerously-load-development-channels server:agent-chat "$@"
