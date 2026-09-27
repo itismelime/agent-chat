@@ -247,10 +247,15 @@ class Store:
             write_json(self._dir(pid) / "spawned.json", records)
             return dict(records[token], token=token)
 
-    def drop_spawned(self, pid, token):
+    def drop_spawned(self, pid, token, session=None):
+        """Forget a start; with session, only if it still has that session
+        (a join may have renamed it since the caller checked)."""
         with self.changed:
             records = self.spawned(pid)
-            if records.pop(token, None) is not None:
+            if token in records:
+                if session is not None and records[token]["session"] != session:
+                    return
+                del records[token]
                 write_json(self._dir(pid) / "spawned.json", records)
             self.needs.discard((pid, token))
 

@@ -107,6 +107,7 @@ class Spawner:
 
     def __init__(self, store):
         self.store = store
+        self.lock = threading.Lock()  # a rename on join vs the poller's liveness check
 
     def start(self, pid, tool):
         project = self.store.project(pid)
@@ -124,8 +125,9 @@ class Spawner:
     def linked(self, pid, token, name):
         """After a join: give the tmux session the agent's name, if free."""
         new = "agent-chat-%s-%s" % (pid, name)
-        if rename(self.record(pid, token)["session"], new):
-            self.store.update_spawned(pid, token, session=new)
+        with self.lock:
+            if rename(self.record(pid, token)["session"], new):
+                self.store.update_spawned(pid, token, session=new)
 
     def stop(self, pid, token):
         stop(self.record(pid, token)["session"])
@@ -135,10 +137,14 @@ class Spawner:
         """Drop starts whose session ended; flag those whose terminal asks."""
         for project in self.store.projects():
             pid = project["id"]
-            for token, r in self.store.spawned(pid).items():
-                if not alive(r["session"]):
-                    self.store.drop_spawned(pid, token)
-                    continue
+            for token in list(self.store.spawned(pid)):
+                with self.lock:
+                    r = self.store.spawned(pid).get(token)
+                    if r is None:
+                        continue
+                    if not alive(r["session"]):
+                        self.store.drop_spawned(pid, token, session=r["session"])
+                        continue
                 if r["name"] and self.store.waiting.get((pid, r["name"])):
                     need = False  # an open chat wait means the agent is idle
                 else:

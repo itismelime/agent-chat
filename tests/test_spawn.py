@@ -170,6 +170,20 @@ class SpawnerTest(unittest.TestCase):
         self.sp.poll()
         self.assertEqual(self.store.spawned("proj"), {})
 
+    def test_poll_does_not_drop_a_record_renamed_meanwhile(self):
+        r = self.sp.start("proj", "claude")
+        real_alive = spawn.alive
+        self.addCleanup(setattr, spawn, "alive", real_alive)
+
+        def alive(session):  # a join renames the session while the poller checks it
+            if session == r["session"]:
+                self.store.update_spawned("proj", r["token"], session="agent-chat-proj-alice")
+                return False
+            return True
+        spawn.alive = alive
+        self.sp.poll()
+        self.assertIn(r["token"], self.store.spawned("proj"))
+
     def test_poll_unjoined_needs_you_after_grace(self):
         r = self.sp.start("proj", "claude")
         (self.d / "screen").write_text("starting...\n")
