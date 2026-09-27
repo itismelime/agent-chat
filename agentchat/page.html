@@ -16,7 +16,7 @@ nav h1{font-size:13px;margin:0;padding:12px 14px 6px;color:var(--mute);font-weig
 border-radius:6px;cursor:pointer;overflow:hidden;white-space:nowrap}
 .p:hover{background:var(--line)}.p.on{background:var(--line);font-weight:600}.p.missing{opacity:.5}
 .badge{background:var(--claude);color:#fff;border-radius:9px;padding:0 7px;font-size:12px;font-weight:600}
-#add{margin:8px}
+#add{margin:8px}#modelsbtn{margin:0 8px 8px}
 main{flex:1;display:flex;flex-direction:column;min-width:0}
 header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;
 align-items:center;flex-wrap:wrap}
@@ -51,22 +51,31 @@ border:1px solid var(--line);border-radius:8px;padding:4px;box-shadow:0 4px 16px
 #ac small{color:var(--mute);margin-left:8px}[hidden]{display:none!important}
 .needs_you .dot{background:var(--claude)}#menu .off{opacity:.45;cursor:default}
 #addagent{float:right;margin:8px 10px 0}
-#term,#help{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:8}
+#term,#help,#modelspanel{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:8}
 #help dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0;font-size:14px}
 #help dt{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}#help dd{margin:0}
 #help h3{margin:10px 0 4px;font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
-#term .box,#help .box{background:var(--card);border:1px solid var(--line);border-radius:10px;width:min(920px,96vw);
+#term .box,#help .box,#modelspanel .box{background:var(--card);border:1px solid var(--line);border-radius:10px;width:min(920px,96vw);
 max-height:92vh;display:flex;flex-direction:column;gap:8px;padding:12px}
-#term .top,#help .top{display:flex;justify-content:space-between;align-items:center;font-weight:600}
+#term .top,#help .top,#modelspanel .top{display:flex;justify-content:space-between;align-items:center;font-weight:600}
 #screen{flex:1;overflow:auto;margin:0;min-height:240px;padding:8px;border-radius:6px;background:var(--bg);
 font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}
 #termkeys button{padding:4px 12px;margin:0 4px 4px 0}
 #ti{width:100%;font:inherit;padding:6px 8px;border-radius:6px;border:1px solid var(--line);
 background:var(--bg);color:var(--fg)}#attach{color:var(--mute);font-size:12px}
+.mtabs{display:flex;gap:6px}.mtab.on{background:var(--line);color:var(--fg)}
+.mview{overflow:auto;max-height:60vh}.mrow{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;
+padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}.mrow input,.mrow select{font:inherit;
+padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.mrow input[type=number]{width:7em}#mstatus{color:var(--mute);font-size:13px}#merr{color:var(--claude);font-size:13px}
+#msearch,#mpull{display:flex;gap:8px;margin:6px 0;padding:0;border:0}
+#msearch input,#mpull input{flex:1;font:inherit;padding:5px 8px;border-radius:6px;border:1px solid var(--line);
+background:var(--bg);color:var(--fg)}#msearch button,#mpull button{padding:0 14px}
 @media (max-width:800px){aside{display:none}}@media (max-width:640px){nav{width:130px}}
 </style>
 <nav><h1>Projects</h1><div id=projects></div>
-<button id=add class=ghost type=button title="Add a project folder">+ Add project</button></nav>
+<button id=add class=ghost type=button title="Add a project folder">+ Add project</button>
+<button id=modelsbtn class=ghost type=button title="Local models">Models</button></nav>
 <main>
 <header><span id=name></span>
 <button id=keys class=ghost type=button title="Shortcuts and commands (?)">?</button>
@@ -98,6 +107,17 @@ title="Start an agent in this project">+ Agent</button><div id=members></div></a
 <pre id=screen></pre><div id=termkeys></div>
 <form id=tf><input id=ti placeholder="Type a line for the terminal; Enter sends it" maxlength=2000></form>
 <span id=attach></span></div></div>
+<div id=modelspanel hidden><div class=box role=dialog aria-label="Local models">
+<div class=top><span>Local models</span><button id=mclose class=ghost type=button>Close</button></div>
+<div id=mstatus></div>
+<div class=mtabs><button class="ghost mtab" data-tab=installed type=button>Installed</button>
+<button class="ghost mtab" data-tab=get type=button>Get models</button>
+<button class="ghost mtab" data-tab=jobs type=button>Jobs</button></div><div id=merr></div>
+<section class=mview data-tab=installed><button id=munload class=ghost type=button>Unload now</button><div id=mlist></div></section>
+<section class=mview data-tab=get hidden><form id=msearch><input id=mq placeholder="Search Hugging Face for GGUF models">
+<button>Search</button></form><form id=mpull><input id=mpullname placeholder="Or pull from Ollama's library, e.g. qwen3:0.6b">
+<button>Pull</button></form><div id=mresults></div></section>
+<section class=mview data-tab=jobs hidden><div id=mjobs></div></section></div></div>
 <script>
 const $=id=>document.getElementById(id),log=$('log'),t=$('t'),ac=$('ac'),bell=$('bell');
 const saved={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v===null?d:v}catch(e){return d}},
@@ -321,3 +341,4 @@ async function runCommand(text){
   throw new Error(`Unknown command /${cmd}. Press ? for the list; //text posts text starting with /.`);}
 refresh();setInterval(refresh,2000);t.focus();
 </script>
+<script src=models.js></script>

@@ -14,11 +14,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+from . import models as models_mod
 from . import spawn
 from .codex import Deliverer
+from .ollama import OllamaError
 from .store import Store, StoreError
 
 PAGE = Path(__file__).with_name("page.html")
+MODELS_JS = Path(__file__).with_name("models.js")
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 WAIT_SECONDS = 300
@@ -39,7 +42,7 @@ def peer_uid(client_port, server_port, table=TCP_TABLE):
     return -1
 
 
-def make_handler(store, port, wait_seconds, spawner, owner):
+def make_handler(store, port, wait_seconds, spawner, owner, models):
     hosts = {"127.0.0.1:%d" % port, "localhost:%d" % port}
 
     class Handler(BaseHTTPRequestHandler):
@@ -108,6 +111,8 @@ def make_handler(store, port, wait_seconds, spawner, owner):
                 self.send(*self.route(method, parts, query))
             except StoreError as e:
                 self.send(e.code, {"error": str(e)})
+            except OllamaError as e:
+                self.send(502, {"error": str(e)})
 
         def do_GET(self):
             self.dispatch("GET")
@@ -118,6 +123,8 @@ def make_handler(store, port, wait_seconds, spawner, owner):
         def route(self, method, parts, query):
             if method == "GET" and not parts:
                 return 200, PAGE.read_bytes(), "text/html; charset=utf-8"
+            if method == "GET" and parts == ["models.js"]:
+                return 200, MODELS_JS.read_bytes(), "text/javascript; charset=utf-8"
             if parts[:1] != ["api"]:
                 raise StoreError(404, "not found")
             rest = parts[1:]
@@ -137,6 +144,8 @@ def make_handler(store, port, wait_seconds, spawner, owner):
                 return 200, {"project": project}
             if rest == ["tools"] and method == "GET":
                 return 200, spawn.available()
+            if rest[:1] == ["models"]:
+                return self.model_route(method, rest[1:], query)
             if len(rest) >= 3 and rest[0] == "projects":
                 pid, what = rest[1], rest[2:]
                 if what == ["messages"] and method == "GET":
@@ -191,13 +200,54 @@ def make_handler(store, port, wait_seconds, spawner, owner):
                     return 200, {"agents": store.status(pid)}
             raise StoreError(404, "not found")
 
+        def model_route(self, method, what, query):
+            m = models
+            if method == "GET" and what == ["status"]:
+                return 200, m.status()
+            if method == "GET" and what == []:
+                return 200, {"models": models_mod.installed(m.ollama, m.tuning, models_mod.gpu())}
+            if method == "GET" and what == ["search"]:
+                return 200, {"results": m.hub.search(query.get("q", ""), m.gpu_total())}
+            if method == "GET" and what == ["jobs"]:
+                return 200, {"jobs": m.jobs.list()}
+            if method != "POST":
+                raise StoreError(404, "not found")
+            data = self.body()
+            if len(what) == 3 and what[0] == "jobs" and what[2] == "cancel":
+                return 200, {"job": m.jobs.cancel(what[1])}
+            if what == ["unload"]:
+                return 200, {"unloaded": m.ollama.unload_all()}
+            name = data.get("model")
+            if what == ["import"]:
+                url, filename = data.get("url"), data.get("filename")
+                models_mod.check_import(url, filename, name)
+                work = m.root / "imports"
+                return 202, {"job": m.jobs.start("import", name, lambda job: models_mod.import_gguf(
+                    job, m.ollama, url, filename, name, work))}
+            models_mod.check_model_name(name)
+            if what == ["pull"]:
+                return 202, {"job": m.jobs.start("pull", name,
+                                                 lambda job: models_mod.pull(job, m.ollama, name))}
+            if what == ["benchmark"]:
+                return 202, {"job": m.jobs.start("benchmark", name, lambda job: models_mod.benchmark(
+                    job, m.ollama, name, m.tuning))}
+            if what == ["delete"]:
+                m.ollama.delete(name)
+                m.tuning.forget(name)
+                return 200, {"deleted": name}
+            if what == ["tune"]:
+                fields = {k: data[k] for k in ("num_ctx", "think") if k in data}
+                return 200, {"model": m.tuning.set(name, m.ollama, m.gpu_total(), **fields)}
+            raise StoreError(404, "not found")
+
         def log_message(self, *args):
             pass
 
     return Handler
 
 
-def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=None):
+def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=None,
+          models=None):
     """Bind the service; the caller runs serve_forever(). deliver=False
     leaves Codex sessions and tmux alone (tests)."""
     if port is None:
@@ -211,7 +261,8 @@ def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=
         spawner.start_poller()
     server.RequestHandlerClass = make_handler(store, server.server_address[1],
                                               wait_seconds, spawner,
-                                              os.getuid() if owner is None else owner)
+                                              os.getuid() if owner is None else owner,
+                                              models or models_mod.Models(store.root))
     return server
 
 

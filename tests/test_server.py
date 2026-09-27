@@ -2,11 +2,14 @@ import http.client
 import json
 import os
 import socket
+import tempfile
 import threading
 import time
 import unittest
 
+from agentchat import models as models_mod
 from agentchat.client import ApiError, Client, ServiceDown, fmt, label
+from tests.fake_ollama import GIB, FakeOllama
 from agentchat.server import peer_uid, serve
 from tests.helpers import start, stop
 from tests.test_spawn import SCREENS, stub_tools  # noqa: F401
@@ -207,6 +210,55 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(label(m, "alice"), "for others: read only")
         self.assertEqual(label(dict(m, text="hi"), "alice"), "for everyone: reply")
 
+
+class ModelRoutesTest(unittest.TestCase):
+    def setUp(self):
+        self.fake = FakeOllama()
+        self.addCleanup(self.fake.close)
+        self.fake.add("qwen3.5:9b", size=6 * GIB, capabilities=["completion", "thinking"],
+                      arch="qwen35", ctx=262144)
+        hub = models_mod.Hub(fetch=lambda url: [] if "/api/models?" in url else {"siblings": []})
+        m = models_mod.Models(root=tempfile.mkdtemp(), ollama_url=self.fake.url, hub=hub)
+        _, self.server, self.port, _ = start(models=m)
+        self.addCleanup(stop, self.server)
+        self.c = Client(self.port)
+
+    def test_routes(self):
+        c = self.c
+        self.assertTrue(c.call("GET", "/api/models/status")[1]["reachable"])
+        rows = c.call("GET", "/api/models")[1]["models"]
+        self.assertEqual([r["name"] for r in rows], ["qwen3.5:9b"])
+        tuned = c.call("POST", "/api/models/tune", {"model": "qwen3.5:9b", "num_ctx": 8192,
+                                                     "think": "on"})[1]["model"]
+        self.assertEqual((tuned["override"], tuned["think"]), (8192, "on"))
+        self.assertEqual(c.call("GET", "/api/models/search?q=x")[1]["results"], [])
+        job = c.call("POST", "/api/models/pull", {"model": "tiny"})[1]["job"]
+        for _ in range(100):
+            jobs = c.call("GET", "/api/models/jobs")[1]["jobs"]
+            if jobs[0]["state"] != "running":
+                break
+            time.sleep(0.05)
+        self.assertEqual((jobs[0]["id"], jobs[0]["state"]), (job["id"], "done"))
+        self.assertEqual(c.call("POST", "/api/models/unload", {})[1], {"unloaded": []})
+        c.call("POST", "/api/models/delete", {"model": "tiny"})
+        self.assertNotIn("tiny", self.fake.models)
+        for path, body, code in (("/api/models/tune", {"model": "qwen3.5:9b", "num_ctx": 5}, 400),
+                                 ("/api/models/import", {"url": "http://x/y.gguf",
+                                                         "filename": "y.gguf", "model": "y"}, 400),
+                                 ("/api/models/pull", {"model": "has space"}, 400),
+                                 ("/api/models/jobs/nope/cancel", {}, 404),
+                                 ("/api/models/delete", {"model": "ghost"}, 502)):
+            with self.assertRaises(ApiError, msg=path) as e:
+                c.call("POST", path, body)
+            self.assertEqual(e.exception.code, code, path)
+
+    def test_models_js_is_served(self):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.request("GET", "/models.js")
+        r = conn.getresponse()
+        self.assertEqual(r.status, 200)
+        self.assertIn(b"openModels", r.read())
+        conn.close()
 
 if __name__ == "__main__":
     unittest.main()
