@@ -170,6 +170,7 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                                        data.get("thread"), data.get("spawn"))
                     if agent["spawn"]:
                         spawner.linked(pid, agent["spawn"], agent["name"])
+                    agent["personality"] = store.agents(pid)[agent["name"]].get("role")
                     return 201, {"agent": agent, "recent": store.messages(pid)[-20:]}
                 if what == ["locals"] and method == "POST":
                     data = self.body()
@@ -206,7 +207,10 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         return 200, {"messages": store.read(pid, what[1])}
                     if what[2] == "wait":
                         result = store.wait(pid, what[1], wait_seconds, alive=self.client_alive)
-                        return (204, None) if result is None else (200, result)
+                        if result is None:
+                            return 204, None
+                        role = store.agents(pid).get(what[1], {}).get("role")
+                        return 200, dict(result, personality=role)
                 if len(what) == 3 and what[0] == "agents" and method == "POST" \
                         and what[2] in ("remove", "readd", "role", "personality", "forget"):
                     data = self.body()

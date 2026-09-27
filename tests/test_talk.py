@@ -18,8 +18,8 @@ class PromptTest(unittest.TestCase):
         p = talk.system_prompt("qwen", "OpenVIBES", ["alice", "cody"], None)
         self.assertIn("You are qwen, a local model in the chat of project OpenVIBES", p)
         self.assertIn("with the user and alice, cody", p)
-        self.assertNotIn("Your role", p)
-        self.assertIn("Your role: Be terse", talk.system_prompt("qwen", "P", [], "Be terse"))
+        self.assertNotIn("Your personality", p)
+        self.assertIn("Your personality: Be terse", talk.system_prompt("qwen", "P", [], "Be terse"))
         self.assertIn("no other members", talk.system_prompt("qwen", "P", [], None))
 
     def test_budget_newest_first_and_roles(self):
@@ -70,7 +70,7 @@ class TalkerTest(unittest.TestCase):
         self.assertEqual(self.texts()[-1], ("qwen", "hi there"))
         req = self.chats()[0]
         self.assertEqual((req["model"], req["think"], req["options"]["num_predict"]), ("tiny", False, 1024))
-        self.assertIn("Your role: Be terse", req["messages"][0]["content"])
+        self.assertIn("Your personality: Be terse", req["messages"][0]["content"])
         self.assertEqual(req["messages"][-1], {"role": "user", "content": "user: hello"})
         self.assertEqual(self.store.agents("proj")["qwen"]["cursor"], m["n"])
 

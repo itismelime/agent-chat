@@ -64,6 +64,13 @@ class DeliverTest(unittest.TestCase):
         self.assertIn("addressed to you: reply", "\n".join(args[4:]))
         self.assertEqual(self.store.read("proj", "cody"), [])
 
+    def test_the_personality_comes_first(self):
+        self.stub(0)
+        self.store.set_personality("proj", "cody", "You test things")
+        deliver(self.store, "proj", "cody", T1, self.m)
+        text = self.out.read_text().split("--message\n", 1)[1]
+        self.assertTrue(text.startswith("Your personality: You test things\n"), text)
+
     def test_failure_keeps_the_message_unread(self):
         self.stub(1)
         self.assertFalse(deliver(self.store, "proj", "cody", T1, self.m))

@@ -132,6 +132,14 @@ class McpTest(unittest.TestCase):
         cjoin = next(t for t in rpc(codex, "tools/list")["result"]["tools"] if t["name"] == "chat_join")
         self.assertIn("spawn", cjoin["inputSchema"]["properties"])
 
+    def test_join_tells_the_personality(self):
+        self.store.add_spawned("proj", "tok", "claude", "agent-chat-test-no-such-session", personality="You test")
+        s = Session(Client(self.port), str(self.dir), spawn_token="tok")
+        rpc(s, "initialize", {"clientInfo": {"name": "claude-code"}})
+        text, err = tool(s, "chat_join", {"name": "kit"})
+        self.assertFalse(err, text)
+        self.assertIn("Your personality: You test", text)
+
     def test_name_taken(self):
         self.store.join("proj", "alice", "codex")
         text, err = tool(self.s, "chat_join", {"name": "alice"})

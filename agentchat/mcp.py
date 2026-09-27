@@ -132,6 +132,8 @@ class Session:
                     how = ("This Codex session could not be linked to the chat (for example "
                            "a resumed session), so messages are not delivered to you; call "
                            "chat_read to see new ones.")
+                if body["agent"].get("personality"):
+                    joined += "Your personality: %s. " % body["agent"]["personality"]
                 return "%s%s\n\nRecent messages:\n%s" % (joined, how, recent), False
             if tool not in ("chat_post", "chat_read"):
                 return "unknown tool: %s" % tool, True

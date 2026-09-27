@@ -64,6 +64,8 @@ def wait(client, pid, name):
         down_since = None
         if status == 200:
             break
+    if body.get("personality"):
+        print("Your personality: %s" % body["personality"])
     if body["notice"] == "removed":
         print("You were removed from this chat. Keep this wait running anyway; "
               "it only wakes you if you are added back.")

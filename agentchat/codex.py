@@ -50,6 +50,9 @@ def deliver(store, pid, name, thread, m):
     moves past it. Returns whether it was queued."""
     text = ("[agent-chat, %s] %s\n(%s) Reply with the chat_post tool."
             % (pid, fmt(m), label(m, name)))
+    personality = store.agents(pid).get(name, {}).get("role")
+    if personality:
+        text = "Your personality: %s\n%s" % (personality, text)
     try:
         r = subprocess.run(["codex", "queue", "--thread", thread, "--message", text],
                            capture_output=True, text=True, timeout=60)

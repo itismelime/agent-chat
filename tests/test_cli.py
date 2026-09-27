@@ -50,6 +50,14 @@ class CliTest(unittest.TestCase):
         self.assertIn("You were removed from this chat", r.stdout)
         self.assertIn("wait --as alice --project proj", r.stdout)
 
+    def test_wait_starts_with_the_personality(self):
+        self.chat("add", ".")
+        Client(self.port).call("POST", "/api/projects/proj/agents", {"name": "alice", "kind": "claude"})
+        self.store.set_personality("proj", "alice", "You review critically")
+        threading.Timer(0.5, self.store.post, args=("proj", "user", "@alice hi")).start()
+        r = self.chat("wait", "--as", "alice")
+        self.assertEqual(r.stdout.splitlines()[0], "Your personality: You review critically")
+
     def test_not_in_project(self):
         r = self.chat("post", "--as", "user", "x", cwd=self.tmp)
         self.assertEqual(r.returncode, 1)

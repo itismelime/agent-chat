@@ -22,7 +22,7 @@ def system_prompt(name, project, others, role):
             'Messages are shown as "name: text". Reply as %s only, briefly, in plain text, '
             'without your name in front. A message without @ is for everyone; with @names '
             'only those reply.' % (name, project, ", ".join(others) or "no other members", name))
-    return text + ("\nYour role: " + role if role else "")
+    return text + ("\nYour personality: " + role if role else "")
 
 
 def build_messages(name, project, others, role, history, num_ctx):
