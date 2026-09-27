@@ -272,6 +272,37 @@ class StoreTest(unittest.TestCase):
         self.store.set_needs(self.pid, "t", True)
         self.assertEqual(row()["status"], "needs_you")
 
+    def test_forget_frees_the_name(self):
+        self.store.join(self.pid, "alice", "claude")
+        self.store.post(self.pid, "alice", "hello")
+        with self.assertRaises(StoreError) as e:
+            self.store.forget(self.pid, "alice")
+        self.assertEqual(e.exception.code, 400)  # only removed agents
+        self.store.remove(self.pid, "alice")
+        self.store.forget(self.pid, "alice")
+        self.assertNotIn("alice", self.store.agents(self.pid))
+        self.assertEqual(self.store.messages(self.pid)[0]["from"], "alice")  # messages stay
+        self.assertEqual(self.store.join(self.pid, "alice", "codex")["kind"], "codex")
+        with self.assertRaises(StoreError) as e:
+            self.store.forget(self.pid, "nobody")
+        self.assertEqual(e.exception.code, 404)
+
+    def test_personalities(self):
+        self.store.join(self.pid, "alice", "claude")
+        row = lambda n: next(a for a in self.store.status(self.pid) if a["name"] == n)
+        self.assertIsNone(row("alice")["personality"])
+        self.store.set_personality(self.pid, "alice", "You review critically")
+        self.assertEqual(row("alice")["personality"], "You review critically")
+        self.store.set_personality(self.pid, "alice", "  ")
+        self.assertIsNone(row("alice")["personality"])
+        self.store.add_local(self.pid, "qwen", "m", role="Be terse")  # a role is a personality
+        self.assertEqual(row("qwen")["personality"], "Be terse")
+        self.store.add_spawned(self.pid, "tok", "claude", "s", personality="You test")
+        self.store.join(self.pid, "kit", "claude", spawn="tok")
+        self.assertEqual(row("kit")["personality"], "You test")
+        with self.assertRaises(StoreError):
+            self.store.set_personality(self.pid, "alice", "x" * 501)
+
     def test_remove_and_readd(self):
         self.store.join(self.pid, "alice", "claude")
         self.store.remove(self.pid, "alice")

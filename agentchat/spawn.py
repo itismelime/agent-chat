@@ -157,7 +157,8 @@ class Spawner:
         self.store, self.models, self.port = store, models, port
         self.lock = threading.Lock()  # a rename on join vs the poller's liveness check
 
-    def start(self, pid, tool, model=None):
+    def start(self, pid, tool, model=None, personality=None):
+        self.store._check_role(personality)  # before tmux starts anything
         project = self.store.project(pid)
         token = secrets.token_hex(16)
         session = "agent-chat-%s-%s" % (pid, token[:6])
@@ -172,7 +173,7 @@ class Spawner:
             home = str(opencode.config_home(self.store.root))
         data = str(opencode.data_home(self.store.root)) if tool == "opencode" else None
         start(tool, project["path"], session, token, model=model, config_home=home, data_home=data)
-        record = self.store.add_spawned(pid, token, tool, session)
+        record = self.store.add_spawned(pid, token, tool, session, personality)
         if model:
             record = self.store.update_spawned(pid, token, model=model)
         return record

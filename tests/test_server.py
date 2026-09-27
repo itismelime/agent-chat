@@ -199,6 +199,20 @@ class ServerTest(unittest.TestCase):
         self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})
         self.c.call("POST", self.c.agent_path(pid, "alice", "remove"), {})  # not started: nothing to stop
 
+    def test_forget_and_personality_routes(self):
+        d = stub_tools(self)
+        pid = self.add()
+        self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})
+        agents = self.c.call("POST", self.c.agent_path(pid, "alice", "personality"),
+                             {"personality": "You review"})[1]["agents"]
+        self.assertEqual(agents[0]["personality"], "You review")
+        self.c.call("POST", self.c.agent_path(pid, "alice", "remove"), {})
+        agents = self.c.call("POST", self.c.agent_path(pid, "alice", "forget"), {})[1]["agents"]
+        self.assertEqual(agents, [])
+        r = self.c.call("POST", "/api/projects/%s/spawned" % pid,
+                        {"tool": "claude", "personality": "You test"})[1]["spawned"]
+        self.assertEqual(r["personality"], "You test")
+
     def test_remove_and_readd_routes(self):
         pid = self.add()
         self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})

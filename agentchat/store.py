@@ -229,7 +229,9 @@ class Store:
                       < LINK_SECONDS]
             spawn = recent[0] if kind == "codex" and len(recent) == 1 else None
         if spawn:
-            self.update_spawned(pid, spawn, name=name)
+            record = self.update_spawned(pid, spawn, name=name)
+            if record.get("personality"):
+                self._update(pid, name, role=record["personality"])
         return spawn
 
     # agents started from the page (spawn.py runs them; these are the records)
@@ -238,10 +240,12 @@ class Store:
         f = self._dir(pid) / "spawned.json"
         return json.loads(f.read_text()) if f.exists() else {}
 
-    def add_spawned(self, pid, token, tool, session):
+    def add_spawned(self, pid, token, tool, session, personality=None):
+        personality = self._check_role(personality)
         with self.changed:
             records = self.spawned(pid)
-            records[token] = {"tool": tool, "session": session, "started": now(), "name": None}
+            records[token] = {"tool": tool, "session": session, "started": now(), "name": None,
+                              "personality": personality}
             write_json(self._dir(pid) / "spawned.json", records)
             return dict(records[token], token=token)
 
@@ -284,7 +288,7 @@ class Store:
     @staticmethod
     def _check_role(role):
         if role is not None and not (isinstance(role, str) and len(role) <= MAX_ROLE):
-            raise StoreError(400, "a role is text of at most %d characters" % MAX_ROLE)
+            raise StoreError(400, "a personality is text of at most %d characters" % MAX_ROLE)
         return (role or "").strip() or None
 
     def add_local(self, pid, name, model, role=None):
@@ -296,10 +300,23 @@ class Store:
             return dict(agent, model=model, role=role)
 
     def set_role(self, pid, name, role):
+        """An agent's personality (stored as "role", which local members had first)."""
         role = self._check_role(role)
         with self.changed:
             self._agent(pid, name, active=False)
             self._update(pid, name, role=role)
+
+    set_personality = set_role
+
+    def forget(self, pid, name):
+        """Delete a removed agent's entry; its name is free again, its messages stay."""
+        with self.changed:
+            if not self._agent(pid, name, active=False).get("removed"):
+                raise StoreError(400, "only a removed agent can be forgotten; remove %s first" % name)
+            agents = self.agents(pid)
+            del agents[name]
+            write_json(self._dir(pid) / "agents.json", agents)
+            self.local.pop((pid, name), None)
 
     def set_local(self, pid, name, **fields):
         with self.changed:
@@ -393,7 +410,7 @@ class Store:
                     status = "offline"
                 out.append({"name": name, "kind": a["kind"], "joined": a["joined"],
                             "status": status, "spawn": token, "model": a.get("model"),
-                            "role": a.get("role"),
+                            "role": a.get("role"), "personality": a.get("role"),
                             "error": self.local.get((pid, name), {}).get("error")
                             if a.get("model") else None})
         return out

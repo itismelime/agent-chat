@@ -183,7 +183,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 if what == ["spawned"] and method == "POST":
                     data = self.body()
                     return 201, {"spawned": spawner.start(pid, self.field(data, "tool"),
-                                                          data.get("model"))}
+                                                          data.get("model"),
+                                                          data.get("personality"))}
                 if len(what) == 3 and what[0] == "spawned":
                     token, action = what[1], what[2]
                     if action == "screen" and method == "GET":
@@ -207,10 +208,12 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         result = store.wait(pid, what[1], wait_seconds, alive=self.client_alive)
                         return (204, None) if result is None else (200, result)
                 if len(what) == 3 and what[0] == "agents" and method == "POST" \
-                        and what[2] in ("remove", "readd", "role"):
+                        and what[2] in ("remove", "readd", "role", "personality", "forget"):
                     data = self.body()
-                    if what[2] == "role":
-                        store.set_role(pid, what[1], data.get("role"))
+                    if what[2] in ("role", "personality"):
+                        store.set_personality(pid, what[1], data.get(what[2]))
+                    elif what[2] == "forget":
+                        store.forget(pid, what[1])
                     elif what[2] == "remove":
                         store.remove(pid, what[1])
                         # an agent started from the page leaves with its tmux session
