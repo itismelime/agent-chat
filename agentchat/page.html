@@ -51,13 +51,13 @@ border:1px solid var(--line);border-radius:8px;padding:4px;box-shadow:0 4px 16px
 #ac small{color:var(--mute);margin-left:8px}[hidden]{display:none!important}
 .needs_you .dot{background:var(--claude)}#menu .off{opacity:.45;cursor:default}
 #addagent{float:right;margin:8px 10px 0}
-#term,#help,#modelspanel{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:8}
+#term,#help,#modelspanel,#cardpanel{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:8}
 #help dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0;font-size:14px}
 #help dt{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}#help dd{margin:0}
 #help h3{margin:10px 0 4px;font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
-#term .box,#help .box,#modelspanel .box{background:var(--card);border:1px solid var(--line);border-radius:10px;width:min(920px,96vw);
+#term .box,#help .box,#modelspanel .box,#cardpanel .box{background:var(--card);border:1px solid var(--line);border-radius:10px;width:min(920px,96vw);
 max-height:92vh;display:flex;flex-direction:column;gap:8px;padding:12px}
-#term .top,#help .top,#modelspanel .top{display:flex;justify-content:space-between;align-items:center;font-weight:600}
+#term .top,#help .top,#modelspanel .top,#cardpanel .top{display:flex;justify-content:space-between;align-items:center;font-weight:600}
 #screen{flex:1;overflow:auto;margin:0;min-height:240px;padding:8px;border-radius:6px;background:var(--bg);
 font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}
 #termkeys button{padding:4px 12px;margin:0 4px 4px 0}
@@ -71,13 +71,27 @@ padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--
 #msearch,#mpull{display:flex;gap:8px;margin:6px 0;padding:0;border:0}
 #msearch input,#mpull input{flex:1;font:inherit;padding:5px 8px;border-radius:6px;border:1px solid var(--line);
 background:var(--bg);color:var(--fg)}#msearch button,#mpull button{padding:0 14px}
+.m code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);padding:0 4px;border-radius:4px}
+.codeblock{position:relative;margin:6px 0;white-space:normal}.codeblock pre{margin:0;padding:8px 10px;background:var(--bg);
+border:1px solid var(--line);border-radius:6px;overflow:auto;font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}
+.codeblock .copy{position:absolute;top:4px;right:4px;padding:1px 8px;font-size:12px}.board .n{color:var(--mute)}
+.views{display:flex;gap:4px}.views .on{background:var(--line);color:var(--fg)}
+#boardview{flex:1;display:flex;gap:10px;padding:12px 16px;overflow:auto;align-items:flex-start}
+.col{flex:1;min-width:170px;background:var(--side);border:1px solid var(--line);border-radius:8px;padding:8px;
+display:flex;flex-direction:column;gap:6px;min-height:120px}.col.over{outline:2px dashed var(--user)}
+.col h3{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin:0 0 4px;color:var(--mute)}
+.col h3 button{padding:0 8px}.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:6px 8px;
+cursor:grab;font-size:14px;overflow-wrap:anywhere}.card small{display:block;color:var(--mute)}
+#cardpanel input,#cardpanel textarea,#cardpanel select{font:inherit;padding:6px 8px;border-radius:6px;border:1px solid var(--line);
+background:var(--bg);color:var(--fg)}#cardpanel textarea{height:140px;resize:vertical}#cardpanel .row{display:flex;gap:8px;align-items:center}
 @media (max-width:800px){aside{display:none}}@media (max-width:640px){nav{width:130px}}
 </style>
 <nav><h1>Projects</h1><div id=projects></div>
 <button id=add class=ghost type=button title="Add a project folder">+ Add project</button>
 <button id=modelsbtn class=ghost type=button title="Local models">Models</button></nav>
 <main>
-<header><span id=name></span>
+<header><span id=name></span><span class=views><button id=viewchat class="ghost on" type=button>Chat</button>
+<button id=viewboard class=ghost type=button>Board</button></span>
 <button id=keys class=ghost type=button title="Shortcuts and commands (?)">?</button>
 <button id=bell class=ghost type=button hidden>Enable notifications</button></header>
 <div id=wrap><div id=chat>
@@ -85,6 +99,7 @@ background:var(--bg);color:var(--fg)}#msearch button,#mpull button{padding:0 14p
 <form id=f><div id=ac role=listbox hidden></div>
 <textarea id=t placeholder="Message (Enter sends, Shift+Enter new line; @ addresses someone; / starts a command)"></textarea>
 <button>Send</button></form></div>
+<div id=boardview hidden></div>
 <aside aria-label="Agents in this project"><button id=addagent class=ghost type=button
 title="Start an agent in this project">+ Agent</button><div id=members></div></aside></div>
 </main>
@@ -108,6 +123,11 @@ title="Start an agent in this project">+ Agent</button><div id=members></div></a
 <pre id=screen></pre><div id=termkeys></div>
 <form id=tf><input id=ti placeholder="Type a line for the terminal; Enter sends it" maxlength=2000></form>
 <span id=attach></span></div></div>
+<div id=cardpanel hidden><div class=box role=dialog aria-label="Card">
+<div class=top><span id=cardtitle></span><button id=cardclose class=ghost type=button>Close</button></div>
+<input id=ctitle maxlength=200 placeholder=Title><textarea id=cdesc maxlength=4000 placeholder=Description></textarea>
+<div class=row><label for=cassignee>Assignee</label><select id=cassignee></select><span style=flex:1></span>
+<button id=cdelete class=ghost type=button>Delete</button><button id=csave type=button>Save</button></div></div></div>
 <div id=modelspanel hidden><div class=box role=dialog aria-label="Local models">
 <div class=top><span>Local models</span><button id=mclose class=ghost type=button>Close</button></div>
 <div id=mstatus></div>
@@ -126,6 +146,17 @@ const saved={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==
 let projects=[],cur=saved.get('cur',null),msgs={},agents=[],seen=saved.get('seen',{}),notified={},drawn='',busy=false,down=false;
 let tools={},spawned=[],needed=new Set();
 
+// ```code blocks``` and `inline code` in messages; everything else stays plain text
+function renderText(text){
+  const frag=document.createDocumentFragment(),re=/```[^\n`]*\n?([\s\S]*?)```/g;let last=0,m;
+  const inline=s=>s.split(/(`[^`\n]+`)/).forEach((part,i)=>{
+    if(i%2)frag.append(el('code','',part.slice(1,-1)));else if(part)frag.append(part);});
+  while((m=re.exec(text))){
+    inline(text.slice(last,m.index).replace(/\n$/,''));last=re.lastIndex+(text[re.lastIndex]==='\n'?1:0);
+    const code=m[1].replace(/\n$/,''),box=el('div','codeblock'),copy=el('button','ghost copy','Copy');copy.type='button';
+    copy.onclick=()=>navigator.clipboard.writeText(code).then(()=>{copy.textContent='Copied';setTimeout(()=>{copy.textContent='Copy';},1200);});
+    box.append(el('pre','',code),copy);frag.append(box);}
+  inline(text.slice(last));return frag;}
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;
   if(text!==undefined)e.textContent=text;return e;}
 async function api(path,body){
@@ -181,7 +212,7 @@ function render(){
   $('members').replaceChildren(...GROUPS.flatMap(([st,title])=>{
     const g=members.filter(a=>a.status===st);if(!g.length)return [];
     return [el('h2','',title+' — '+g.length),...g.map(a=>{const d=el('div','a '+a.status);
-      d.title=a.error?'Offline: '+a.error:'Right-click for options';
+      d.title=a.error?'Offline: '+a.error:(a.personality?'Personality: '+a.personality+'\n':'')+'Right-click for options';
       d.append(el('i','dot'),a.name,el('small','',a.model?'local LLM · '+a.model:a.kind==='opencode'?'OpenCode · '+((spawned.find(s=>s.token===a.spawn)||{}).model||''):KIND[a.kind]||a.kind));
       d.oncontextmenu=e=>{e.stopPropagation();openMenu(e,agentItems(a));};return d;})];}));
   hint();
@@ -189,7 +220,7 @@ function render(){
   const switched=!drawn.startsWith(cur+':');drawn=key;
   const atEnd=log.scrollHeight-log.scrollTop-log.clientHeight<40;
   log.replaceChildren(...(p?msgs[p.id]:[]).map(m=>{const d=el('div','m '+m.kind),h=el('div','h');
-    h.append(el('span','n',m.from),' · '+m.time.slice(11,19));d.append(h,m.text);return d;}));
+    h.append(el('span','n',m.from),' · '+m.time.slice(11,19));d.append(h,renderText(m.text));return d;}));
   if(atEnd||switched)log.scrollTop=log.scrollHeight;
 }
 
@@ -211,20 +242,33 @@ function agentItems(a){
   if(a.spawn){items.push(['View terminal',()=>openTerm(a.spawn,who)]);
     items.push(['Stop',()=>{if(confirm(`Stop ${who}? Its tmux session ends.`))return api(path(a.spawn,'stop'),{});}]);}
   if(a.starting)return items;
-  if(a.model)items.push(['Edit role',()=>{const r=prompt(`Role for ${a.name} (empty for none)`,a.role||'');
-    if(r!==null)return api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/role`,{role:r||null});}]);
+  items.push(['Edit personality',()=>{const p=askPersonality(a.personality,a.name);
+    if(p!==null)return api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/personality`,{personality:p||null});}]);
   const [text,action]=a.status==='removed'?['Add back','readd']:['Remove from chat','remove'];
   items.push([text,()=>api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/${action}`,{})]);
+  if(a.status==='removed')items.push(['Forget',()=>{if(confirm(`Forget ${a.name}? Its name becomes free again; its messages stay.`))
+    return api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/forget`,{});}]);
   return items;}
+const PRESETS=[['Reviewer','You review changes critically: correctness first, then clarity. Point to exact lines.'],
+  ['Architect','You think about structure and trade-offs before code, and keep designs small.'],
+  ['Tester','You look for how things break and write the smallest test that shows it.'],
+  ['Terse helper','You answer in as few words as possible.']];
+function askPersonality(current,who){  // null: cancelled; '' : none
+  const r=prompt(`Personality for ${who}: your own text, or a preset number:\n`+
+    PRESETS.map(([n],i)=>`${i+1}  ${n}`).join('\n')+'\n(leave empty for none)',current||'');
+  if(r===null)return null;const i=/^\s*([1-4])\s*$/.exec(r);return i?PRESETS[i[1]-1][1]:r.trim();}
+function startWith(tool,model){
+  const p=askPersonality('',model?`OpenCode (${model})`:KIND[tool]);if(p===null)return;
+  return api(`api/projects/${cur}/spawned`,{tool,model,personality:p||null});}
 function startItems(){
   const items=['claude','codex'].map(tool=>{
     const off=!cur?'Add a project first':!tools.tmux?'tmux is not installed':!tools[tool]?`${KIND[tool]} is not installed`:'';
-    return ['Start '+KIND[tool],()=>api(`api/projects/${cur}/spawned`,{tool}),off];});
+    return ['Start '+KIND[tool],()=>startWith(tool),off];});
   const ocOff=!cur?'Add a project first':!tools.tmux?'tmux is not installed':!tools.opencode?'OpenCode is not installed':
     !locals.ok?locals.reason:'';
   if(ocOff||!oc.models.length)items.push(['Start OpenCode',()=>{},ocOff||'No model that can call tools; get one in Models']);
   else for(const m of oc.models)items.push(['Start OpenCode: '+m+(m===oc.default?' (default)':''),
-    ()=>api(`api/projects/${cur}/spawned`,{tool:'opencode',model:m}),'']);
+    ()=>startWith('opencode',m),'']);
   if(!locals.ok)items.push(['Add local model',()=>{},locals.reason]);
   else if(!locals.names.length)items.push(['Add local model',()=>{},'No models installed; get one in Models']);
   else for(const n of locals.names)items.push(['Add local model: '+n,()=>addLocal(n),cur?'':'Add a project first']);
@@ -325,7 +369,7 @@ function suggestName(model){return model.split(':')[0].split('/').pop().toLowerC
   .replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'')||'local';}
 async function addLocal(model,name){
   if(name===undefined){name=prompt(`Name for ${model} in this chat`,suggestName(model));if(!name)return;}
-  const role=name&&arguments.length<2?prompt('Optional role, e.g. "You review plans critically" (leave empty for none)',''):null;
+  const role=name&&arguments.length<2?askPersonality('',name):null;
   await api(`api/projects/${cur}/locals`,{model,name:name.trim(),role:role||null});
   return `Added ${name.trim()} (${model}).`;}
 // keyboard shortcuts (Alt, since the browser owns most Ctrl keys) and commands
@@ -374,3 +418,4 @@ async function runCommand(text){
 refresh();setInterval(refresh,2000);t.focus();
 </script>
 <script src=models.js></script>
+<script src=board.js></script>

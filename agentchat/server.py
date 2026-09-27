@@ -22,7 +22,6 @@ from .ollama import OllamaError
 from .store import Store, StoreError
 
 PAGE = Path(__file__).with_name("page.html")
-MODELS_JS = Path(__file__).with_name("models.js")
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 WAIT_SECONDS = 300
@@ -125,8 +124,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
         def route(self, method, parts, query):
             if method == "GET" and not parts:
                 return 200, PAGE.read_bytes(), "text/html; charset=utf-8"
-            if method == "GET" and parts == ["models.js"]:
-                return 200, MODELS_JS.read_bytes(), "text/javascript; charset=utf-8"
+            if method == "GET" and parts in (["models.js"], ["board.js"]):
+                return 200, PAGE.with_name(parts[0]).read_bytes(), "text/javascript; charset=utf-8"
             if parts[:1] != ["api"]:
                 raise StoreError(404, "not found")
             rest = parts[1:]
