@@ -160,6 +160,46 @@ class StoreTest(unittest.TestCase):
         self.store.delivered(self.pid, "cody", one["n"])
         self.assertEqual(self.store.read(self.pid, "cody"), [])
 
+    def test_spawned_records_and_join_by_token(self):
+        self.store.add_spawned(self.pid, "tok1", "claude", "agent-chat-openvibes-tok1")
+        self.store.add_spawned(self.pid, "tok2", "claude", "agent-chat-openvibes-tok2")
+        self.assertEqual([(s["token"], s["state"]) for s in self.store.spawned_list(self.pid)],
+                         [("tok1", "starting"), ("tok2", "starting")])
+        a = self.store.join(self.pid, "alice", "claude", spawn="tok2")
+        self.assertEqual(a["spawn"], "tok2")
+        self.assertEqual(self.store.spawned(self.pid)["tok2"]["name"], "alice")
+        b = self.store.join(self.pid, "bob", "claude", spawn="nope")  # unknown token: joins anyway
+        self.assertEqual(b["spawn"], "tok1")  # ...and is linked by the fallback (one unlinked claude)
+        status = {s["name"]: s["spawn"] for s in self.store.status(self.pid)}
+        self.assertEqual(status, {"alice": "tok2", "bob": "tok1"})
+
+    def test_join_fallback_needs_exactly_one_recent_start(self):
+        self.store.add_spawned(self.pid, "c1", "codex", "s1")
+        self.store.add_spawned(self.pid, "c2", "codex", "s2")
+        self.assertIsNone(self.store.join(self.pid, "cody", "codex")["spawn"])  # two: ambiguous
+        self.store.drop_spawned(self.pid, "c2")
+        self.store.update_spawned(self.pid, "c1", started="2020-01-01T00:00:00+00:00")
+        self.assertIsNone(self.store.join(self.pid, "cody2", "codex")["spawn"])  # too old
+        self.store.add_spawned(self.pid, "c3", "codex", "s3")
+        self.assertIsNone(self.store.join(self.pid, "clara", "claude")["spawn"])  # other tool
+        self.assertEqual(self.store.join(self.pid, "cody3", "codex")["spawn"], "c3")
+
+    def test_needs_you_overrides_status_until_cleared(self):
+        self.store.add_spawned(self.pid, "tok", "codex", "s")
+        self.store.join(self.pid, "cody", "codex", thread="t-1", spawn="tok")
+        self.store.set_needs(self.pid, "tok", True)
+        self.assertEqual(self.store.status(self.pid)[0]["status"], "needs_you")
+        self.assertEqual(self.store.spawned_list(self.pid)[0]["state"], "needs_you")
+        self.store.set_needs(self.pid, "tok", False)
+        self.assertEqual(self.store.status(self.pid)[0]["status"], "waiting")
+        self.store.set_needs(self.pid, "tok", True)
+        self.store.drop_spawned(self.pid, "tok")
+        self.assertEqual(self.store.status(self.pid)[0]["status"], "waiting")
+        self.assertEqual(self.store.spawned(self.pid), {})
+        with self.assertRaises(StoreError) as e:
+            self.store.update_spawned(self.pid, "tok", name="x")
+        self.assertEqual(e.exception.code, 404)
+
     def test_remove_and_readd(self):
         self.store.join(self.pid, "alice", "claude")
         self.store.remove(self.pid, "alice")

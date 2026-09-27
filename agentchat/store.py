@@ -17,6 +17,7 @@ RESERVED = {"user", "all"}
 KINDS = {"claude", "codex", "llm"}
 THREAD = re.compile(r"^[0-9A-Za-z-]{1,64}$")
 BUSY_SECONDS = 600
+LINK_SECONDS = 300  # a join links to a start at most this old
 
 
 class StoreError(Exception):
@@ -70,6 +71,7 @@ class Store:
         # deliver(pid, name, thread, message) hands a message to an agent that
         # is woken by queueing into its session (Codex); it must not block.
         self.deliver = None
+        self.needs = set()  # (project id, start token) whose terminal asks the user
 
     # projects
 
@@ -189,7 +191,7 @@ class Store:
             fields["cursor"] = cursor
         self._update(pid, name, **fields)
 
-    def join(self, pid, name, kind, thread=None):
+    def join(self, pid, name, kind, thread=None, spawn=None):
         name = (name or "").strip().lower()
         if not NAME.match(name) or name in RESERVED:
             raise StoreError(400, "a name is 1-32 of a-z, 0-9 and '-', starting with a "
@@ -206,7 +208,62 @@ class Store:
                             "cursor": self._last_n(pid), "removed": False, "notice": None,
                             "thread": thread}
             write_json(self._dir(pid) / "agents.json", agents)
-            return dict(agents[name], name=name)
+            return dict(agents[name], name=name, spawn=self._link(pid, name, kind, spawn))
+
+    def _link(self, pid, name, kind, spawn):
+        """Link a joining agent to the start it came from: by its token, or
+        else the only unlinked start of the same tool from the last
+        LINK_SECONDS (Codex's MCP servers do not see the start token)."""
+        records = self.spawned(pid)
+        if not (isinstance(spawn, str) and records.get(spawn, {"name": 1})["name"] is None):
+            recent = [t for t, r in records.items() if r["name"] is None and r["tool"] == kind
+                      and time.time() - datetime.fromisoformat(r["started"]).timestamp()
+                      < LINK_SECONDS]
+            spawn = recent[0] if len(recent) == 1 else None
+        if spawn:
+            self.update_spawned(pid, spawn, name=name)
+        return spawn
+
+    # agents started from the page (spawn.py runs them; these are the records)
+
+    def spawned(self, pid):
+        f = self._dir(pid) / "spawned.json"
+        return json.loads(f.read_text()) if f.exists() else {}
+
+    def add_spawned(self, pid, token, tool, session):
+        with self.changed:
+            records = self.spawned(pid)
+            records[token] = {"tool": tool, "session": session, "started": now(), "name": None}
+            write_json(self._dir(pid) / "spawned.json", records)
+            return dict(records[token], token=token)
+
+    def update_spawned(self, pid, token, **fields):
+        with self.changed:
+            records = self.spawned(pid)
+            if token not in records:
+                raise StoreError(404, "no started agent %s" % token)
+            records[token].update(fields)
+            write_json(self._dir(pid) / "spawned.json", records)
+            return dict(records[token], token=token)
+
+    def drop_spawned(self, pid, token):
+        with self.changed:
+            records = self.spawned(pid)
+            if records.pop(token, None) is not None:
+                write_json(self._dir(pid) / "spawned.json", records)
+            self.needs.discard((pid, token))
+
+    def set_needs(self, pid, token, flag):
+        with self.changed:
+            (self.needs.add if flag else self.needs.discard)((pid, token))
+
+    def spawned_list(self, pid):
+        out = []
+        for token, r in sorted(self.spawned(pid).items(), key=lambda kv: kv[1]["started"]):
+            state = ("needs_you" if (pid, token) in self.needs
+                     else "joined" if r["name"] else "starting")
+            out.append(dict(r, token=token, state=state))
+        return out
 
     def read(self, pid, name):
         """Messages after the agent's cursor; moves the cursor to the end."""
@@ -273,10 +330,14 @@ class Store:
     def status(self, pid):
         out = []
         with self.changed:
+            started = {r["name"]: t for t, r in self.spawned(pid).items() if r["name"]}
             for name, a in sorted(self.agents(pid).items()):
                 seen = datetime.fromisoformat(a["last_seen"]).timestamp()
+                token = started.get(name)
                 if a.get("removed"):
                     status = "removed"
+                elif token and (pid, token) in self.needs:
+                    status = "needs_you"
                 elif self.waiting.get((pid, name)) or a.get("thread"):
                     status = "waiting"
                 elif time.time() - seen < BUSY_SECONDS:
@@ -284,5 +345,5 @@ class Store:
                 else:
                     status = "offline"
                 out.append({"name": name, "kind": a["kind"], "joined": a["joined"],
-                            "status": status})
+                            "status": status, "spawn": token})
         return out
