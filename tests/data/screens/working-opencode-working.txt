@@ -1,0 +1,40 @@
+
+     + Thought: 407ms
+
+     ALPHA
+
+     ▣  Build · Qwen3.5 9B · 685ms
+
+  ┃
+  ┃  Reply with just the word BETA.
+  ┃
+
+     + Thought: 450ms
+
+     BETA
+
+     ▣  Build · Qwen3.5 9B · 671ms
+
+  ┃
+  ┃  Write a 400 word essay about pelicans.
+  ┃
+
+     + Thought: 747ms
+
+     Pelicans are among the most distinctive and impressive members of the bird family Pelicanidae, recognized
+     primarily for their large bill pouches that hang down from their beaks. These magnificent wading birds inhabit
+     coastal regions throughout the world's oceans as well as inland lakes and rivers. Their remarkable physical
+     adaptations make them supremely efficient at both fishing within water and navigating through harsh
+     environmental conditions.
+
+     The pelican family encompasses seven extant species divided into three genera, representing one of the
+
+     ▣  Build · Qwen3.5 9B
+
+  ┃
+  ┃
+  ┃
+  ┃  Build · Qwen3.5 9B agent-chat Ollama
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   ⬝⬝⬝⬝⬝⬝⬝⬝  esc interrupt                                                                       8.5K  ctrl+p commands
+

@@ -1,0 +1,40 @@
+
+  ┃
+  ┃  join the chat
+  ┃
+
+     + Thought: 705ms
+
+     ⚙ agent-chat_chat_join [name=opencode]
+
+     + Thought: 645ms
+
+     $ /home/lime/Projects/agent-chat/bin/chat wait --as opencode --project proj
+
+     ▣  Build · Qwen3.5 9B
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ┃
+  ┃
+  ┃
+  ┃  Build · Qwen3.5 9B agent-chat Ollama
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   /tmp/claude-1000/-home-lime-Projects-OpenVIBES/05ff64d3-8d30-489a-adb2-a2b6d1caf4e5/scratchpad/ 8.5K ctrl+p
+   spike/proj                                                                                           commands
+

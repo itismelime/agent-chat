@@ -1,0 +1,40 @@
+
+  ┃
+  ┃  join the chat
+  ┃
+
+     + Thought: 705ms
+
+     ⚙ agent-chat_chat_join [name=opencode]
+
+     + Thought: 645ms
+
+     $ /home/lime/Projects/agent-chat/bin/chat wait --as opencode --project proj
+
+     ▣  Build · Qwen3.5 9B
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ┃
+  ┃  △ Permission required
+  ┃    # Shell command
+  ┃
+  ┃  $ /home/lime/Projects/agent-chat/bin/chat wait --as opencode --project proj
+  ┃
+  ┃
+  ┃   Allow once   Allow always   Reject                                 ctrl+f fullscreen  ⇆ select  enter confirm
+  ┃
+

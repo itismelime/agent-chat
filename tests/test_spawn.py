@@ -44,7 +44,7 @@ class TmuxTest(unittest.TestCase):
         self.d = stub_tools(self)
 
     def test_available(self):
-        self.assertEqual(spawn.available(), {"tmux": True, "claude": True, "codex": True})
+        self.assertEqual(spawn.available(), {"tmux": True, "claude": True, "codex": True, "opencode": False})
         (self.d / "codex").unlink()
         self.assertFalse(spawn.available()["codex"])
 
@@ -59,6 +59,27 @@ class TmuxTest(unittest.TestCase):
         self.assertEqual(calls(self.d), [
             "new-session -d -s agent-chat-p-abc123 -c /p -e AGENT_CHAT_SPAWN=tok "
             "-- codex join the chat (start tok)"])
+
+    def test_start_opencode(self):
+        (self.d / "opencode").write_text("#!/bin/sh\nexit 0\n")
+        (self.d / "opencode").chmod(0o755)
+        spawn.start("opencode", "/p", "agent-chat-p-abc123", "tok", model="qwen3-coder:30b",
+                    config_home="/data/opencode-config")
+        self.assertEqual(calls(self.d), [
+            "new-session -d -s agent-chat-p-abc123 -c /p -e AGENT_CHAT_SPAWN=tok "
+            "-e XDG_CONFIG_HOME=/data/opencode-config -- opencode -m ac/qwen3-coder:30b "
+            "--prompt join the chat"])
+        with self.assertRaises(StoreError) as e:
+            spawn.start("opencode", "/p", "s", "t")
+        self.assertEqual(e.exception.code, 400)
+
+    def test_format_message(self):
+        m = {"from": "user", "text": "@kit look\nat this", "time": "2026-09-27T20:00:00+02:00"}
+        self.assertEqual(spawn.format_message(m, "kit"),
+                         "[chat] user: @kit look / at this (addressed to you: reply) Reply with chat_post.")
+        long = spawn.format_message(dict(m, text="x" * 5000), "kit")
+        self.assertLessEqual(len(long), spawn.MAX_TEXT)
+        self.assertIn("(… cut; chat_read has the whole message)", long)
 
     def test_start_errors(self):
         for tool, code in (("bash", 400),):
@@ -129,9 +150,10 @@ class TmuxTest(unittest.TestCase):
 class NeedsYouTest(unittest.TestCase):
     def test_real_screens(self):
         files = sorted(SCREENS.glob("*.txt"))
-        self.assertEqual(len(files), 6)
+        self.assertEqual(len(files), 9)
         for f in files:
             self.assertEqual(spawn.needs_you(f.read_text()), f.name.startswith("question-"), f.name)
+            self.assertEqual(spawn.working(f.read_text()), f.name.startswith("working-"), f.name)
 
     def test_only_the_bottom_of_the_screen_counts(self):
         old_question = (SCREENS / "question-codex-approval.txt").read_text()

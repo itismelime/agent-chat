@@ -14,7 +14,7 @@ from datetime import datetime
 
 from .store import StoreError
 
-TOOLS = ("claude", "codex")
+TOOLS = ("claude", "codex", "opencode")
 PROMPT = "join the chat"
 KEYS = {"1": "1", "2": "2", "3": "3", "up": "Up", "down": "Down",
         "enter": "Enter", "esc": "Escape"}
@@ -30,8 +30,10 @@ POLL_SECONDS = 2
 # menu with its cursor on an option.
 # ponytail: text matching, so a new wording can slip past; add it here and a
 # screen to tests/data/screens.
-QUESTION = re.compile(r"enter to confirm|enter continue|esc to cancel|do you want to|"
-                      r"would you like to|^\s*[❯›]\s*\d+\.", re.I | re.M)
+QUESTION = re.compile(r"enter to confirm|enter confirm|enter continue|esc to cancel|do you want to|"
+                      r"would you like to|permission required|^\s*[❯›]\s*\d+\.", re.I | re.M)
+# OpenCode's footer while it works (tests/data/screens/working-*)
+WORKING = re.compile(r"esc interrupt", re.I)
 
 
 def tmux(*args):
@@ -52,18 +54,24 @@ def available():
     return {t: shutil.which(t) is not None for t in ("tmux",) + TOOLS}
 
 
-def start(tool, path, session, token):
-    """Start `tool "join the chat"` in a detached tmux session."""
+def start(tool, path, session, token, model=None, config_home=None):
+    """Start the tool with the prompt "join the chat" in a detached tmux session."""
     if tool not in TOOLS:
-        raise StoreError(400, "tool must be claude or codex")
+        raise StoreError(400, "tool must be one of: " + ", ".join(TOOLS))
+    if tool == "opencode" and not model:
+        raise StoreError(400, "OpenCode needs a model")
     missing = [t for t in ("tmux", tool) if shutil.which(t) is None]
     if missing:
         raise StoreError(503, "%s is not installed" % " and ".join(missing))
-    # Codex's MCP servers are started by its app-server daemon and do not see
-    # AGENT_CHAT_SPAWN, so Codex gets the token in its prompt for chat_join.
-    prompt = PROMPT if tool == "claude" else "%s (start %s)" % (PROMPT, token)
-    r = tmux("new-session", "-d", "-s", session, "-c", path,
-             "-e", "AGENT_CHAT_SPAWN=" + token, "--", tool, prompt)
+    env = ["-e", "AGENT_CHAT_SPAWN=" + token]
+    if tool == "opencode":
+        env += ["-e", "XDG_CONFIG_HOME=" + config_home] if config_home else []
+        command = ["opencode", "-m", "ac/" + model, "--prompt", PROMPT]
+    else:
+        # Codex's MCP servers are started by its app-server daemon and do not see
+        # AGENT_CHAT_SPAWN, so Codex gets the token in its prompt for chat_join.
+        command = [tool, PROMPT if tool == "claude" else "%s (start %s)" % (PROMPT, token)]
+    r = tmux("new-session", "-d", "-s", session, "-c", path, *env, "--", *command)
     if r.returncode:
         raise StoreError(503, "tmux could not start it: %s" % r.stderr.strip())
 
@@ -104,6 +112,24 @@ def stop(session):
 def needs_you(text):
     """Whether the bottom of a terminal screen asks the user something."""
     return bool(QUESTION.search("\n".join(text.rstrip().splitlines()[-SCREEN_LINES:])))
+
+
+def working(text):
+    """Whether the bottom of the screen shows OpenCode working."""
+    return bool(WORKING.search("\n".join(text.rstrip().splitlines()[-SCREEN_LINES:])))
+
+
+def format_message(m, name):
+    """One line to type into an OpenCode agent's terminal."""
+    from .client import label
+    tail = " (%s) Reply with chat_post." % label(m, name)
+    text = m["text"].replace("\r", "").replace("\n", " / ")
+    line = "[chat] %s: %s%s" % (m["from"], text, tail)
+    if len(line) > MAX_TEXT:
+        cut = " (… cut; chat_read has the whole message)"
+        room = MAX_TEXT - len("[chat] %s: " % m["from"]) - len(cut) - len(tail)
+        line = "[chat] %s: %s%s%s" % (m["from"], text[:room], cut, tail)
+    return line
 
 
 class Spawner:

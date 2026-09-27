@@ -136,7 +136,7 @@ class ServerTest(unittest.TestCase):
         d = stub_tools(self)
         pid = self.add()
         tools = self.c.call("GET", "/api/tools")[1]
-        self.assertEqual(tools, {"tmux": True, "claude": True, "codex": True})
+        self.assertEqual(tools, {"tmux": True, "claude": True, "codex": True, "opencode": False})
         status, body = self.c.call("POST", "/api/projects/%s/spawned" % pid, {"tool": "claude"})
         self.assertEqual(status, 201)
         token = body["spawned"]["token"]
