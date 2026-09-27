@@ -136,3 +136,7 @@ project uses the same model.
 - Live with the user: a qwen3-coder:30b agent in a scratch project does a
   small task from the chat, one permission question answered through the
   terminal panel, then Stop.
+
+## Verified
+
+2026-09-27, live in OpenVIBES: the user started OpenCode with `qwen3-coder:30b` from the page; it joined, was given a task in the chat (create `hello.txt` containing `hi`), did it, and replied. The user then used Remove rather than Stop, which leaves the tmux session and its model running (Remove only leaves the chat); Stop is the way to end it.
