@@ -45,9 +45,12 @@ the agent's name on the started entry and renames the tmux session to
 `agent-chat-<project>-<name>`. Codex's session lookup (core spec) works as
 before.
 Codex's MCP servers are started by its app-server daemon and do not see
-`AGENT_CHAT_SPAWN`, so a join without a known token is linked to the only
-unlinked start of the same tool in that project from the last 5 minutes, if
-there is exactly one.
+`AGENT_CHAT_SPAWN`, so Codex gets the token in its first prompt
+(`codex "join the chat (start <token>)"`) and passes it to `chat_join` as
+`spawn`. A known token always wins. A Codex join without one is linked to the
+only unlinked Codex start in that project from the last 5 minutes, if there
+is exactly one; other agents without a token are not linked, so an agent
+started by hand never takes a page start's record.
 
 **State per started agent:**
 
