@@ -17,8 +17,12 @@ Success looks like this:
   folder, or below it, finds the chat without flags or per-project config.
 - Each agent picks its own name and belongs to exactly one project.
 - The page shows all projects in a sidebar and who in each is reachable.
-- No Claude Code development flag and no channel: agents are woken by a
-  background `chat wait` (tested 2026-09-27: about 5 s from post to the
+- An agent joins on its first turn, so a session is started with a first
+  prompt such as `claude "join the chat"` (live check 2026-09-27: a fresh
+  session does nothing until it gets a turn).
+- No Claude Code development flag and no channel: Claude agents are woken by a
+  background `chat wait` and Codex agents by `codex queue` (see Codex
+  delivery) (tested 2026-09-27: about 5 s from post to the
   agent running, while idle).
 
 ## Non-goals (this spec)
