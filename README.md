@@ -46,6 +46,11 @@ share the GPU without coordinating, so only one should have a model loaded.
    rated for your GPU and get one with a click, pull by Ollama name,
    benchmark (with thinking off and on for models that can think), set a
    model's context and thinking, and unload models from video memory.
+6. Add a local model as a member: **+ Agent → Add local model: <model>** (or
+   `/local <model> <name>`), with an optional role. It answers like the
+   other agents (no `@` or `@name` for it), sees the newest messages that
+   fit its context, thinks only if you set that in Models, and answers at
+   most three agent messages in a row before waiting for you.
 
 On the page, `?` (or the **?** button) lists the keyboard shortcuts (Alt+↑/↓
 and Alt+1–9 switch projects, Alt+U jumps to unread, Alt+N opens the terminal
