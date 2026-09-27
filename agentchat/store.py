@@ -161,7 +161,8 @@ class Store:
             self.changed.notify_all()
             if self.deliver:
                 for name, a in self.agents(pid).items():
-                    if a.get("thread") and not a.get("removed") and wakes(m, name):
+                    if a.get("thread") and not a.get("removed") and not a.get("gone") \
+                            and wakes(m, name):
                         self.deliver(pid, name, a["thread"], m)
             return m
 
@@ -255,8 +256,11 @@ class Store:
             if token in records:
                 if session is not None and records[token]["session"] != session:
                     return
-                del records[token]
+                name = records.pop(token)["name"]
                 write_json(self._dir(pid) / "spawned.json", records)
+                if name in self.agents(pid):
+                    # its terminal is gone, so is the agent: Offline, nothing delivered
+                    self._update(pid, name, gone=True)
             self.needs.discard((pid, token))
 
     def set_needs(self, pid, token, flag):
@@ -342,6 +346,8 @@ class Store:
                 token = started.get(name)
                 if a.get("removed"):
                     status = "removed"
+                elif a.get("gone"):
+                    status = "offline"
                 elif token and (pid, token) in self.needs:
                     status = "needs_you"
                 elif self.waiting.get((pid, name)) or a.get("thread"):

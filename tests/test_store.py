@@ -203,11 +203,25 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(self.store.status(self.pid)[0]["status"], "waiting")
         self.store.set_needs(self.pid, "tok", True)
         self.store.drop_spawned(self.pid, "tok")
-        self.assertEqual(self.store.status(self.pid)[0]["status"], "waiting")
+        self.assertEqual(self.store.status(self.pid)[0]["status"], "offline")  # its terminal ended
         self.assertEqual(self.store.spawned(self.pid), {})
         with self.assertRaises(StoreError) as e:
             self.store.update_spawned(self.pid, "tok", name="x")
         self.assertEqual(e.exception.code, 404)
+
+    def test_an_ended_start_leaves_its_agent_offline(self):
+        sent = []
+        self.store.deliver = lambda pid, name, thread, m: sent.append(name)
+        self.store.add_spawned(self.pid, "k", "claude", "s1")
+        self.store.add_spawned(self.pid, "l", "codex", "s2")
+        self.store.join(self.pid, "kit", "claude", spawn="k")
+        self.store.join(self.pid, "lime", "codex", thread="t-1", spawn="l")
+        self.store.drop_spawned(self.pid, "k")
+        self.store.drop_spawned(self.pid, "l")
+        status = {a["name"]: a["status"] for a in self.store.status(self.pid)}
+        self.assertEqual(status, {"kit": "offline", "lime": "offline"})
+        self.store.post(self.pid, "user", "anyone there?")
+        self.assertEqual(sent, [])  # nothing queued into a session that is gone
 
     def test_remove_and_readd(self):
         self.store.join(self.pid, "alice", "claude")
