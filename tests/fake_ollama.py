@@ -18,6 +18,7 @@ class FakeOllama:
     def __init__(self):
         self.models, self.loaded, self.blobs, self.calls = {}, set(), set(), []
         self.fail_chat = None
+        self.reply, self.chat_delay = None, 0
         self.server = _serve(self._handler())
         self.url = "http://127.0.0.1:%d" % self.server.server_address[1]
 
@@ -97,7 +98,9 @@ class FakeOllama:
                         return self.reply(500, {"error": fake.fail_chat})
                     fake.loaded.add(name)
                     think = data.get("think")
-                    content = "391" if "17" in data["messages"][-1]["content"] else "benchmark ok"
+                    time.sleep(fake.chat_delay)
+                    content = fake.reply if fake.reply is not None else (
+                        "391" if "17" in data["messages"][-1]["content"] else "benchmark ok")
                     message = {"role": "assistant", "content": content}
                     if think:
                         message["thinking"] = "x" * 300

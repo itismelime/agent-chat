@@ -81,8 +81,9 @@ class Ollama:
                                        "Content-Length": str(size)}):
                 pass
 
-    def chat(self, model, messages, num_ctx=None, think=False, timeout=600):
+    def chat(self, model, messages, num_ctx=None, think=False, timeout=600, num_predict=None):
         body = {"model": model, "messages": messages, "stream": False, "think": think}
-        if num_ctx:
-            body["options"] = {"num_ctx": num_ctx}
+        options = {k: v for k, v in (("num_ctx", num_ctx), ("num_predict", num_predict)) if v}
+        if options:
+            body["options"] = options
         return self.json("POST", "/api/chat", body, timeout)
