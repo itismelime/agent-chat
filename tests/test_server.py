@@ -7,6 +7,7 @@ import unittest
 
 from agentchat.client import ApiError, Client, ServiceDown, fmt, label
 from tests.helpers import start, stop
+from tests.test_spawn import SCREENS, stub_tools  # noqa: F401
 
 API = {"X-Agent-Chat": "1"}
 JSON = dict(API, **{"Content-Type": "application/json"})
@@ -124,6 +125,40 @@ class ServerTest(unittest.TestCase):
         with self.assertRaises(ApiError) as e:
             self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "x", "kind": "codex", "thread": 5})
         self.assertEqual(e.exception.code, 400)
+
+    def test_spawn_routes(self):
+        d = stub_tools(self)
+        pid = self.add()
+        tools = self.c.call("GET", "/api/tools")[1]
+        self.assertEqual(tools, {"tmux": True, "claude": True, "codex": True})
+        status, body = self.c.call("POST", "/api/projects/%s/spawned" % pid, {"tool": "claude"})
+        self.assertEqual(status, 201)
+        token = body["spawned"]["token"]
+        (d / "screen").write_text("hello\n")
+        base = "/api/projects/%s/spawned/%s" % (pid, token)
+        self.assertEqual(self.c.call("GET", base + "/screen")[1], {"screen": "hello\n"})
+        self.c.call("POST", base + "/keys", {"key": "enter"})
+        self.c.call("POST", base + "/keys", {"text": "hi"})
+        self.assertIn("send-keys -t %s Enter" % body["spawned"]["session"],
+                      (d / "calls").read_text())
+        joined = self.c.call("POST", "/api/projects/%s/agents" % pid,
+                             {"name": "alice", "kind": "claude", "spawn": token})[1]
+        self.assertEqual(joined["agent"]["spawn"], token)
+        listed = self.c.call("GET", "/api/projects/%s/spawned" % pid)[1]["spawned"]
+        self.assertEqual([(s["name"], s["state"], s["session"]) for s in listed],
+                         [("alice", "joined", "agent-chat-%s-alice" % pid)])
+        self.c.call("POST", base + "/stop", {})
+        self.assertEqual(self.c.call("GET", "/api/projects/%s/spawned" % pid)[1]["spawned"], [])
+        for method, path, data, code in (
+                ("POST", base + "/keys", {"key": "enter"}, 404),
+                ("POST", "/api/projects/%s/spawned" % pid, {"tool": "bash"}, 400)):
+            with self.assertRaises(ApiError) as e:
+                self.c.call(method, path, data)
+            self.assertEqual(e.exception.code, code)
+        (d / "claude").unlink()
+        with self.assertRaises(ApiError) as e:
+            self.c.call("POST", "/api/projects/%s/spawned" % pid, {"tool": "claude"})
+        self.assertEqual((e.exception.code, str(e.exception)), (503, "claude is not installed"))
 
     def test_remove_and_readd_routes(self):
         pid = self.add()

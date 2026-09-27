@@ -14,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+from . import spawn
 from .codex import Deliverer
 from .store import Store, StoreError
 
@@ -22,7 +23,7 @@ MAX_BODY = 20000
 WAIT_SECONDS = 300
 
 
-def make_handler(store, port, wait_seconds):
+def make_handler(store, port, wait_seconds, spawner):
     hosts = {"127.0.0.1:%d" % port, "localhost:%d" % port}
 
     class Handler(BaseHTTPRequestHandler):
@@ -113,6 +114,8 @@ def make_handler(store, port, wait_seconds):
                 if project is None:
                     raise StoreError(404, "not in a registered project")
                 return 200, {"project": project}
+            if rest == ["tools"] and method == "GET":
+                return 200, spawn.available()
             if len(rest) >= 3 and rest[0] == "projects":
                 pid, what = rest[1], rest[2:]
                 if what == ["messages"] and method == "GET":
@@ -130,8 +133,30 @@ def make_handler(store, port, wait_seconds):
                 if what == ["agents"] and method == "POST":
                     data = self.body()
                     agent = store.join(pid, self.field(data, "name"), self.field(data, "kind"),
-                                       data.get("thread"))
+                                       data.get("thread"), data.get("spawn"))
+                    if agent["spawn"]:
+                        spawner.linked(pid, agent["spawn"], agent["name"])
                     return 201, {"agent": agent, "recent": store.messages(pid)[-20:]}
+                if what == ["spawned"] and method == "GET":
+                    return 200, {"spawned": store.spawned_list(pid)}
+                if what == ["spawned"] and method == "POST":
+                    return 201, {"spawned": spawner.start(pid, self.field(self.body(), "tool"))}
+                if len(what) == 3 and what[0] == "spawned":
+                    token, action = what[1], what[2]
+                    if action == "screen" and method == "GET":
+                        return 200, {"screen": spawn.screen(spawner.record(pid, token)["session"])}
+                    if action == "keys" and method == "POST":
+                        data = self.body()
+                        session = spawner.record(pid, token)["session"]
+                        if "text" in data:
+                            spawn.send_text(session, self.field(data, "text"))
+                        else:
+                            spawn.send_key(session, self.field(data, "key"))
+                        return 200, {"ok": True}
+                    if action == "stop" and method == "POST":
+                        self.body()
+                        spawner.stop(pid, token)
+                        return 200, {"spawned": store.spawned_list(pid)}
                 if len(what) == 3 and what[0] == "agents" and method == "GET":
                     if what[2] == "read":
                         return 200, {"messages": store.read(pid, what[1])}
@@ -153,16 +178,18 @@ def make_handler(store, port, wait_seconds):
 
 def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True):
     """Bind the service; the caller runs serve_forever(). deliver=False
-    leaves Codex sessions alone (tests)."""
+    leaves Codex sessions and tmux alone (tests)."""
     if port is None:
         port = int(os.environ.get("AGENT_CHAT_PORT", "8765"))
     server = ThreadingHTTPServer(("127.0.0.1", port), BaseHTTPRequestHandler)
     server.daemon_threads = True
     store = store or Store()
+    spawner = spawn.Spawner(store)
     if deliver:
         store.deliver = Deliverer(store)
+        spawner.start_poller()
     server.RequestHandlerClass = make_handler(store, server.server_address[1],
-                                              wait_seconds)
+                                              wait_seconds, spawner)
     return server
 
 
