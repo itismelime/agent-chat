@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""agent-chat command line.
+
+  chat                             follow this project's chat
+  chat add <path>                  register a project folder
+  chat post --as <name> <text>     post (--as user for yourself)
+  chat wait --as <name>            block until a message wakes <name>
+  chat serve                       run the service
+  chat mcp                         run the MCP server (agent tools)
+
+post and wait use the project of the working directory, or --project <id>.
+"""
+import argparse
+import os
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(HERE))
+
+from agentchat.client import ApiError, Client, ServiceDown, fmt, label  # noqa: E402
+
+CHAT = HERE / "bin" / "chat"
+WAIT_TIMEOUT = 330  # longer than the service's 300 s long-poll
+RETRY_SECONDS = 60
+
+
+def project_id(client, given):
+    if given:
+        return given
+    project = client.resolve(os.getcwd())
+    if project is None:
+        sys.exit("chat: %s is not in a registered project (chat add <path>)" % os.getcwd())
+    return project["id"]
+
+
+def follow(client, pid):
+    after = None
+    while True:
+        msgs = client.call("GET", "/api/projects/%s/messages?after=%d" % (pid, after or 0))[1]["messages"]
+        for m in msgs if after is not None else msgs[-40:]:
+            print(fmt(m), flush=True)
+        if msgs:
+            after = msgs[-1]["n"]
+        elif after is None:
+            after = 0
+        time.sleep(2)
+
+
+def wait(client, pid, name):
+    path = client.agent_path(pid, name, "wait")
+    down_since = None
+    while True:
+        try:
+            status, body = client.call("GET", path, timeout=WAIT_TIMEOUT)
+        except ServiceDown:
+            down_since = down_since or time.monotonic()
+            if time.monotonic() - down_since > RETRY_SECONDS:
+                raise
+            time.sleep(5)
+            continue
+        down_since = None
+        if status == 200:
+            break
+    if body["notice"] == "removed":
+        print("You were removed from this chat. Keep this wait running anyway; "
+              "it only wakes you if you are added back.")
+    elif body["notice"] == "added back":
+        print("You were added back to the chat.")
+    for m in body["messages"]:
+        if m["from"] != name:
+            print(fmt(m))
+            print("    (%s)" % label(m, name))
+    print("Restart the wait in the background: %s wait --as %s --project %s" % (CHAT, name, pid))
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="chat", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd")
+    sub.add_parser("add").add_argument("path")
+    for cmd in ("post", "wait"):
+        p = sub.add_parser(cmd)
+        p.add_argument("--as", dest="name", required=True)
+        p.add_argument("--project")
+        if cmd == "post":
+            p.add_argument("text", nargs="+")
+    sub.add_parser("serve")
+    sub.add_parser("mcp")
+    args = ap.parse_args()
+
+    if args.cmd == "serve":
+        from agentchat.server import main as serve
+        return serve()
+    if args.cmd == "mcp":
+        from agentchat.mcp import main as mcp
+        return mcp()
+    client = Client()
+    try:
+        if args.cmd == "add":
+            body = client.call("POST", "/api/projects", {"path": os.path.abspath(args.path)})[1]
+            p = body["project"]
+            print("%s: %s (%s)" % ("already registered" if body["existing"] else "registered",
+                                   p["name"], p["path"]))
+        elif args.cmd == "post":
+            client.call("POST", "/api/projects/%s/messages" % project_id(client, args.project),
+                        {"from": args.name, "text": " ".join(args.text)})
+        elif args.cmd == "wait":
+            wait(client, project_id(client, args.project), args.name)
+        else:
+            follow(client, project_id(client, None))
+    except ServiceDown as e:
+        sys.exit(str(e))
+    except ApiError as e:
+        sys.exit("chat: %s" % e)
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    main()
