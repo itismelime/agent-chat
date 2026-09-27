@@ -62,9 +62,8 @@ a failed load shows Ollama's message with that hint (see Failure behaviour).
 ## Model Hub (service)
 
 New module `agentchat/models.py`. All Ollama calls go to the configured URL;
-chat-style calls use the native `/api/chat` with `"think": false` (Ollama's
-OpenAI endpoint ignores it, and hybrid reasoning models would otherwise
-think before every answer).
+chat-style calls use the native `/api/chat`, whose `think` field Ollama's
+OpenAI endpoint ignores. `think` is set per model (see Thinking).
 
 **GPU.** `nvidia-smi --query-gpu=name,memory.total,memory.used
 --format=csv,noheader,nounits`, summed over GPUs. Missing: capacity unknown.
@@ -107,15 +106,34 @@ temporary file is always deleted afterwards.
 **Pull.** `POST /api/pull {"model": <name>}` for Ollama-library names.
 
 **Benchmark.** Loads the model and asks it
-`Reply with exactly: benchmark ok` (`think: false`), reporting load +
+`Reply with exactly: benchmark ok` with `think: false`, reporting load +
 generate seconds, tokens per second (`eval_count / eval_duration`), and
-video memory used (from `nvidia-smi` before and after).
+video memory used (from `nvidia-smi` before and after). For a model that
+can think, it also asks `What is 17 × 23? Answer with the number only.`
+with thinking off and on (or at the model's lowest level, for
+level-based models), reporting for each: seconds, output tokens, and how
+many of them were thinking; so the user sees what thinking costs on this
+GPU.
+
+**Thinking.** Thinking costs time and context, not extra video memory: the
+weights are the same, and the thinking tokens fill the context window
+reserved by `num_ctx` either way. Ollama does not send earlier turns'
+thinking back, so it does not pile up over a conversation. From
+`POST /api/show`, a model can think when its `capabilities` include
+`thinking`; models from the gpt-oss family take a level (`low`, `medium`,
+`high`) instead of on/off. The setting per model is `off`, `on`, or a
+level; unset, the caller's default applies: **off for talking members**
+(part 2, where quick answers matter) and **on for local agents** (part 3,
+where multi-step work benefits). Models that cannot think always get
+`think: false`.
 
 **Tuning.** Recommended context: ≥ 12 GiB GPU memory 32768, ≥ 8 GiB 16384,
 else 8192; capped by the model's `<arch>.context_length` from
 `POST /api/show`; rounded down to a multiple of 64, at least 512. Stored per
-model in `<data>/models.json` as `{"<model>": {"num_ctx", "override"}}`; the
-user can set an override. Parts 2 and 3 send `num_ctx` with every request.
+model in `<data>/models.json` as `{"<model>": {"num_ctx", "override",
+"think"}}` (`think` null when unset); the user can set a context override
+and the thinking setting. Parts 2 and 3 send `num_ctx` and `think` with
+every request.
 
 **Unloading.** The 5-minute keep-alive unloads an idle model. **Unload now**
 sends `POST /api/generate {"model", "keep_alive": 0}` for each loaded model
@@ -134,14 +152,14 @@ own Unix user only).
 | Method and path | Does |
 |---|---|
 | `GET /api/models/status` | Ollama URL, own/external, reachable, version; GPU name, total and used memory |
-| `GET /api/models` | installed models: name, size, loaded, fit verdict, `num_ctx`, override |
+| `GET /api/models` | installed models: name, size, loaded, fit verdict, `num_ctx`, override, can think (and levels), `think` |
 | `GET /api/models/search?q=` | rated Hugging Face results, best first |
 | `POST /api/models/import {url, filename, model}` | start an import job |
 | `POST /api/models/pull {model}` | start a pull job |
 | `POST /api/models/benchmark {model}` | start a benchmark job |
 | `POST /api/models/delete {model}` | delete an installed model |
 | `POST /api/models/unload {}` | unload every loaded model |
-| `POST /api/models/tune {model, num_ctx}` | set (or clear with `null`) the context override |
+| `POST /api/models/tune {model, num_ctx?, think?}` | set the context override and/or the thinking setting (`off`, `on`, a level); `null` clears |
 | `GET /api/models/jobs` | jobs, newest first |
 | `POST /api/models/jobs/<id>/cancel {}` | cancel a running import or pull |
 
@@ -152,7 +170,10 @@ terminal panel). Its header shows Ollama (own or external, reachable,
 version) and the GPU (name, used / total). Tabs:
 
 - **Installed:** name, size, Loaded badge, fit verdict, context (with an
-  edit field for the override), buttons Benchmark and Delete (confirms);
+  edit field for the override), thinking (for models that can think: a
+  choice of default / off / on or the model's levels; "Default" explains
+  off for talking members, on for agents), buttons Benchmark and Delete
+  (confirms);
   **Unload now** above the list.
 - **Get models:** a search box; results sorted by score, each with label,
   score, fit verdict, best file and its size, downloads, and **Get**
@@ -176,13 +197,18 @@ The panel refreshes every 2 s while open.
   local-ai-chat has one loaded): Ollama's message, plus "free video memory
   (another program may have a model loaded) or pick a smaller file".
 - Bad input (URL not on huggingface.co, unsafe file name, bad model name,
-  context outside 512–131072): `400`.
+  context outside 512–131072, a thinking value the model does not
+  support): `400`.
 
 ## Testing
 
 - Rating and best file: ported from local-ai-chat's
   `test-recommendations.mjs` cases, plus boundaries of every fit verdict.
 - Context recommendation: GPU sizes around 8 and 12 GiB, model limits.
+- Thinking: capability detection from `/api/show` (on/off models, level
+  models, non-thinking models), the stored setting and the per-use
+  default, refusal of unsupported values, and the two-way benchmark
+  against the fake Ollama server.
 - Import against a fake Hugging Face server and a fake Ollama server (both
   local `http.server`s): hash, blob upload skipped when present, create,
   disk-space refusal, cancel deletes the temporary file, URL and file name
