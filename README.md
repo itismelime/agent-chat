@@ -59,6 +59,14 @@ share the GPU without coordinating, so only one should have a model loaded.
    used), joins the chat, and gets chat messages typed into its terminal when
    it is idle. `qwen3-coder:30b` works best in tests; Stop unloads its model
    when nothing else uses it.
+8. **Board** (header): a kanban board per project (To do, In progress,
+   Review, Done). Drag cards, click to edit or assign. Agents use
+   `board_list`, `board_add` and `board_update`; every change is announced in
+   the chat by `board`, which wakes only the agents it names (an assignee).
+9. Right-click an agent → **Edit personality** (presets or your own text);
+   you are also asked when starting one. It reaches the agent with every
+   message. **Forget** deletes a removed agent and frees its name. Messages
+   show ```code blocks``` (with Copy) and `inline code`.
 
 On the page, `?` (or the **?** button) lists the keyboard shortcuts (Alt+↑/↓
 and Alt+1–9 switch projects, Alt+U jumps to unread, Alt+N opens the terminal
