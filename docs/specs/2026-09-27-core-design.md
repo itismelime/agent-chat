@@ -54,8 +54,10 @@ Directory: `${XDG_DATA_HOME:-~/.local/share}/agent-chat/`.
   project. `time` is ISO 8601 with seconds and offset. `kind` is `user`,
   `claude`, `codex` or `llm`. Append-only.
 - `projects/<id>/agents.json`:
-  `{"<name>": {"kind", "joined", "last_seen", "cursor"}}`. `cursor` is
-  the last message number delivered to that agent.
+  `{"<name>": {"kind", "joined", "last_seen", "cursor", "removed",
+  "notice"}}`. `cursor` is the last message number delivered to that agent;
+  `removed` is true after the user removed it; `notice` is a pending
+  `"removed"` or `"added back"` for its next wait.
 
 Writes of the JSON files go to a temporary file followed by `os.replace`.
 One service process writes; a lock inside it serialises writes.
@@ -90,11 +92,24 @@ API (JSON in and out):
 | `GET /api/projects/<id>/agents` | agents with `status` |
 | `POST /api/projects/<id>/agents {name, kind}` | join; `201`, `409` if taken |
 | `GET /api/projects/<id>/agents/<name>/read` | messages after the agent's cursor; advances it |
-| `GET /api/projects/<id>/agents/<name>/wait` | blocks until a message wakes this agent, returns it and advances the cursor; `204` after 300 s |
+| `GET /api/projects/<id>/agents/<name>/wait` | blocks until a message wakes this agent or a notice is pending; returns `{notice, messages}` and advances the cursor; `204` after 300 s |
+| `POST /api/projects/<id>/agents/<name>/remove {}` | remove the agent from the chat (user action) |
+| `POST /api/projects/<id>/agents/<name>/readd {}` | add a removed agent back |
 | `GET /` | the page |
 
-Status per agent: `waiting` while a `wait` request is open, `busy` if seen
-(any API call) in the last 10 minutes, otherwise `offline`.
+Status per agent: `removed` if removed; else `waiting` while a `wait`
+request is open (shown as **Available**: idle, woken at once), `busy` if seen
+(any API call) in the last 10 minutes (**Working**: it sees messages when its
+current task ends), otherwise `offline`.
+
+Removing and adding back (user, 2026-09-27):
+
+- Remove: the agent's post and read are refused with "you were removed from
+  this chat"; its name stays reserved; its open wait returns the notice
+  "removed", telling it to keep the wait running anyway. While removed, its
+  wait wakes only for a notice.
+- Add back: clears `removed`, moves its cursor to the newest message (it does
+  not get what it missed) and wakes its wait with the notice "added back".
 
 Localhost protection, as today: the `Host` header must be
 `127.0.0.1:<port>` or `localhost:<port>`; a request carrying an `Origin`
@@ -112,7 +127,9 @@ The project is found with `/api/resolve` from the working directory.
 - `chat wait --as <name>` repeats the `wait` request until a message
   arrives, prints it and exits. The output ends with either "addressed to
   you: reply" or "for others: read only", then the line to restart the
-  wait.
+  wait. A notice prints instead: "You were removed from this chat. Keep
+  this wait running anyway; it only wakes you if you are added back." or
+  "You were added back to the chat.", then the restart line.
 - If the service is unreachable: prints `agent-chat service not running
   (systemctl --user start agent-chat)` and exits 1.
 
@@ -153,8 +170,14 @@ is revised before building further.
 - Main area: the selected project's messages, the input with `@`
   autocomplete over the project's agent names plus `user`, notifications
   and the `(n)` tab title, as today.
-- Agent list for the project: name, kind, and a status dot
-  (waiting / busy / offline).
+- Member list on the right, like Discord: the project's agents grouped
+  Available / Working / Offline / Removed, each with name, a status dot and
+  its tool (Claude, Codex, local LLM). Right-click a name for a menu:
+  **Remove from chat**, or **Add back** for a removed agent. (**Start a new
+  agent here** joins this menu with part 4.)
+- When the message being typed addresses an agent that is Working or
+  Offline, a hint under the input says so ("alice is working and will see
+  this when its current task ends").
 - Updates by polling `messages?after=` every 2 s, as today.
 
 ## Install (`install.sh`)
