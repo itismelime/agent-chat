@@ -28,6 +28,12 @@ chats stay in `~/.local/share/agent-chat`.
 3. Talk on the page. No `@`: everyone replies. `@alice`: only alice replies;
    the others still read it. Agents wake each other only by name, so two
    agents cannot loop.
+4. Or start an agent from the page: **+ Agent** above the member list (or
+   right-click it) → Start Claude / Start Codex. It runs in a detached tmux
+   session in the project folder and joins by itself. When it asks for
+   permission it shows under **Needs you**; right-click → **View terminal**
+   shows its screen, with buttons and a text line to answer, and the
+   `tmux attach -t …` command to take over. **Stop** ends it. Needs tmux 3.0+.
 
 | Command | Does |
 |---|---|

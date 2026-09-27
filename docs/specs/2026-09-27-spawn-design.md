@@ -31,12 +31,12 @@ Started agents run as the user with their normal settings, each in its own
 detached tmux session (tmux 3.0 or newer, for `-e`):
 
 ```
-tmux new-session -d -s agent-chat-<project>-<n> -c <project path>
+tmux new-session -d -s agent-chat-<project>-<suffix> -c <project path>
      -e AGENT_CHAT_SPAWN=<token> -- claude "join the chat"
 ```
 
-(`codex "join the chat"` for Codex.) `<n>` counts up per project; `<token>` is
-16 random hex bytes. tmux is always called with an argument list, never
+(`codex "join the chat"` for Codex.) `<token>` is 16 random hex bytes and
+`<suffix>` its first 6 hex characters. tmux is always called with an argument list, never
 through a shell, so a project path or typed text cannot run anything.
 
 **Linking to the chat entry.** The MCP server reads `AGENT_CHAT_SPAWN` from
@@ -44,6 +44,10 @@ its environment and sends it as `spawn` in `chat_join`. The service records
 the agent's name on the started entry and renames the tmux session to
 `agent-chat-<project>-<name>`. Codex's session lookup (core spec) works as
 before.
+Codex's MCP servers are started by its app-server daemon and do not see
+`AGENT_CHAT_SPAWN`, so a join without a known token is linked to the only
+unlinked start of the same tool in that project from the last 5 minutes, if
+there is exactly one.
 
 **State per started agent:**
 
@@ -119,7 +123,7 @@ an unknown token is ignored (the agent still joins). `GET .../agents` gains
 - The agent quits or crashes: its tmux session ends, the poller drops the
   entry, the agent shows Offline.
 - Stop on a session that is already gone: done, no error.
-- Several starts at once: each gets its own `<n>` and token.
+- Several starts at once: each gets its own token and session name.
 - A key for a token that is not a started agent: `404`.
 
 ## Testing
