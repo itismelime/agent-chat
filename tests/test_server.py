@@ -116,6 +116,15 @@ class ServerTest(unittest.TestCase):
         agents = self.c.call("GET", "/api/projects/%s/agents" % pid)[1]["agents"]
         self.assertNotEqual(agents[0]["status"], "waiting")
 
+    def test_join_with_codex_thread(self):
+        pid = self.add()
+        self.c.call("POST", "/api/projects/%s/agents" % pid,
+                    {"name": "cody", "kind": "codex", "thread": "01a0e3df-6b97-7233-b194-a7cb90765ce4"})
+        self.assertEqual(self.store.agents(pid)["cody"]["thread"], "01a0e3df-6b97-7233-b194-a7cb90765ce4")
+        with self.assertRaises(ApiError) as e:
+            self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "x", "kind": "codex", "thread": 5})
+        self.assertEqual(e.exception.code, 400)
+
     def test_remove_and_readd_routes(self):
         pid = self.add()
         self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})

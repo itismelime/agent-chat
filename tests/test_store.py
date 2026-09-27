@@ -130,6 +130,36 @@ class StoreTest(unittest.TestCase):
         time.sleep(0.3)
         self.assertEqual([m["text"] for m in self.store.read(self.pid, "alice")], ["@alice important"])
 
+    def test_codex_with_thread_gets_deliveries(self):
+        sent = []
+        self.store.deliver = lambda pid, name, thread, m: sent.append((name, thread, m["text"]))
+        self.store.join(self.pid, "alice", "claude")
+        self.store.join(self.pid, "cody", "codex", thread="t-1")
+        self.store.join(self.pid, "old", "codex")  # no thread: nothing to deliver to
+        self.store.post(self.pid, "user", "hi all")
+        self.store.post(self.pid, "alice", "@bob not cody")
+        self.store.post(self.pid, "alice", "@cody you")
+        self.store.post(self.pid, "cody", "@cody myself")
+        self.assertEqual(sent, [("cody", "t-1", "hi all"), ("cody", "t-1", "@cody you")])
+        status = {a["name"]: a["status"] for a in self.store.status(self.pid)}
+        self.assertEqual(status["cody"], "waiting")
+        self.assertEqual(status["old"], "busy")
+        self.store.remove(self.pid, "cody")
+        self.store.post(self.pid, "user", "after removal")
+        self.assertEqual(len(sent), 2)
+        with self.assertRaises(StoreError) as e:
+            self.store.join(self.pid, "x", "codex", thread="not a thread!")
+        self.assertEqual(e.exception.code, 400)
+
+    def test_delivered_moves_the_cursor_forward_only(self):
+        self.store.join(self.pid, "cody", "codex", thread="t-1")
+        one = self.store.post(self.pid, "user", "one")
+        self.store.post(self.pid, "user", "two")
+        self.store.delivered(self.pid, "cody", one["n"])
+        self.assertEqual([m["text"] for m in self.store.read(self.pid, "cody")], ["two"])
+        self.store.delivered(self.pid, "cody", one["n"])
+        self.assertEqual(self.store.read(self.pid, "cody"), [])
+
     def test_remove_and_readd(self):
         self.store.join(self.pid, "alice", "claude")
         self.store.remove(self.pid, "alice")

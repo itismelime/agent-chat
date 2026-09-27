@@ -47,7 +47,6 @@ class InstallTest(unittest.TestCase):
         self.assertIn('ExecStart=/usr/bin/env python3 "%s/bin/chat" serve' % ROOT, unit.read_text())
         self.assertIn("Environment=AGENT_CHAT_PORT=%d" % self.port, unit.read_text())
         self.assertIn("running on http://127.0.0.1:%d" % self.port, r.stdout)
-        self.assertIn("network_access = true", r.stdout)  # Codex sandbox note
         calls = self.calls_made()
         self.assertIn("systemctl --user restart agent-chat", calls)
         self.assertIn("claude mcp add --scope user agent-chat -- %s/bin/chat mcp" % ROOT, calls)

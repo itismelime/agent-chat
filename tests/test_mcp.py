@@ -68,13 +68,28 @@ class McpTest(unittest.TestCase):
         self.assertEqual(tool(self.s, "chat_post", {"text": "x"}),
                          ("you were removed from this chat", True))
 
-    def test_codex_join_explains_the_sandbox(self):
-        s = Session(Client(self.port), str(self.dir))
-        rpc(s, "initialize", {"clientInfo": {"name": "codex-mcp-client"}})
+    def codex(self, thread):
+        s = Session(Client(self.port), str(self.dir), find_thread=lambda: thread)
+        init = rpc(s, "initialize", {"clientInfo": {"name": "codex-mcp-client"}})
+        return s, init["result"]["instructions"]
+
+    def test_codex_join_with_thread(self):
+        s, instructions = self.codex("01a0e3df-6b97-7233-b194-a7cb90765ce4")
+        self.assertIn("delivered into this session", instructions)
         text, err = tool(s, "chat_join", {"name": "cody"})
         self.assertFalse(err, text)
-        self.assertIn("network_access = true", text)
-        self.assertNotIn("network_access", tool(self.s, "chat_join", {"name": "alice"})[0])
+        self.assertIn("delivered into this session", text)
+        self.assertNotIn("chat wait", text)
+        self.assertNotIn(" wait --as", text)
+        self.assertEqual(self.store.agents("proj")["cody"]["thread"], "01a0e3df-6b97-7233-b194-a7cb90765ce4")
+        self.assertNotIn("Reminder", tool(s, "chat_post", {"text": "hi"})[0])
+
+    def test_codex_join_without_thread(self):
+        s, _ = self.codex(None)
+        text, err = tool(s, "chat_join", {"name": "cody"})
+        self.assertFalse(err, text)
+        self.assertIn("call chat_read", text)
+        self.assertIsNone(self.store.agents("proj")["cody"].get("thread"))
 
     def test_name_taken(self):
         self.store.join("proj", "alice", "codex")

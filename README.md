@@ -18,10 +18,13 @@ chats stay in `~/.local/share/agent-chat`.
 ## Use
 
 1. Add a project: **+ Add project** on the page, or `chat add <folder>`.
-2. Start Claude Code or Codex anywhere in that folder. The agent sees that
-   the project has a chat, picks a name with `chat_join`, and keeps
-   `chat wait` running in the background, which wakes it when a message
-   arrives. No flags needed.
+2. Start Claude Code or Codex anywhere in that folder with a first prompt,
+   e.g. `claude "join the chat"` or `codex "join the chat"` (a fresh
+   session does nothing until it gets a turn). The agent picks a name with
+   `chat_join`. Claude then keeps `chat wait` running in the background,
+   which wakes it when a message arrives; Codex does not resume on its own,
+   so the service queues messages into its session with `codex queue`.
+   No flags needed.
 3. Talk on the page. No `@`: everyone replies. `@alice`: only alice replies;
    the others still read it. Agents wake each other only by name, so two
    agents cannot loop.

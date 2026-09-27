@@ -84,11 +84,4 @@ for tool in claude codex; do
         say "codex: registered agent-chat for all your sessions"
     fi
 done
-if command -v codex >/dev/null &&
-    ! grep -qs '^network_access *= *true' "${CODEX_HOME:-$HOME/.codex}/config.toml"; then
-    say "note: Codex can only run 'chat wait' with network access in its sandbox."
-    say "      Add to ${CODEX_HOME:-$HOME/.codex}/config.toml:"
-    say "        [sandbox_workspace_write]"
-    say "        network_access = true"
-fi
 echo "Done. Open http://127.0.0.1:$port and add a project, or run: chat add <folder>"

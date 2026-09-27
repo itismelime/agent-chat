@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from .client import ApiError, Client, ServiceDown, fmt, label
+from .codex import find_thread
 
 CHAT = Path(__file__).resolve().parent.parent / "bin" / "chat"
 
@@ -28,19 +29,15 @@ TOOLS = [
 ]
 
 
-CODEX_NOTE = ("\n\nIf the wait exits with 'service not running', your sandbox blocks "
-              "127.0.0.1: tell the user to add `[sandbox_workspace_write]` "
-              "`network_access = true` to ~/.codex/config.toml, and use chat_read until then.")
-
-
 def kind_of(client_name):
     n = (client_name or "").lower()
     return "claude" if "claude" in n else "codex" if "codex" in n else "llm"
 
 
 class Session:
-    def __init__(self, client, cwd):
+    def __init__(self, client, cwd, find_thread=find_thread):
         self.client, self.name, self.kind = client, None, "llm"
+        self.find_thread = find_thread
         try:
             self.project, self.down = client.resolve(cwd), False
         except (ServiceDown, ApiError):
@@ -55,6 +52,12 @@ class Session:
                     "unavailable (systemctl --user start agent-chat, then restart the session).")
         if not self.project:
             return None
+        if self.kind == "codex":
+            return ("This project (%s) has a shared chat with the user and other agents. "
+                    "Call chat_join with a short name you pick for yourself; chat messages "
+                    "for you are then delivered into this session as they arrive. Reply with "
+                    "chat_post if a message is for you. A message without @ is for everyone; "
+                    "with @names only those reply. Keep replies short." % self.project["name"])
         return ("This project (%s) has a shared chat with the user and other agents. "
                 "Call chat_join with a short name you pick for yourself, then keep the wait "
                 "command it gives you running as a background command. When the wait exits, "
@@ -66,6 +69,8 @@ class Session:
         return TOOLS if self.project else []
 
     def reminder(self):
+        if self.kind == "codex":
+            return ""  # Codex is woken by codex queue, not by a wait
         agents = self.client.call("GET", "/api/projects/%s/agents" % self.project["id"])[1]["agents"]
         if any(a["name"] == self.name and a["status"] == "waiting" for a in agents):
             return ""
@@ -83,16 +88,24 @@ class Session:
             if tool == "chat_join":
                 if self.name:
                     return "already joined as %s; one session has one name" % self.name, True
-                body = self.client.call("POST", "/api/projects/%s/agents" % pid,
-                                        {"name": str(args.get("name", "")), "kind": self.kind})[1]
+                join = {"name": str(args.get("name", "")), "kind": self.kind}
+                if self.kind == "codex":
+                    join["thread"] = self.find_thread()
+                body = self.client.call("POST", "/api/projects/%s/agents" % pid, join)[1]
                 self.name = body["agent"]["name"]
                 recent = "\n".join(fmt(m) for m in body["recent"]) or "(no messages yet)"
-                text = ("Joined %s as %s. Run this as a background command now, and again "
-                        "each time it exits:\n%s\n\nRecent messages:\n%s"
-                        % (self.project["name"], self.name, self.wait_command(), recent))
-                if self.kind == "codex":
-                    text += CODEX_NOTE
-                return text, False
+                joined = "Joined %s as %s. " % (self.project["name"], self.name)
+                if self.kind != "codex":
+                    how = ("Run this as a background command now, and again each time it "
+                           "exits:\n%s" % self.wait_command())
+                elif join["thread"]:
+                    how = ("Chat messages for you are delivered into this session as they "
+                           "arrive; reply with chat_post.")
+                else:
+                    how = ("This Codex session could not be linked to the chat (for example "
+                           "a resumed session), so messages are not delivered to you; call "
+                           "chat_read to see new ones.")
+                return "%s%s\n\nRecent messages:\n%s" % (joined, how, recent), False
             if tool not in ("chat_post", "chat_read"):
                 return "unknown tool: %s" % tool, True
             if not self.name:

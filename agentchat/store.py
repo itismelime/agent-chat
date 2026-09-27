@@ -15,6 +15,7 @@ from pathlib import Path
 NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 RESERVED = {"user", "all"}
 KINDS = {"claude", "codex", "llm"}
+THREAD = re.compile(r"^[0-9A-Za-z-]{1,64}$")
 BUSY_SECONDS = 600
 
 
@@ -66,6 +67,9 @@ class Store:
         (self.root / "projects").mkdir(parents=True, exist_ok=True)
         self.changed = threading.Condition(threading.RLock())
         self.waiting = {}  # (project id, name) -> number of open waits
+        # deliver(pid, name, thread, message) hands a message to an agent that
+        # is woken by queueing into its session (Codex); it must not block.
+        self.deliver = None
 
     # projects
 
@@ -153,6 +157,10 @@ class Store:
             with open(self._dir(pid) / "messages.jsonl", "a") as f:
                 f.write(json.dumps(m) + "\n")
             self.changed.notify_all()
+            if self.deliver:
+                for name, a in self.agents(pid).items():
+                    if a.get("thread") and not a.get("removed") and wakes(m, name):
+                        self.deliver(pid, name, a["thread"], m)
             return m
 
     # agents
@@ -181,19 +189,22 @@ class Store:
             fields["cursor"] = cursor
         self._update(pid, name, **fields)
 
-    def join(self, pid, name, kind):
+    def join(self, pid, name, kind, thread=None):
         name = (name or "").strip().lower()
         if not NAME.match(name) or name in RESERVED:
             raise StoreError(400, "a name is 1-32 of a-z, 0-9 and '-', starting with a "
                                   "letter or digit, and not 'user' or 'all'")
         if kind not in KINDS:
             raise StoreError(400, "kind must be one of: claude, codex, llm")
+        if thread is not None and not (isinstance(thread, str) and THREAD.match(thread)):
+            raise StoreError(400, "thread must be a session id")
         with self.changed:
             agents = self.agents(pid)
             if name in agents:
                 raise StoreError(409, "the name %s is taken in this project; pick another" % name)
             agents[name] = {"kind": kind, "joined": now(), "last_seen": now(),
-                            "cursor": self._last_n(pid), "removed": False, "notice": None}
+                            "cursor": self._last_n(pid), "removed": False, "notice": None,
+                            "thread": thread}
             write_json(self._dir(pid) / "agents.json", agents)
             return dict(agents[name], name=name)
 
@@ -203,6 +214,12 @@ class Store:
             msgs = self.messages(pid, self._agent(pid, name)["cursor"])
             self._touch(pid, name, msgs[-1]["n"] if msgs else None)
             return msgs
+
+    def delivered(self, pid, name, n):
+        """A message up to n was queued into the agent's session."""
+        with self.changed:
+            if self._agent(pid, name, active=False)["cursor"] < n:
+                self._update(pid, name, cursor=n)
 
     def remove(self, pid, name):
         """User action: the agent may no longer post or read; its name stays reserved."""
@@ -260,7 +277,7 @@ class Store:
                 seen = datetime.fromisoformat(a["last_seen"]).timestamp()
                 if a.get("removed"):
                     status = "removed"
-                elif self.waiting.get((pid, name)):
+                elif self.waiting.get((pid, name)) or a.get("thread"):
                     status = "waiting"
                 elif time.time() - seen < BUSY_SECONDS:
                     status = "busy"

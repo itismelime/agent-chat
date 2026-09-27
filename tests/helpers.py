@@ -11,7 +11,7 @@ def start(wait_seconds=1):
     (store, server, port, tmp); call stop(server) when done."""
     tmp = Path(tempfile.mkdtemp())
     store = Store(tmp / "data")
-    server = serve(port=0, store=store, wait_seconds=wait_seconds)
+    server = serve(port=0, store=store, wait_seconds=wait_seconds, deliver=False)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return store, server, server.server_address[1], tmp
 

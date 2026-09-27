@@ -14,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+from .codex import Deliverer
 from .store import Store, StoreError
 
 PAGE = Path(__file__).with_name("page.html")
@@ -128,7 +129,8 @@ def make_handler(store, port, wait_seconds):
                     return 200, {"agents": store.status(pid)}
                 if what == ["agents"] and method == "POST":
                     data = self.body()
-                    agent = store.join(pid, self.field(data, "name"), self.field(data, "kind"))
+                    agent = store.join(pid, self.field(data, "name"), self.field(data, "kind"),
+                                       data.get("thread"))
                     return 201, {"agent": agent, "recent": store.messages(pid)[-20:]}
                 if len(what) == 3 and what[0] == "agents" and method == "GET":
                     if what[2] == "read":
@@ -149,13 +151,17 @@ def make_handler(store, port, wait_seconds):
     return Handler
 
 
-def serve(port=None, store=None, wait_seconds=WAIT_SECONDS):
-    """Bind the service; the caller runs serve_forever()."""
+def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True):
+    """Bind the service; the caller runs serve_forever(). deliver=False
+    leaves Codex sessions alone (tests)."""
     if port is None:
         port = int(os.environ.get("AGENT_CHAT_PORT", "8765"))
     server = ThreadingHTTPServer(("127.0.0.1", port), BaseHTTPRequestHandler)
     server.daemon_threads = True
-    server.RequestHandlerClass = make_handler(store or Store(), server.server_address[1],
+    store = store or Store()
+    if deliver:
+        store.deliver = Deliverer(store)
+    server.RequestHandlerClass = make_handler(store, server.server_address[1],
                                               wait_seconds)
     return server
 
