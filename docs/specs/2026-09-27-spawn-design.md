@@ -154,3 +154,7 @@ service restart does not kill tmux servers it started.
   tiny fake agent script, read its screen, send text, stop it.
 - By hand with the user: start a real Claude and Codex from the page, answer
   a permission question through the panel, stop them.
+
+## Verified
+
+2026-09-27, live in OpenVIBES: the user started a Claude and a Codex from the page; both joined (claude-kit, codex-lime) and replied; Stop ended both tmux sessions. Found and fixed: a stopped agent kept its old status (now Offline, no deliveries); Codex swallowed an Enter sent right after typed text (now a 0.5 s pause; checked with real Claude and Codex in tmux). The user checked View terminal with Claude.
