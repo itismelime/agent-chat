@@ -9,7 +9,12 @@ showing a Codex agent started by hand in a terminal as Offline once that
 session ends (today it stays Available: nothing checks that its session log is
 still open by a Codex process) (user, 2026-09-27); and code formatting in
 the chat: fenced code blocks and inline code rendered in messages (user,
-2026-09-27).
+2026-09-27); a kanban board per project that the user and every agent can
+view and edit, agents through chat tools (user, 2026-09-27); personalities
+for every agent that joins, not only local members (user, 2026-09-27);
+and the Model Hub picking an IQ1 file or a speculative-decoding helper file
+(e.g. `eagle3-…-BF16.gguf`) as a model's best file (found 2026-09-27).
+"Forget" above covers removing agents in the Removed state for good.
 
 ## Goal
 
