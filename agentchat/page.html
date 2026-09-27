@@ -101,6 +101,7 @@ title="Start an agent in this project">+ Agent</button><div id=members></div></a
 <dt>/start claude</dt><dd>start Claude in this project (or <code>/start codex</code>)</dd>
 <dt>/stop &lt;name&gt;</dt><dd>stop an agent started from the page</dd>
 <dt>/term &lt;name&gt;</dt><dd>open its terminal</dd><dt>/remove &lt;name&gt;</dt><dd>remove it from the chat</dd>
+<dt>/local &lt;model&gt; &lt;name&gt;</dt><dd>add an installed local model as a member</dd>
 <dt>//text</dt><dd>post a message that starts with /</dd></dl></div></div>
 <div id=term hidden><div class=box role=dialog aria-label="Agent terminal">
 <div class=top><span id=termtitle></span><button id=termclose class=ghost type=button>Close</button></div>
@@ -180,7 +181,8 @@ function render(){
   $('members').replaceChildren(...GROUPS.flatMap(([st,title])=>{
     const g=members.filter(a=>a.status===st);if(!g.length)return [];
     return [el('h2','',title+' — '+g.length),...g.map(a=>{const d=el('div','a '+a.status);
-      d.title='Right-click for options';d.append(el('i','dot'),a.name,el('small','',KIND[a.kind]||a.kind));
+      d.title=a.error?'Offline: '+a.error:'Right-click for options';
+      d.append(el('i','dot'),a.name,el('small','',a.model?'local LLM · '+a.model:KIND[a.kind]||a.kind));
       d.oncontextmenu=e=>{e.stopPropagation();openMenu(e,agentItems(a));};return d;})];}));
   hint();
   const key=cur+':'+lastN(cur);if(key===drawn)return;
@@ -209,13 +211,19 @@ function agentItems(a){
   if(a.spawn){items.push(['View terminal',()=>openTerm(a.spawn,who)]);
     items.push(['Stop',()=>{if(confirm(`Stop ${who}? Its tmux session ends.`))return api(path(a.spawn,'stop'),{});}]);}
   if(a.starting)return items;
+  if(a.model)items.push(['Edit role',()=>{const r=prompt(`Role for ${a.name} (empty for none)`,a.role||'');
+    if(r!==null)return api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/role`,{role:r||null});}]);
   const [text,action]=a.status==='removed'?['Add back','readd']:['Remove from chat','remove'];
   items.push([text,()=>api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/${action}`,{})]);
   return items;}
 function startItems(){
-  return ['claude','codex'].map(tool=>{
+  const items=['claude','codex'].map(tool=>{
     const off=!cur?'Add a project first':!tools.tmux?'tmux is not installed':!tools[tool]?`${KIND[tool]} is not installed`:'';
-    return ['Start '+KIND[tool],()=>api(`api/projects/${cur}/spawned`,{tool}),off];});}
+    return ['Start '+KIND[tool],()=>api(`api/projects/${cur}/spawned`,{tool}),off];});
+  if(!locals.ok)items.push(['Add local model',()=>{},locals.reason]);
+  else if(!locals.names.length)items.push(['Add local model',()=>{},'No models installed; get one in Models']);
+  else for(const n of locals.names)items.push(['Add local model: '+n,()=>addLocal(n),cur?'':'Add a project first']);
+  return items;}
 $('addagent').onclick=e=>{e.stopPropagation();openMenu(e,startItems());};
 $('members').parentElement.oncontextmenu=e=>openMenu(e,startItems());
 addEventListener('click',()=>{menu.hidden=true;});
@@ -299,6 +307,21 @@ $('f').onsubmit=async e=>{e.preventDefault();
   catch(e){t.value=text;$('err').textContent='Not sent: '+e.message;}
   refresh();};
 api('api/tools').then(x=>{tools=x;}).catch(()=>{});
+// installed local models for the start menu, refreshed every 30 s
+let locals={ok:false,reason:'Checking Ollama…',names:[]};
+async function loadLocals(){
+  try{const s=await api('api/models/status');
+    if(!s.reachable){locals={ok:false,reason:'Ollama is not reachable',names:[]};return;}
+    locals={ok:true,reason:'',names:(await api('api/models')).models.map(m=>m.name)};}
+  catch(e){locals={ok:false,reason:e.message,names:[]};}}
+loadLocals();setInterval(loadLocals,30000);
+function suggestName(model){return model.split(':')[0].split('/').pop().toLowerCase()
+  .replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'')||'local';}
+async function addLocal(model,name){
+  if(name===undefined){name=prompt(`Name for ${model} in this chat`,suggestName(model));if(!name)return;}
+  const role=name&&arguments.length<2?prompt('Optional role, e.g. "You review plans critically" (leave empty for none)',''):null;
+  await api(`api/projects/${cur}/locals`,{model,name:name.trim(),role:role||null});
+  return `Added ${name.trim()} (${model}).`;}
 // keyboard shortcuts (Alt, since the browser owns most Ctrl keys) and commands
 let lastSent='';
 const typing=()=>['TEXTAREA','INPUT'].includes((document.activeElement||{}).tagName);
@@ -327,7 +350,7 @@ addEventListener('keydown',e=>{
   }});
 $('keys').onclick=()=>{$('help').hidden=false;};$('helpclose').onclick=()=>{$('help').hidden=true;t.focus();};
 async function runCommand(text){
-  const [cmd,arg='']=text.slice(1).trim().split(/\s+/);
+  const [cmd,arg='',arg2='']=text.slice(1).trim().split(/\s+/);
   const agent=()=>{const a=agents.find(a=>a.name===arg.toLowerCase());
     if(!a)throw new Error(arg?`No agent named ${arg} in this project.`:`Say which agent: /${cmd} <name>`);return a;};
   const started=()=>{const a=agent();if(!a.spawn)throw new Error(`${a.name} was not started from the page.`);return a;};
@@ -338,6 +361,7 @@ async function runCommand(text){
   if(cmd==='term'){const a=started();openTerm(a.spawn,a.name);return '';}
   if(cmd==='remove'){const a=agent();
     await api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/remove`,{});return `Removed ${a.name}.`;}
+  if(cmd==='local'){if(!arg||!arg2)throw new Error('Use /local <model> <name>.');return addLocal(arg,arg2);}
   throw new Error(`Unknown command /${cmd}. Press ? for the list; //text posts text starting with /.`);}
 refresh();setInterval(refresh,2000);t.focus();
 </script>
