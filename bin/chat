@@ -7,6 +7,7 @@
   chat wait --as <name>            block until a message wakes <name>
   chat serve                       run the service
   chat mcp                         run the MCP server (agent tools)
+  chat config ollama-url [<url>|own]  show or set the Ollama agent-chat uses
 
 post and wait use the project of the working directory, or --project <id>.
 """
@@ -88,6 +89,9 @@ def main():
             p.add_argument("text", nargs="+")
     sub.add_parser("serve")
     sub.add_parser("mcp")
+    cfg = sub.add_parser("config")
+    cfg.add_argument("key", choices=["ollama-url"])
+    cfg.add_argument("value", nargs="?")
     args = ap.parse_args()
 
     if args.cmd == "serve":
@@ -96,6 +100,17 @@ def main():
     if args.cmd == "mcp":
         from agentchat.mcp import main as mcp
         return mcp()
+    if args.cmd == "config":
+        from agentchat import config
+        if args.value is None:
+            print(config.ollama_url())
+            return
+        try:
+            config.set_ollama_url(args.value)
+        except ValueError as e:
+            print("chat: %s" % e, file=sys.stderr)
+            sys.exit(2)
+        return
     client = Client()
     try:
         if args.cmd == "add":
