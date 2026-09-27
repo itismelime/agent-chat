@@ -75,7 +75,6 @@ class Store:
         self.needs = set()  # (project id, start token) whose terminal asks the user
         # talk(pid, name, message) wakes a local-model member (talk.Talker); must not block
         self.talk = None
-        self.type_in = None  # type_in(pid, name, message): OpenCode agents (spawn.Spawner)
         self.local = {}  # (project id, name) -> {"busy", "error"} of local-model members
 
     # projects
@@ -171,8 +170,6 @@ class Store:
                     self.deliver(pid, name, a["thread"], m)
                 elif a.get("model") and self.talk:
                     self.talk(pid, name, m)
-                elif a["kind"] == "opencode" and self.type_in:
-                    self.type_in(pid, name, m)
             return m
 
     # agents

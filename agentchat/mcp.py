@@ -59,7 +59,13 @@ class Session:
                     "unavailable (systemctl --user start agent-chat, then restart the session).")
         if not self.project:
             return None
-        if self.kind in ("codex", "opencode"):
+        if self.kind == "opencode":
+            return ("This project (%s) has a shared chat with the user and other agents. "
+                    "Call chat_join with a short name you pick for yourself; chat messages "
+                    "for you are then typed into this session as they arrive. Reply with "
+                    "chat_post if a message is for you. A message without @ is for everyone; "
+                    "with @names only those reply. Keep replies short." % self.project["name"])
+        if self.kind == "codex":
             return ("This project (%s) has a shared chat with the user and other agents. "
                     "Call chat_join with a short name you pick for yourself (and, if your first "
                     "prompt said \"(start <code>)\", that code as spawn); chat messages "
@@ -150,6 +156,8 @@ def handle(session, req):
     if method == "initialize":
         info = params.get("clientInfo") if isinstance(params.get("clientInfo"), dict) else {}
         session.kind = kind_of(info.get("name"))
+        if session.kind == "opencode" and not session.spawn_token:
+            session.kind = "llm"  # started by hand, not by the page: nothing types into it
         result = {"protocolVersion": params.get("protocolVersion", "2025-06-18"),
                   "capabilities": {"tools": {}},
                   "serverInfo": {"name": "agent-chat", "version": "1"}}

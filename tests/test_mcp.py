@@ -108,12 +108,19 @@ class McpTest(unittest.TestCase):
         self.assertFalse(err, text)
         self.assertEqual(self.store.spawned("proj")["tok"]["name"], "cody")
 
+    def test_a_hand_started_opencode_is_not_typed_to(self):
+        s = Session(Client(self.port), str(self.dir))   # no AGENT_CHAT_SPAWN
+        init = rpc(s, "initialize", {"clientInfo": {"name": "opencode"}})
+        self.assertEqual(s.kind, "llm")
+        self.assertIn("wait", tool(s, "chat_join", {"name": "hand"})[0])
+
     def test_opencode_session(self):
         s = Session(Client(self.port), str(self.dir), spawn_token="tok")
         self.store.add_spawned("proj", "tok", "opencode", "agent-chat-test-no-such-session")
         init = rpc(s, "initialize", {"clientInfo": {"name": "opencode", "version": "1.18.32"}})
         self.assertEqual(s.kind, "opencode")
         self.assertNotIn("chat wait", init["result"]["instructions"])
+        self.assertNotIn("spawn", init["result"]["instructions"])
         join = next(t for t in rpc(s, "tools/list")["result"]["tools"] if t["name"] == "chat_join")
         self.assertNotIn("spawn", join["inputSchema"]["properties"])
         text, err = tool(s, "chat_join", {"name": "kit"})

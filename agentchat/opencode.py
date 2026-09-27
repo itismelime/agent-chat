@@ -32,6 +32,11 @@ def config_home(root):
     return Path(root) / "opencode-config"
 
 
+def data_home(root):
+    """OpenCode's own data (sessions), apart from the user's ~/.local/share/opencode."""
+    return Path(root) / "opencode-data"
+
+
 def write_config(root, ollama_url, models, port):
     """OpenCode's config: agent-chat's Ollama, the chat tools, no skill tool
     (OpenCode would list every installed skill in its prompt)."""

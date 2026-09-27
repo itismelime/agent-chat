@@ -275,7 +275,6 @@ def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=
     spawner = spawn.Spawner(store, models, server.server_address[1])
     if deliver:
         store.deliver = Deliverer(store)
-        store.type_in = spawner
         spawner.start_poller()
         talker = talk.Talker(store, models)
         store.talk = talker

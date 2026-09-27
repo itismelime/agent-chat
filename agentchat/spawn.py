@@ -12,7 +12,7 @@ import threading
 import time
 from datetime import datetime
 
-from .store import StoreError
+from .store import StoreError, wakes
 
 TOOLS = ("claude", "codex", "opencode")
 PROMPT = "join the chat"
@@ -54,7 +54,7 @@ def available():
     return {t: shutil.which(t) is not None for t in ("tmux",) + TOOLS}
 
 
-def start(tool, path, session, token, model=None, config_home=None):
+def start(tool, path, session, token, model=None, config_home=None, data_home=None):
     """Start the tool with the prompt "join the chat" in a detached tmux session."""
     if tool not in TOOLS:
         raise StoreError(400, "tool must be one of: " + ", ".join(TOOLS))
@@ -66,6 +66,11 @@ def start(tool, path, session, token, model=None, config_home=None):
     env = ["-e", "AGENT_CHAT_SPAWN=" + token]
     if tool == "opencode":
         env += ["-e", "XDG_CONFIG_HOME=" + config_home] if config_home else []
+        env += ["-e", "XDG_DATA_HOME=" + data_home] if data_home else []
+        # none of the user's own OpenCode or Claude Code setup: no CLAUDE.md, no
+        # config from a tmux server's environment
+        env += ["-e", "OPENCODE_DISABLE_CLAUDE_CODE=1", "-e", "OPENCODE_CONFIG=",
+                "-e", "OPENCODE_CONFIG_DIR=", "-e", "OPENCODE_CONFIG_CONTENT="]
         command = ["opencode", "-m", "ac/" + model, "--prompt", PROMPT]
     else:
         # Codex's MCP servers are started by its app-server daemon and do not see
@@ -114,6 +119,17 @@ def needs_you(text):
     return bool(QUESTION.search("\n".join(text.rstrip().splitlines()[-SCREEN_LINES:])))
 
 
+def opencode_state(text):
+    """OpenCode's state from its footer only (the conversation above it may
+    contain any words): working, question, idle, or unknown (a dialog, starting)."""
+    foot = "\n".join([l for l in text.rstrip().splitlines() if l.strip()][-3:]).lower()
+    if "esc interrupt" in foot:
+        return "working"
+    if "enter confirm" in foot:
+        return "question"
+    return "idle" if "ctrl+p" in foot else "unknown"
+
+
 def working(text):
     """Whether the bottom of the screen shows OpenCode working."""
     return bool(WORKING.search("\n".join(text.rstrip().splitlines()[-SCREEN_LINES:])))
@@ -123,7 +139,9 @@ def format_message(m, name):
     """One line to type into an OpenCode agent's terminal."""
     from .client import label
     tail = " (%s) Reply with chat_post." % label(m, name)
-    text = m["text"].replace("\r", "").replace("\n", " / ")
+    # typed as keystrokes into a coding agent: no control characters, which
+    # could erase the "[chat]" prefix, interrupt it, or start a "!" shell line
+    text = re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", m["text"].replace("\r", "").replace("\n", " / "))
     line = "[chat] %s: %s%s" % (m["from"], text, tail)
     if len(line) > MAX_TEXT:
         cut = " (… cut; chat_read has the whole message)"
@@ -138,12 +156,6 @@ class Spawner:
     def __init__(self, store, models=None, port=8765):
         self.store, self.models, self.port = store, models, port
         self.lock = threading.Lock()  # a rename on join vs the poller's liveness check
-        self.pending = {}  # (pid, name) -> messages to type into an OpenCode agent, oldest first
-
-    def __call__(self, pid, name, m):
-        """store.type_in: queue a message for an OpenCode agent."""
-        with self.lock:
-            self.pending.setdefault((pid, name), []).append(m)
 
     def start(self, pid, tool, model=None):
         project = self.store.project(pid)
@@ -158,7 +170,8 @@ class Spawner:
                                  % (model, ", ".join(usable) or "none"))
             opencode.write_config(self.store.root, self.models.ollama.url, usable, self.port)
             home = str(opencode.config_home(self.store.root))
-        start(tool, project["path"], session, token, model=model, config_home=home)
+        data = str(opencode.data_home(self.store.root)) if tool == "opencode" else None
+        start(tool, project["path"], session, token, model=model, config_home=home, data_home=data)
         record = self.store.add_spawned(pid, token, tool, session)
         if model:
             record = self.store.update_spawned(pid, token, model=model)
@@ -220,21 +233,24 @@ class Spawner:
                         age = time.time() - datetime.fromisoformat(r["started"]).timestamp()
                         need = need or age > JOIN_GRACE
                     elif r["tool"] == "opencode":
-                        self._type_pending(pid, r, text, need)
+                        need = self._type_unread(pid, r, text)
                 self.store.set_needs(pid, token, need)
 
-    def _type_pending(self, pid, r, text, need):
-        """Type the oldest pending message into an idle OpenCode agent."""
-        key = (pid, r["name"])
-        busy = working(text)
-        with self.lock:
-            queue = self.pending.get(key) or []
-            m = queue.pop(0) if queue and not busy and not need else None
-            left = bool(queue)
-        if m:
-            send_text(r["session"], format_message(m, r["name"]))
-            self.store.delivered(pid, r["name"], m["n"])
-        self.store.set_local(pid, r["name"], busy=busy or left or bool(m))
+    def _type_unread(self, pid, r, text):
+        """Type the oldest unread message that wakes this OpenCode agent, if its
+        screen is idle. Unread comes from its stored cursor, so nothing is lost
+        on a restart and nothing it already read with chat_read is typed.
+        Returns whether its screen asks the user something."""
+        name, state = r["name"], opencode_state(text)
+        agent = self.store.agents(pid).get(name)
+        if not agent or agent.get("removed") or agent.get("gone"):
+            return state == "question"
+        unread = [m for m in self.store.messages(pid, agent["cursor"]) if wakes(m, name)]
+        if state == "idle" and unread:
+            send_text(r["session"], format_message(unread[0], name))
+            self.store.delivered(pid, name, unread[0]["n"])
+        self.store.set_local(pid, name, busy=state != "idle" or bool(unread))
+        return state == "question"
 
     def run(self):
         while True:
