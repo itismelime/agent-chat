@@ -6,6 +6,7 @@ import tempfile
 import threading
 import time
 import unittest
+from pathlib import Path
 
 from agentchat import models as models_mod
 from agentchat.client import ApiError, Client, ServiceDown, fmt, label
@@ -251,6 +252,23 @@ class ModelRoutesTest(unittest.TestCase):
             with self.assertRaises(ApiError, msg=path) as e:
                 c.call("POST", path, body)
             self.assertEqual(e.exception.code, code, path)
+
+    def test_local_member_routes(self):
+        c = self.c
+        pdir = Path(tempfile.mkdtemp())
+        pid = c.call("POST", "/api/projects", {"path": str(pdir)})[1]["project"]["id"]
+        base = "/api/projects/%s" % pid
+        status, body = c.call("POST", base + "/locals", {"model": "qwen3.5:9b", "name": "qwen",
+                                                         "role": "Be terse"})
+        self.assertEqual((status, body["agent"]["model"]), (201, "qwen3.5:9b"))
+        for data, code in (({"model": "ghost", "name": "g"}, 400),
+                           ({"model": "qwen3.5:9b", "name": "qwen"}, 409)):
+            with self.assertRaises(ApiError) as e:
+                c.call("POST", base + "/locals", data)
+            self.assertEqual(e.exception.code, code)
+        agents = c.call("POST", base + "/agents/qwen/role", {"role": "Be kind"})[1]["agents"]
+        row = next(a for a in agents if a["name"] == "qwen")
+        self.assertEqual((row["role"], row["model"], row["kind"]), ("Be kind", "qwen3.5:9b", "llm"))
 
     def test_models_js_is_served(self):
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)

@@ -15,7 +15,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import spawn
+from . import spawn, talk
 from .codex import Deliverer
 from .ollama import OllamaError
 from .store import Store, StoreError
@@ -167,6 +167,13 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     if agent["spawn"]:
                         spawner.linked(pid, agent["spawn"], agent["name"])
                     return 201, {"agent": agent, "recent": store.messages(pid)[-20:]}
+                if what == ["locals"] and method == "POST":
+                    data = self.body()
+                    model = self.field(data, "model")
+                    if model not in [m["name"] for m in models.ollama.tags()]:
+                        raise StoreError(400, "%s is not installed in the Ollama in use" % model)
+                    agent = store.add_local(pid, self.field(data, "name"), model, data.get("role"))
+                    return 201, {"agent": agent}
                 if what == ["spawned"] and method == "GET":
                     return 200, {"spawned": store.spawned_list(pid)}
                 if what == ["spawned"] and method == "POST":
@@ -194,9 +201,12 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         result = store.wait(pid, what[1], wait_seconds, alive=self.client_alive)
                         return (204, None) if result is None else (200, result)
                 if len(what) == 3 and what[0] == "agents" and method == "POST" \
-                        and what[2] in ("remove", "readd"):
-                    self.body()
-                    (store.remove if what[2] == "remove" else store.readd)(pid, what[1])
+                        and what[2] in ("remove", "readd", "role"):
+                    data = self.body()
+                    if what[2] == "role":
+                        store.set_role(pid, what[1], data.get("role"))
+                    else:
+                        (store.remove if what[2] == "remove" else store.readd)(pid, what[1])
                     return 200, {"agents": store.status(pid)}
             raise StoreError(404, "not found")
 
@@ -259,10 +269,14 @@ def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=
     if deliver:
         store.deliver = Deliverer(store)
         spawner.start_poller()
+    models = models or models_mod.Models(store.root)
+    if deliver:
+        talker = talk.Talker(store, models)
+        store.talk = talker
+        talker.start()
     server.RequestHandlerClass = make_handler(store, server.server_address[1],
                                               wait_seconds, spawner,
-                                              os.getuid() if owner is None else owner,
-                                              models or models_mod.Models(store.root))
+                                              os.getuid() if owner is None else owner, models)
     return server
 
 
