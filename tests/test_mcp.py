@@ -33,7 +33,8 @@ class McpTest(unittest.TestCase):
     def test_in_project(self):
         self.assertIn("This project (proj) has a shared chat", self.instructions)
         names = [t["name"] for t in rpc(self.s, "tools/list")["result"]["tools"]]
-        self.assertEqual(names, ["chat_join", "chat_post", "chat_read"])
+        self.assertEqual(names, ["chat_join", "chat_post", "chat_read",
+                                 "board_list", "board_add", "board_update"])
 
     def test_outside_project(self):
         s = Session(Client(self.port), str(self.tmp))
@@ -139,6 +140,22 @@ class McpTest(unittest.TestCase):
         text, err = tool(s, "chat_join", {"name": "kit"})
         self.assertFalse(err, text)
         self.assertIn("Your personality: You test", text)
+
+    def test_board_tools(self):
+        names = [t["name"] for t in rpc(self.s, "tools/list")["result"]["tools"]]
+        self.assertEqual(names[-3:], ["board_list", "board_add", "board_update"])
+        self.assertTrue(tool(self.s, "board_list", {})[1])  # join first
+        tool(self.s, "chat_join", {"name": "alice"})
+        text, err = tool(self.s, "board_add", {"title": "Fix login", "assignee": "alice"})
+        self.assertFalse(err, text)
+        self.assertIn("#1", text)
+        text, err = tool(self.s, "board_update", {"id": 1, "column": "review"})
+        self.assertFalse(err, text)
+        text, _ = tool(self.s, "board_list", {})
+        self.assertIn("Review", text)
+        self.assertIn('#1 "Fix login" (alice)', text)
+        self.assertTrue(tool(self.s, "board_update", {"id": 1, "column": "later"})[1])
+        self.assertTrue(tool(self.s, "board_update", {"id": "x"})[1])
 
     def test_name_taken(self):
         self.store.join("proj", "alice", "codex")

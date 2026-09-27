@@ -29,7 +29,25 @@ TOOLS = [
     {"name": "chat_read",
      "description": "Chat messages you have not seen yet.",
      "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "board_list",
+     "description": "The project's kanban board: cards by column (To do, In progress, Review, Done).",
+     "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "board_add",
+     "description": "Add a card to the board (in To do). assignee: an agent's name, user, or leave out.",
+     "inputSchema": {"type": "object", "required": ["title"],
+                     "properties": {"title": {"type": "string"}, "description": {"type": "string"},
+                                    "assignee": {"type": "string"}}}},
+    {"name": "board_update",
+     "description": "Change a card: move it (column todo, doing, review or done), assign it, or "
+                    "edit its title or description.",
+     "inputSchema": {"type": "object", "required": ["id"],
+                     "properties": {"id": {"type": "integer"},
+                                    "column": {"type": "string",
+                                               "enum": ["todo", "doing", "review", "done"]},
+                                    "assignee": {"type": "string"}, "title": {"type": "string"},
+                                    "description": {"type": "string"}}}},
 ]
+BOARD_TOOLS = ("board_list", "board_add", "board_update")
 
 
 def kind_of(client_name):
@@ -89,6 +107,31 @@ class Session:
                                            "properties": {"name": {"type": "string"}}})
         return [join] + TOOLS[1:]
 
+    def board(self, pid, tool, args):
+        base = "/api/projects/%s/board" % pid
+        if tool == "board_list":
+            b = self.client.call("GET", base)[1]
+            lines = []
+            for key, label in b["columns"]:
+                cards = [c for c in b["cards"] if c["column"] == key]
+                lines.append("%s: %s" % (label, "; ".join(
+                    '#%d "%s"%s' % (c["id"], c["title"], " (%s)" % c["assignee"] if c["assignee"] else "")
+                    for c in cards) or "(empty)"))
+            return "\n".join(lines)
+        if tool == "board_add":
+            card = self.client.call("POST", base + "/cards", {
+                "by": self.name, "title": str(args.get("title", "")),
+                "description": str(args.get("description") or ""),
+                "assignee": args.get("assignee")})[1]["card"]
+            return 'added #%d "%s"' % (card["id"], card["title"])
+        n = args.get("id")
+        if not isinstance(n, int) or isinstance(n, bool):
+            raise ApiError(400, "id must be a card number")
+        data = {k: args[k] for k in ("column", "assignee", "title", "description") if k in args}
+        card = self.client.call("POST", "%s/cards/%d" % (base, n), dict(data, by=self.name))[1]["card"]
+        return '#%d "%s" is now in %s%s' % (card["id"], card["title"], card["column"],
+                                             ", assigned to %s" % card["assignee"] if card["assignee"] else "")
+
     def reminder(self):
         if self.kind in ("codex", "opencode"):
             return ""  # Codex is woken by codex queue, not by a wait
@@ -135,10 +178,12 @@ class Session:
                 if body["agent"].get("personality"):
                     joined += "Your personality: %s. " % body["agent"]["personality"]
                 return "%s%s\n\nRecent messages:\n%s" % (joined, how, recent), False
-            if tool not in ("chat_post", "chat_read"):
+            if tool not in ("chat_post", "chat_read") + BOARD_TOOLS:
                 return "unknown tool: %s" % tool, True
             if not self.name:
                 return "call chat_join first", True
+            if tool in BOARD_TOOLS:
+                return self.board(pid, tool, args), False
             if tool == "chat_post":
                 m = self.client.call("POST", "/api/projects/%s/messages" % pid,
                                      {"from": self.name, "text": str(args.get("text", ""))})[1]
