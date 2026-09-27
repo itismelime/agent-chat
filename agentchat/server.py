@@ -19,11 +19,27 @@ from .codex import Deliverer
 from .store import Store, StoreError
 
 PAGE = Path(__file__).with_name("page.html")
+TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 WAIT_SECONDS = 300
 
 
-def make_handler(store, port, wait_seconds, spawner):
+def peer_uid(client_port, server_port, table=TCP_TABLE):
+    """The uid owning the local TCP socket from client_port to server_port:
+    None if the table cannot be read (not Linux), -1 if no such socket."""
+    want = ("%04X" % client_port, "%04X" % server_port)
+    try:
+        lines = Path(table).read_text().splitlines()[1:]
+    except OSError:
+        return None
+    for line in lines:
+        f = line.split()
+        if len(f) > 7 and (f[1].rsplit(":", 1)[-1], f[2].rsplit(":", 1)[-1]) == want:
+            return int(f[7])
+    return -1
+
+
+def make_handler(store, port, wait_seconds, spawner, owner):
     hosts = {"127.0.0.1:%d" % port, "localhost:%d" % port}
 
     class Handler(BaseHTTPRequestHandler):
@@ -74,6 +90,11 @@ def make_handler(store, port, wait_seconds, spawner):
 
         def dispatch(self, method):
             host, origin = self.headers.get("Host"), self.headers.get("Origin")
+            # typing into agents' terminals runs code as this user, so other
+            # users on this machine may not use the service at all
+            uid = peer_uid(self.client_address[1], port)
+            if uid is not None and uid != owner:
+                return self.send(403, {"error": "only this service's own user may use it"})
             if host not in hosts:
                 return self.send(403, {"error": "bad host"})
             if origin is not None and origin != "http://" + host:
@@ -176,7 +197,7 @@ def make_handler(store, port, wait_seconds, spawner):
     return Handler
 
 
-def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True):
+def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=None):
     """Bind the service; the caller runs serve_forever(). deliver=False
     leaves Codex sessions and tmux alone (tests)."""
     if port is None:
@@ -189,7 +210,8 @@ def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True):
         store.deliver = Deliverer(store)
         spawner.start_poller()
     server.RequestHandlerClass = make_handler(store, server.server_address[1],
-                                              wait_seconds, spawner)
+                                              wait_seconds, spawner,
+                                              os.getuid() if owner is None else owner)
     return server
 
 

@@ -93,6 +93,18 @@ bodies up to 20 000 bytes).
 an unknown token is ignored (the agent still joins). `GET .../agents` gains
 `status: "needs_you"` for joined started agents that need the user.
 
+## Security
+
+Typing into an agent's terminal runs code as the user (Claude's `!` bash
+mode, or approving a command). So on top of the core protections the service
+refuses connections from any other Unix user of the machine (it looks up the
+peer socket's uid in `/proc/net/tcp`). Anything running as the user, the
+agents included, can still start agents, read their screens and answer their
+questions, one agent another's; that cannot be prevented while everything
+runs as one user, and is accepted. tmux targets use `=name` so a name never
+matches another session by prefix, and the unit has `KillMode=process` so a
+service restart does not kill tmux servers it started.
+
 ## Page
 
 - Member list: a **+ Agent** button at its top and **Start agent ▸ Claude /

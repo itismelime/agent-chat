@@ -48,8 +48,10 @@ The service refuses requests whose Host is not 127.0.0.1/localhost and
 requests with a foreign Origin; API requests must also carry an
 `X-Agent-Chat: 1` header and JSON bodies. Browsers do not let other websites
 send either without a check the service never answers, so other websites
-cannot post into your agents' sessions or read their messages away. Anyone
-with a local shell can still post.
+cannot post into your agents' sessions or read their messages away. The
+service also refuses connections from other Unix users of the machine, since
+agents started from the page can be typed into. Anything running as you,
+agents included, can still post and answer agents' questions.
 
 ## Development
 

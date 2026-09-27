@@ -1,11 +1,13 @@
 import http.client
 import json
+import os
 import socket
 import threading
 import time
 import unittest
 
 from agentchat.client import ApiError, Client, ServiceDown, fmt, label
+from agentchat.server import peer_uid, serve
 from tests.helpers import start, stop
 from tests.test_spawn import SCREENS, stub_tools  # noqa: F401
 
@@ -159,6 +161,28 @@ class ServerTest(unittest.TestCase):
         with self.assertRaises(ApiError) as e:
             self.c.call("POST", "/api/projects/%s/spawned" % pid, {"tool": "claude"})
         self.assertEqual((e.exception.code, str(e.exception)), (503, "claude is not installed"))
+
+    def test_peer_uid(self):
+        table = self.tmp / "tcp"
+        table.write_text(
+            "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid\n"
+            "   0: 0100007F:223D 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000\n"
+            "   1: 0100007F:D431 0100007F:223D 01 00000000:00000000 00:00000000 00000000  1001\n")
+        self.assertEqual(peer_uid(0xD431, 0x223D, table), 1001)
+        self.assertEqual(peer_uid(0xD432, 0x223D, table), -1)
+        self.assertIsNone(peer_uid(1, 2, self.tmp / "missing"))
+
+    def test_other_users_are_refused(self):
+        _, server, port, _ = start()
+        self.addCleanup(stop, server)
+        other = serve(port=0, store=self.store, deliver=False, owner=os.getuid() + 1)
+        threading.Thread(target=other.serve_forever, daemon=True).start()
+        self.addCleanup(stop, other)
+        with self.assertRaises(ApiError) as e:
+            Client(other.server_address[1]).call("GET", "/api/projects")
+        self.assertEqual((e.exception.code, str(e.exception)),
+                         (403, "only this service's own user may use it"))
+        self.assertEqual(Client(port).call("GET", "/api/projects")[0], 200)
 
     def test_remove_and_readd_routes(self):
         pid = self.add()
