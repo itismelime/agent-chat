@@ -135,16 +135,34 @@ def format_message(m, name):
 class Spawner:
     """Starts, links, watches and stops the agents started from the page."""
 
-    def __init__(self, store):
-        self.store = store
+    def __init__(self, store, models=None, port=8765):
+        self.store, self.models, self.port = store, models, port
         self.lock = threading.Lock()  # a rename on join vs the poller's liveness check
+        self.pending = {}  # (pid, name) -> messages to type into an OpenCode agent, oldest first
 
-    def start(self, pid, tool):
+    def __call__(self, pid, name, m):
+        """store.type_in: queue a message for an OpenCode agent."""
+        with self.lock:
+            self.pending.setdefault((pid, name), []).append(m)
+
+    def start(self, pid, tool, model=None):
         project = self.store.project(pid)
         token = secrets.token_hex(16)
         session = "agent-chat-%s-%s" % (pid, token[:6])
-        start(tool, project["path"], session, token)
-        return self.store.add_spawned(pid, token, tool, session)
+        home = None
+        if tool == "opencode":
+            from . import opencode
+            usable = opencode.tool_models(self.models.ollama, self.models.gpu_total())
+            if model not in usable:
+                raise StoreError(400, "%s cannot call tools or is not installed; choose one of: %s"
+                                 % (model, ", ".join(usable) or "none"))
+            opencode.write_config(self.store.root, self.models.ollama.url, usable, self.port)
+            home = str(opencode.config_home(self.store.root))
+        start(tool, project["path"], session, token, model=model, config_home=home)
+        record = self.store.add_spawned(pid, token, tool, session)
+        if model:
+            record = self.store.update_spawned(pid, token, model=model)
+        return record
 
     def record(self, pid, token):
         records = self.store.spawned(pid)
@@ -160,8 +178,23 @@ class Spawner:
                 self.store.update_spawned(pid, token, session=new)
 
     def stop(self, pid, token):
-        stop(self.record(pid, token)["session"])
+        r = self.record(pid, token)
+        stop(r["session"])
         self.store.drop_spawned(pid, token)
+        if r.get("model") and self.models and not self._model_in_use(r["model"]):
+            try:
+                self.models.ollama.unload(r["model"])
+            except Exception as e:  # stopping still succeeded
+                print("agent-chat: could not unload %s: %s" % (r["model"], e), file=sys.stderr)
+
+    def _model_in_use(self, model):
+        for p in self.store.projects():
+            for a in self.store.agents(p["id"]).values():
+                if a.get("model") == model and not a.get("removed") and not a.get("gone"):
+                    return True
+            if any(r.get("model") == model for r in self.store.spawned(p["id"]).values()):
+                return True
+        return False
 
     def poll(self):
         """Drop starts whose session ended; flag those whose terminal asks."""
@@ -179,13 +212,29 @@ class Spawner:
                     need = False  # an open chat wait means the agent is idle
                 else:
                     try:
-                        need = needs_you(screen(r["session"]))
+                        text = screen(r["session"])
                     except StoreError:
                         continue
+                    need = needs_you(text)
                     if not r["name"]:
                         age = time.time() - datetime.fromisoformat(r["started"]).timestamp()
                         need = need or age > JOIN_GRACE
+                    elif r["tool"] == "opencode":
+                        self._type_pending(pid, r, text, need)
                 self.store.set_needs(pid, token, need)
+
+    def _type_pending(self, pid, r, text, need):
+        """Type the oldest pending message into an idle OpenCode agent."""
+        key = (pid, r["name"])
+        busy = working(text)
+        with self.lock:
+            queue = self.pending.get(key) or []
+            m = queue.pop(0) if queue and not busy and not need else None
+            left = bool(queue)
+        if m:
+            send_text(r["session"], format_message(m, r["name"]))
+            self.store.delivered(pid, r["name"], m["n"])
+        self.store.set_local(pid, r["name"], busy=busy or left or bool(m))
 
     def run(self):
         while True:

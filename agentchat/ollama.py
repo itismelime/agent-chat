@@ -67,6 +67,9 @@ class Ollama:
             self.json("POST", "/api/generate", {"model": name, "keep_alive": 0}, timeout=120)
         return names
 
+    def unload(self, model):
+        self.json("POST", "/api/generate", {"model": model, "keep_alive": 0}, timeout=120)
+
     def has_blob(self, digest):
         try:
             with self.request("HEAD", "/api/blobs/" + digest):

@@ -5,7 +5,9 @@ import unittest
 from pathlib import Path
 
 from agentchat import spawn
+from agentchat import models as models_mod
 from agentchat.store import StoreError
+from tests.fake_ollama import GIB, FakeOllama
 
 SCREENS = Path(__file__).resolve().parent / "data" / "screens"
 TMUX_STUB = """#!/bin/sh
@@ -169,6 +171,63 @@ class SpawnerTest(unittest.TestCase):
         self.store = Store(tmp / "data")
         self.store.add_project(str(tmp / "proj"))
         self.sp = spawn.Spawner(self.store)
+
+    def opencode_setup(self):
+        (self.d / "opencode").write_text("#!/bin/sh\nexit 0\n")
+        (self.d / "opencode").chmod(0o755)
+        self.fake = FakeOllama()
+        self.addCleanup(self.fake.close)
+        self.fake.add("coder:30b", size=18 * GIB, capabilities=["tools"])
+        self.sp = spawn.Spawner(self.store, models_mod.Models(root=self.store.root,
+                                                              ollama_url=self.fake.url), port=8765)
+        r = self.sp.start("proj", "opencode", model="coder:30b")
+        self.store.join("proj", "kit", "opencode", spawn=r["token"])
+        self.store.type_in = self.sp
+        return r
+
+    def typed(self):
+        return [c for c in calls(self.d) if c.startswith("send-keys") and " -l -- " in c]
+
+    def test_opencode_start_writes_the_config(self):
+        r = self.opencode_setup()
+        self.assertEqual(r["model"], "coder:30b")
+        cfg = self.store.root / "opencode-config" / "opencode" / "opencode.json"
+        self.assertIn("coder:30b", cfg.read_text())
+        self.assertIn("XDG_CONFIG_HOME=%s" % (self.store.root / "opencode-config"),
+                      [c for c in calls(self.d) if c.startswith("new-session")][0])
+
+    def test_types_pending_messages_only_when_idle(self):
+        self.opencode_setup()
+        (self.d / "screen").write_text((SCREENS / "working-opencode-working.txt").read_text())
+        self.store.post("proj", "user", "first")
+        self.store.post("proj", "user", "second")
+        self.sp.poll()
+        self.assertEqual(self.typed(), [])
+        self.assertEqual(next(a for a in self.store.status("proj") if a["name"] == "kit")["status"], "busy")
+        (self.d / "screen").write_text((SCREENS / "question-opencode-permission.txt").read_text())
+        self.sp.poll()
+        self.assertEqual(self.typed(), [])
+        (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text())
+        self.sp.poll()
+        self.sp.poll()
+        self.sp.poll()
+        typed = self.typed()
+        self.assertEqual(len(typed), 2)  # each once, oldest first
+        self.assertIn("[chat] user: first", typed[0])
+        self.assertIn("[chat] user: second", typed[1])
+        self.assertEqual(self.store.agents("proj")["kit"]["cursor"], self.store.messages("proj")[-1]["n"])
+        self.assertEqual(next(a for a in self.store.status("proj") if a["name"] == "kit")["status"], "waiting")
+
+    def test_stop_unloads_only_an_unused_model(self):
+        r = self.opencode_setup()
+        self.fake.loaded.add("coder:30b")
+        self.store.add_local("proj", "talker", "coder:30b")
+        self.sp.stop("proj", r["token"])
+        self.assertIn("coder:30b", self.fake.loaded)  # the local member still uses it
+        self.store.remove("proj", "talker")
+        r2 = self.sp.start("proj", "opencode", model="coder:30b")
+        self.sp.stop("proj", r2["token"])
+        self.assertNotIn("coder:30b", self.fake.loaded)
 
     def test_two_starts_get_their_own_sessions(self):
         a, b = self.sp.start("proj", "claude"), self.sp.start("proj", "claude")

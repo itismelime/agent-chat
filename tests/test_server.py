@@ -270,6 +270,23 @@ class ModelRoutesTest(unittest.TestCase):
         row = next(a for a in agents if a["name"] == "qwen")
         self.assertEqual((row["role"], row["model"], row["kind"]), ("Be kind", "qwen3.5:9b", "llm"))
 
+    def test_opencode_routes(self):
+        d = stub_tools(self)
+        (d / "opencode").write_text("#!/bin/sh\nexit 0\n")
+        (d / "opencode").chmod(0o755)
+        self.fake.add("coder:30b", size=18 * GIB, capabilities=["tools"])
+        body = self.c.call("GET", "/api/opencode/models")[1]
+        self.assertEqual((body["models"], body["default"]), (["coder:30b"], "coder:30b"))
+        pdir = Path(tempfile.mkdtemp())
+        pid = self.c.call("POST", "/api/projects", {"path": str(pdir)})[1]["project"]["id"]
+        for data, code in (({"tool": "opencode"}, 400), ({"tool": "opencode", "model": "qwen3.5:9b"}, 400)):
+            with self.assertRaises(ApiError) as e:
+                self.c.call("POST", "/api/projects/%s/spawned" % pid, data)
+            self.assertEqual(e.exception.code, code)
+        status, r = self.c.call("POST", "/api/projects/%s/spawned" % pid,
+                                {"tool": "opencode", "model": "coder:30b"})
+        self.assertEqual((status, r["spawned"]["model"]), (201, "coder:30b"))
+
     def test_models_js_is_served(self):
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
         conn.request("GET", "/models.js")

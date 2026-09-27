@@ -144,6 +144,10 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 return 200, {"project": project}
             if rest == ["tools"] and method == "GET":
                 return 200, spawn.available()
+            if rest == ["opencode", "models"] and method == "GET":
+                from . import opencode
+                names = opencode.tool_models(models.ollama, models.gpu_total())
+                return 200, {"models": names, "default": names[0] if names else None}
             if rest[:1] == ["models"]:
                 return self.model_route(method, rest[1:], query)
             if len(rest) >= 3 and rest[0] == "projects":
@@ -177,7 +181,9 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 if what == ["spawned"] and method == "GET":
                     return 200, {"spawned": store.spawned_list(pid)}
                 if what == ["spawned"] and method == "POST":
-                    return 201, {"spawned": spawner.start(pid, self.field(self.body(), "tool"))}
+                    data = self.body()
+                    return 201, {"spawned": spawner.start(pid, self.field(data, "tool"),
+                                                          data.get("model"))}
                 if len(what) == 3 and what[0] == "spawned":
                     token, action = what[1], what[2]
                     if action == "screen" and method == "GET":
@@ -265,12 +271,12 @@ def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=
     server = ThreadingHTTPServer(("127.0.0.1", port), BaseHTTPRequestHandler)
     server.daemon_threads = True
     store = store or Store()
-    spawner = spawn.Spawner(store)
+    models = models or models_mod.Models(store.root)
+    spawner = spawn.Spawner(store, models, server.server_address[1])
     if deliver:
         store.deliver = Deliverer(store)
+        store.type_in = spawner
         spawner.start_poller()
-    models = models or models_mod.Models(store.root)
-    if deliver:
         talker = talk.Talker(store, models)
         store.talk = talker
         talker.start()
