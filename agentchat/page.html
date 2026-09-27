@@ -49,6 +49,17 @@ button{font:inherit;padding:0 18px;border-radius:8px;border:0;background:var(--u
 border:1px solid var(--line);border-radius:8px;padding:4px;box-shadow:0 4px 16px #0003}
 #ac div{padding:5px 10px;border-radius:6px;cursor:pointer}#ac .sel{background:var(--line)}
 #ac small{color:var(--mute);margin-left:8px}[hidden]{display:none!important}
+.needs_you .dot{background:var(--claude)}#menu .off{opacity:.45;cursor:default}
+#addagent{float:right;margin:8px 10px 0}
+#term{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:8}
+#term .box{background:var(--card);border:1px solid var(--line);border-radius:10px;width:min(920px,96vw);
+max-height:92vh;display:flex;flex-direction:column;gap:8px;padding:12px}
+#term .top{display:flex;justify-content:space-between;align-items:center;font-weight:600}
+#screen{flex:1;overflow:auto;margin:0;min-height:240px;padding:8px;border-radius:6px;background:var(--bg);
+font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}
+#termkeys button{padding:4px 12px;margin:0 4px 4px 0}
+#ti{width:100%;font:inherit;padding:6px 8px;border-radius:6px;border:1px solid var(--line);
+background:var(--bg);color:var(--fg)}#attach{color:var(--mute);font-size:12px}
 @media (max-width:800px){aside{display:none}}@media (max-width:640px){nav{width:130px}}
 </style>
 <nav><h1>Projects</h1><div id=projects></div>
@@ -61,14 +72,21 @@ border:1px solid var(--line);border-radius:8px;padding:4px;box-shadow:0 4px 16px
 <form id=f><div id=ac role=listbox hidden></div>
 <textarea id=t placeholder="Message (Enter sends, Shift+Enter new line; type @ to address someone)"></textarea>
 <button>Send</button></form></div>
-<aside id=members aria-label="Agents in this project"></aside></div>
+<aside aria-label="Agents in this project"><button id=addagent class=ghost type=button
+title="Start an agent in this project">+ Agent</button><div id=members></div></aside></div>
 </main>
 <div id=menu role=menu hidden></div>
+<div id=term hidden><div class=box role=dialog aria-label="Agent terminal">
+<div class=top><span id=termtitle></span><button id=termclose class=ghost type=button>Close</button></div>
+<pre id=screen></pre><div id=termkeys></div>
+<form id=tf><input id=ti placeholder="Type a line for the terminal; Enter sends it" maxlength=2000></form>
+<span id=attach></span></div></div>
 <script>
 const $=id=>document.getElementById(id),log=$('log'),t=$('t'),ac=$('ac'),bell=$('bell');
 const saved={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v===null?d:v}catch(e){return d}},
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 let projects=[],cur=saved.get('cur',null),msgs={},agents=[],seen=saved.get('seen',{}),notified={},drawn='',busy=false,down=false;
+let tools={},spawned=[],needed=new Set();
 
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;
   if(text!==undefined)e.textContent=text;return e;}
@@ -98,6 +116,11 @@ async function refresh(){
       notified[p.id]=lastN(p.id);
     }
     agents=cur?(await api(`api/projects/${cur}/agents`)).agents:[];
+    spawned=cur?(await api(`api/projects/${cur}/spawned`)).spawned:[];
+    const p=projects.find(p=>p.id===cur);
+    for(const s of spawned)if(s.state==='needs_you'&&!needed.has(s.token)&&p)
+      notify(p,{from:s.name||('new '+(KIND[s.tool]||s.tool)),text:'needs you',n:'need-'+s.token});
+    needed=new Set(spawned.filter(s=>s.state==='needs_you').map(s=>s.token));
     if(cur&&!away())seen[cur]=lastN(cur);
     saved.set('seen',seen);if(down){$('err').textContent='';down=false;}render();
   }catch(e){down=true;$('err').textContent='Service not reachable: '+e.message;}
@@ -114,11 +137,14 @@ function render(){
   document.title=(total?`(${total}) `:'')+'agent-chat';
   const p=projects.find(p=>p.id===cur);
   $('name').textContent=p?p.name:'Add a project to start';
+  const starting=spawned.filter(s=>!s.name).map(s=>({name:'starting…',kind:s.tool,starting:true,
+    spawn:s.token,status:s.state==='needs_you'?'needs_you':'starting'}));
+  const members=[...starting,...agents];
   $('members').replaceChildren(...GROUPS.flatMap(([st,title])=>{
-    const g=agents.filter(a=>a.status===st);if(!g.length)return [];
+    const g=members.filter(a=>a.status===st);if(!g.length)return [];
     return [el('h2','',title+' — '+g.length),...g.map(a=>{const d=el('div','a '+a.status);
       d.title='Right-click for options';d.append(el('i','dot'),a.name,el('small','',KIND[a.kind]||a.kind));
-      d.oncontextmenu=e=>openMenu(e,a);return d;})];}));
+      d.oncontextmenu=e=>{e.stopPropagation();openMenu(e,agentItems(a));};return d;})];}));
   hint();
   const key=cur+':'+lastN(cur);if(key===drawn)return;
   const switched=!drawn.startsWith(cur+':');drawn=key;
@@ -129,26 +155,60 @@ function render(){
 }
 
 // members: groups, right-click menu, hint for agents that will not answer now
-const GROUPS=[['waiting','Available'],['busy','Working'],['offline','Offline'],['removed','Removed']];
+const GROUPS=[['needs_you','Needs you'],['starting','Starting'],['waiting','Available'],
+  ['busy','Working'],['offline','Offline'],['removed','Removed']];
 const KIND={claude:'Claude',codex:'Codex',llm:'local LLM'},menu=$('menu');
-function openMenu(e,a){
+function openMenu(e,items){
   e.preventDefault();
+  menu.replaceChildren(...items.map(([text,fn,off])=>{const item=el('div',off?'off':'',text);
+    item.setAttribute('role','menuitem');if(off)item.title=off;
+    item.onclick=async ev=>{ev.stopPropagation();if(off)return;menu.hidden=true;
+      try{await fn();}catch(err){$('err').textContent=err.message;}refresh();};return item;}));
+  menu.style.left=Math.min(e.clientX,innerWidth-200)+'px';menu.style.top=e.clientY+'px';menu.hidden=false;}
+const path=(token,x)=>`api/projects/${cur}/spawned/${token}/${x}`;
+function agentItems(a){
+  const items=[];
+  const who=a.starting?(KIND[a.kind]||a.kind)+' (starting)':a.name;
+  if(a.spawn){items.push(['View terminal',()=>openTerm(a.spawn,who)]);
+    items.push(['Stop',()=>{if(confirm(`Stop ${who}? Its tmux session ends.`))return api(path(a.spawn,'stop'),{});}]);}
+  if(a.starting)return items;
   const [text,action]=a.status==='removed'?['Add back','readd']:['Remove from chat','remove'];
-  const item=el('div','',text);item.setAttribute('role','menuitem');
-  item.onclick=async()=>{menu.hidden=true;
-    try{await api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/${action}`,{});}
-    catch(err){$('err').textContent=err.message;}
-    refresh();};
-  menu.replaceChildren(item);
-  menu.style.left=Math.min(e.clientX,innerWidth-190)+'px';menu.style.top=e.clientY+'px';menu.hidden=false;}
+  items.push([text,()=>api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/${action}`,{})]);
+  return items;}
+function startItems(){
+  return ['claude','codex'].map(tool=>{
+    const off=!cur?'Add a project first':!tools.tmux?'tmux is not installed':!tools[tool]?`${KIND[tool]} is not installed`:'';
+    return ['Start '+KIND[tool],()=>api(`api/projects/${cur}/spawned`,{tool}),off];});}
+$('addagent').onclick=e=>{e.stopPropagation();openMenu(e,startItems());};
+$('members').parentElement.oncontextmenu=e=>openMenu(e,startItems());
 addEventListener('click',()=>{menu.hidden=true;});
-addEventListener('keydown',e=>{if(e.key==='Escape')menu.hidden=true;});
+addEventListener('keydown',e=>{if(e.key==='Escape'){menu.hidden=true;if(!$('term').hidden&&document.activeElement!==$('ti'))closeTerm();}});
 function hint(){
   const lead=(t.value.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0];
   const to=lead.split(/[\s,:@]+/).filter(Boolean).map(x=>x.toLowerCase());
   $('hint').textContent=agents.filter(a=>to.includes(a.name)&&a.status!=='waiting').map(a=>
     a.status==='busy'?`${a.name} is working and will see this when its current task ends.`:
     a.status==='removed'?`${a.name} was removed from this chat.`:`${a.name} is offline.`).join(' ');}
+
+// terminal panel for an agent started from the page
+let termToken=null,termTimer=null;
+const KEYBTNS=[['1','1'],['2','2'],['3','3'],['↑','up'],['↓','down'],['Enter','enter'],['Esc','esc']];
+$('termkeys').replaceChildren(...KEYBTNS.map(([label,key])=>{const b=el('button','ghost',label);b.type='button';
+  b.onclick=()=>sendKeys({key});return b;}));
+async function sendKeys(body){
+  try{await api(path(termToken,'keys'),body);tick();}catch(e){$('screen').textContent+='\n['+e.message+']';}}
+async function tick(){
+  if(!termToken)return;
+  try{$('screen').textContent=(await api(path(termToken,'screen'))).screen;}
+  catch(e){$('screen').textContent='The terminal has ended.';clearInterval(termTimer);}}
+function openTerm(token,name){
+  termToken=token;$('termtitle').textContent=name+' — terminal';
+  const s=spawned.find(s=>s.token===token);
+  $('attach').textContent=s?`Take over in a terminal: tmux attach -t ${s.session}`:'';
+  $('term').hidden=false;$('ti').value='';tick();clearInterval(termTimer);termTimer=setInterval(tick,1500);$('ti').focus();}
+function closeTerm(){$('term').hidden=true;termToken=null;clearInterval(termTimer);t.focus();}
+$('termclose').onclick=closeTerm;
+$('tf').onsubmit=e=>{e.preventDefault();const text=$('ti').value;if(!text)return;$('ti').value='';sendKeys({text});};
 
 $('add').onclick=async()=>{
   const path=prompt('Project folder (absolute path)');if(!path||!path.trim())return;
@@ -194,5 +254,6 @@ $('f').onsubmit=async e=>{e.preventDefault();
   try{await api(`api/projects/${cur}/messages`,{from:'user',text});$('err').textContent='';}
   catch(e){t.value=text;$('err').textContent='Not sent: '+e.message;}
   refresh();};
+api('api/tools').then(x=>{tools=x;}).catch(()=>{});
 refresh();setInterval(refresh,2000);t.focus();
 </script>
