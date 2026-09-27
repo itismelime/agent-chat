@@ -98,7 +98,7 @@ title="Start an agent in this project">+ Agent</button><div id=members></div></a
 <dt>Alt+A</dt><dd>start an agent</dd><dt>↑</dt><dd>in an empty message box: your last message again</dd>
 <dt>/</dt><dd>focus the message box</dd><dt>?</dt><dd>this list</dd><dt>Esc</dt><dd>close a menu or panel</dd></dl>
 <h3>Commands in the message box</h3><dl>
-<dt>/start claude</dt><dd>start Claude in this project (or <code>/start codex</code>)</dd>
+<dt>/start claude</dt><dd>start Claude in this project (or <code>/start codex</code>, <code>/start opencode [model]</code>)</dd>
 <dt>/stop &lt;name&gt;</dt><dd>stop an agent started from the page</dd>
 <dt>/term &lt;name&gt;</dt><dd>open its terminal</dd><dt>/remove &lt;name&gt;</dt><dd>remove it from the chat</dd>
 <dt>/local &lt;model&gt; &lt;name&gt;</dt><dd>add an installed local model as a member</dd>
@@ -182,7 +182,7 @@ function render(){
     const g=members.filter(a=>a.status===st);if(!g.length)return [];
     return [el('h2','',title+' — '+g.length),...g.map(a=>{const d=el('div','a '+a.status);
       d.title=a.error?'Offline: '+a.error:'Right-click for options';
-      d.append(el('i','dot'),a.name,el('small','',a.model?'local LLM · '+a.model:KIND[a.kind]||a.kind));
+      d.append(el('i','dot'),a.name,el('small','',a.model?'local LLM · '+a.model:a.kind==='opencode'?'OpenCode · '+((spawned.find(s=>s.token===a.spawn)||{}).model||''):KIND[a.kind]||a.kind));
       d.oncontextmenu=e=>{e.stopPropagation();openMenu(e,agentItems(a));};return d;})];}));
   hint();
   const key=cur+':'+lastN(cur);if(key===drawn)return;
@@ -196,7 +196,7 @@ function render(){
 // members: groups, right-click menu, hint for agents that will not answer now
 const GROUPS=[['needs_you','Needs you'],['starting','Starting'],['waiting','Available'],
   ['busy','Working'],['offline','Offline'],['removed','Removed']];
-const KIND={claude:'Claude',codex:'Codex',llm:'local LLM'},menu=$('menu');
+const KIND={claude:'Claude',codex:'Codex',llm:'local LLM',opencode:'OpenCode'},menu=$('menu');
 function openMenu(e,items){
   e.preventDefault();
   menu.replaceChildren(...items.map(([text,fn,off])=>{const item=el('div',off?'off':'',text);
@@ -220,6 +220,11 @@ function startItems(){
   const items=['claude','codex'].map(tool=>{
     const off=!cur?'Add a project first':!tools.tmux?'tmux is not installed':!tools[tool]?`${KIND[tool]} is not installed`:'';
     return ['Start '+KIND[tool],()=>api(`api/projects/${cur}/spawned`,{tool}),off];});
+  const ocOff=!cur?'Add a project first':!tools.tmux?'tmux is not installed':!tools.opencode?'OpenCode is not installed':
+    !locals.ok?locals.reason:'';
+  if(ocOff||!oc.models.length)items.push(['Start OpenCode',()=>{},ocOff||'No model that can call tools; get one in Models']);
+  else for(const m of oc.models)items.push(['Start OpenCode: '+m+(m===oc.default?' (default)':''),
+    ()=>api(`api/projects/${cur}/spawned`,{tool:'opencode',model:m}),'']);
   if(!locals.ok)items.push(['Add local model',()=>{},locals.reason]);
   else if(!locals.names.length)items.push(['Add local model',()=>{},'No models installed; get one in Models']);
   else for(const n of locals.names)items.push(['Add local model: '+n,()=>addLocal(n),cur?'':'Add a project first']);
@@ -308,12 +313,13 @@ $('f').onsubmit=async e=>{e.preventDefault();
   refresh();};
 api('api/tools').then(x=>{tools=x;}).catch(()=>{});
 // installed local models for the start menu, refreshed every 30 s
-let locals={ok:false,reason:'Checking Ollama…',names:[]};
+let locals={ok:false,reason:'Checking Ollama…',names:[]},oc={models:[],default:null};
 async function loadLocals(){
   try{const s=await api('api/models/status');
     if(!s.reachable){locals={ok:false,reason:'Ollama is not reachable',names:[]};return;}
-    locals={ok:true,reason:'',names:(await api('api/models')).models.map(m=>m.name)};}
-  catch(e){locals={ok:false,reason:e.message,names:[]};}}
+    locals={ok:true,reason:'',names:(await api('api/models')).models.map(m=>m.name)};
+    oc=await api('api/opencode/models').catch(()=>({models:[],default:null}));}
+  catch(e){locals={ok:false,reason:e.message,names:[]};oc={models:[],default:null};}}
 loadLocals();setInterval(loadLocals,30000);
 function suggestName(model){return model.split(':')[0].split('/').pop().toLowerCase()
   .replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'')||'local';}
@@ -355,7 +361,9 @@ async function runCommand(text){
     if(!a)throw new Error(arg?`No agent named ${arg} in this project.`:`Say which agent: /${cmd} <name>`);return a;};
   const started=()=>{const a=agent();if(!a.spawn)throw new Error(`${a.name} was not started from the page.`);return a;};
   if(cmd==='start'){
-    if(!['claude','codex'].includes(arg))throw new Error('Use /start claude or /start codex.');
+    if(arg==='opencode'){const model=arg2||oc.default;if(!model)throw new Error('No model that can call tools; get one in Models.');
+      await api(`api/projects/${cur}/spawned`,{tool:'opencode',model});return `Starting OpenCode with ${model}…`;}
+    if(!['claude','codex'].includes(arg))throw new Error('Use /start claude, /start codex or /start opencode [model].');
     await api(`api/projects/${cur}/spawned`,{tool:arg});return `Starting ${KIND[arg]}…`;}
   if(cmd==='stop'){const a=started();await api(path(a.spawn,'stop'),{});return `Stopped ${a.name}.`;}
   if(cmd==='term'){const a=started();openTerm(a.spawn,a.name);return '';}
