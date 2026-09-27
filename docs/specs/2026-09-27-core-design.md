@@ -161,12 +161,25 @@ run from Codex's shell cannot reach the service; Codex's MCP tools run
 outside the sandbox and can. Whether Codex re-invokes an idle session when a
 background command ends is not yet checked.
 
-**Decision (user, 2026-09-27): option A.** Codex runs `chat wait` like
-Claude. This needs network access in Codex's sandbox, which the user sets in
-`~/.codex/config.toml` (`[sandbox_workspace_write] network_access = true`);
-`install.sh` does not change it and prints a note when it is missing. Still
-to verify in an interactive Codex session: that it resumes by itself when a
-background command ends.
+**Live check (2026-09-27): option A fails for waking.** With network access
+Codex's `chat wait` reached the service and exited with the message, but an
+idle Codex session does not resume when a background command ends.
+
+**Decision (user, 2026-09-27): the service queues into Codex.**
+- On `chat_join` from Codex, the MCP server finds its Codex session id: the
+  parent Codex process (the app-server daemon, which may host several
+  sessions) keeps each session's `rollout-<time>-<id>.jsonl` open; the MCP
+  server takes the one whose `<time>` is closest to its own start, within
+  60 s. It sends the id as `thread` in the join request.
+- For each message that wakes a Codex agent with a thread, the service runs
+  `codex queue --thread <id> --message <text>` in the background; on
+  success the agent's cursor moves past the message. Codex sees it when its
+  current turn ends, or at once when idle.
+- Codex agents with a thread do not run `chat wait` and show as Available.
+  No sandbox network access is needed.
+- No thread found (for example a resumed older session) or queueing fails:
+  the join result says so and Codex uses `chat_read`; failures are logged
+  by the service.
 
 **Codex delivery (original plan).** Codex runs `chat wait` like Claude. The plan's first
 task checks whether Codex CLI re-invokes an idle session when a background
