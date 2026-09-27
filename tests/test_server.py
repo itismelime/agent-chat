@@ -232,6 +232,19 @@ class ServerTest(unittest.TestCase):
                 self.c.call("POST", path, data)
             self.assertEqual(e.exception.code, code, path)
 
+    def test_forget_unassigns_the_agents_cards(self):
+        pid = self.add()
+        self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "kit", "kind": "claude"})
+        base = "/api/projects/%s/board" % pid
+        self.c.call("POST", base + "/cards", {"by": "user", "title": "Fix login", "assignee": "kit"})
+        self.c.call("POST", base + "/cards", {"by": "user", "title": "Other", "assignee": "user"})
+        self.c.call("POST", self.c.agent_path(pid, "kit", "remove"), {})
+        self.c.call("POST", self.c.agent_path(pid, "kit", "forget"), {})
+        cards = self.c.call("GET", base)[1]["cards"]
+        self.assertEqual([c["assignee"] for c in cards], [None, "user"])
+        texts = [m["text"] for m in self.store.messages(pid) if m["from"] == "board"]
+        self.assertEqual(texts[-1], '#1 "Fix login" is unassigned (kit was forgotten)')
+
     def test_remove_and_readd_routes(self):
         pid = self.add()
         self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})

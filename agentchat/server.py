@@ -221,6 +221,7 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         store.set_personality(pid, what[1], data.get(what[2]))
                     elif what[2] == "forget":
                         store.forget(pid, what[1])
+                        board.unassign(pid, what[1])
                     elif what[2] == "remove":
                         store.remove(pid, what[1])
                         # an agent started from the page leaves with its tmux session

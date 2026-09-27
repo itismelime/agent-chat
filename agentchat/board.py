@@ -110,6 +110,19 @@ class Board:
                 self.store.notice(pid, '%s%s edited #%s "%s"' % (at, by, n, card["title"]))
         return dict(card, id=int(n))
 
+    def unassign(self, pid, name):
+        """After an agent is forgotten: its cards lose their assignee."""
+        with self.store.changed:
+            b = self._load(pid)
+            mine = [(n, c) for n, c in b["cards"].items() if c["assignee"] == name]
+            if not mine:
+                return
+            for n, c in mine:
+                c["assignee"], c["updated"] = None, now()
+            write_json(self._path(pid), b)
+            for n, c in mine:
+                self.store.notice(pid, '#%s "%s" is unassigned (%s was forgotten)' % (n, c["title"], name))
+
     def delete(self, pid, n, by):
         self._by(pid, by)
         with self.store.changed:
