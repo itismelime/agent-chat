@@ -27,7 +27,9 @@ class Client:
 
     def call(self, method, path, body=None, timeout=10):
         data = None if body is None else json.dumps(body).encode()
-        headers = {"Content-Type": "application/json"} if data else {}
+        headers = {"X-Agent-Chat": "1"}
+        if data:
+            headers["Content-Type"] = "application/json"
         try:
             with urlopen(Request(self.base + path, data, headers, method=method),
                          timeout=timeout) as r:

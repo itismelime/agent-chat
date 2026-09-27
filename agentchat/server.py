@@ -1,8 +1,10 @@
 """agent-chat HTTP service: the JSON API and the page, on 127.0.0.1 only.
 
-Requests must name this server in Host, carry no foreign Origin, and send
-JSON bodies (which a foreign page cannot do without a CORS preflight we
-never answer), so other websites cannot post into the agents' sessions.
+Requests must name this server in Host and carry no foreign Origin; API
+requests must also send the X-Agent-Chat header and JSON bodies, which a
+foreign page cannot do without a CORS preflight we never answer. So other
+websites can neither post into the agents' sessions nor move their cursors
+with a plain GET such as <img src=...>.
 """
 import json
 import os
@@ -76,6 +78,8 @@ def make_handler(store, port, wait_seconds):
                 return self.send(403, {"error": "cross-site request refused"})
             url = urlsplit(self.path)
             parts = [p for p in url.path.split("/") if p]
+            if parts[:1] == ["api"] and self.headers.get("X-Agent-Chat") != "1":
+                return self.send(403, {"error": "missing X-Agent-Chat header"})
             query = {k: v[0] for k, v in parse_qs(url.query).items()}
             try:
                 self.send(*self.route(method, parts, query))

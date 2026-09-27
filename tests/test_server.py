@@ -8,6 +8,9 @@ import unittest
 from agentchat.client import ApiError, Client, ServiceDown, fmt, label
 from tests.helpers import start, stop
 
+API = {"X-Agent-Chat": "1"}
+JSON = dict(API, **{"Content-Type": "application/json"})
+
 
 class ServerTest(unittest.TestCase):
     def setUp(self):
@@ -36,15 +39,18 @@ class ServerTest(unittest.TestCase):
 
     def test_localhost_checks(self):
         self.assertEqual(self.raw("GET", "/", headers={"Host": "evil.example"})[0], 403)
+        # a GET from another site (<img src=...>) cannot add a custom header
+        self.assertEqual(self.raw("GET", "/api/projects")[0], 403)
+        self.assertEqual(self.raw("GET", "/api/projects", headers=API)[0], 200)
         body = json.dumps({"path": str(self.dir)}).encode()
-        foreign = {"Content-Type": "application/json", "Origin": "http://evil.example"}
+        foreign = dict(API, **{"Content-Type": "application/json", "Origin": "http://evil.example"})
         self.assertEqual(self.raw("POST", "/api/projects", body, foreign)[0], 403)
-        own = {"Content-Type": "application/json", "Origin": "http://127.0.0.1:%d" % self.port}
+        own = dict(API, **{"Content-Type": "application/json", "Origin": "http://127.0.0.1:%d" % self.port})
         self.assertEqual(self.raw("POST", "/api/projects", body, own)[0], 201)
-        self.assertEqual(self.raw("POST", "/api/projects", body, {"Content-Type": "text/plain"})[0], 415)
+        self.assertEqual(self.raw("POST", "/api/projects", body, dict(API, **{"Content-Type": "text/plain"}))[0], 415)
         big = json.dumps({"path": "x" * 20001}).encode()
-        self.assertEqual(self.raw("POST", "/api/projects", big, {"Content-Type": "application/json"})[0], 413)
-        self.assertEqual(self.raw("POST", "/api/projects", b"[1]", {"Content-Type": "application/json"})[0], 400)
+        self.assertEqual(self.raw("POST", "/api/projects", big, JSON)[0], 413)
+        self.assertEqual(self.raw("POST", "/api/projects", b"[1]", JSON)[0], 400)
 
     def test_projects_existing_and_missing(self):
         status, body = self.c.call("POST", "/api/projects", {"path": str(self.dir)})

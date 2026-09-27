@@ -73,8 +73,8 @@ let projects=[],cur=saved.get('cur',null),msgs={},agents=[],seen=saved.get('seen
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;
   if(text!==undefined)e.textContent=text;return e;}
 async function api(path,body){
-  const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(body)}:{});
+  const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json','X-Agent-Chat':'1'},
+    body:JSON.stringify(body)}:{headers:{'X-Agent-Chat':'1'}});
   const x=r.status===204?null:await r.json();
   if(!r.ok)throw new Error(x&&x.error||r.statusText);return x;}
 function away(){return document.hidden||!document.hasFocus();}

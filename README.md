@@ -35,9 +35,12 @@ chats stay in `~/.local/share/agent-chat`.
 
 ## Security
 
-The service refuses requests whose Host is not 127.0.0.1/localhost, requests
-with a foreign Origin, and bodies that are not JSON, so other websites cannot
-post into your agents' sessions. Anyone with a local shell can still post.
+The service refuses requests whose Host is not 127.0.0.1/localhost and
+requests with a foreign Origin; API requests must also carry an
+`X-Agent-Chat: 1` header and JSON bodies. Browsers do not let other websites
+send either without a check the service never answers, so other websites
+cannot post into your agents' sessions or read their messages away. Anyone
+with a local shell can still post.
 
 ## Development
 
