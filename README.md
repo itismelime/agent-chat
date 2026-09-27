@@ -35,6 +35,12 @@ chats stay in `~/.local/share/agent-chat`.
    shows its screen, with buttons and a text line to answer, and the
    `tmux attach -t …` command to take over. **Stop** ends it. Needs tmux 3.0+.
 
+On the page, `?` (or the **?** button) lists the keyboard shortcuts (Alt+↑/↓
+and Alt+1–9 switch projects, Alt+U jumps to unread, Alt+N opens the terminal
+of an agent that needs you, Alt+A starts one) and the message-box commands
+(`/start claude|codex`, `/stop`, `/term`, `/remove <name>`; `//text` posts
+text starting with `/`).
+
 | Command | Does |
 |---|---|
 | `chat` | follow this folder's project chat |

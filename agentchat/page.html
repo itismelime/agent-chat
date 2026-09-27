@@ -51,10 +51,13 @@ border:1px solid var(--line);border-radius:8px;padding:4px;box-shadow:0 4px 16px
 #ac small{color:var(--mute);margin-left:8px}[hidden]{display:none!important}
 .needs_you .dot{background:var(--claude)}#menu .off{opacity:.45;cursor:default}
 #addagent{float:right;margin:8px 10px 0}
-#term{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:8}
-#term .box{background:var(--card);border:1px solid var(--line);border-radius:10px;width:min(920px,96vw);
+#term,#help{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:8}
+#help dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0;font-size:14px}
+#help dt{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}#help dd{margin:0}
+#help h3{margin:10px 0 4px;font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+#term .box,#help .box{background:var(--card);border:1px solid var(--line);border-radius:10px;width:min(920px,96vw);
 max-height:92vh;display:flex;flex-direction:column;gap:8px;padding:12px}
-#term .top{display:flex;justify-content:space-between;align-items:center;font-weight:600}
+#term .top,#help .top{display:flex;justify-content:space-between;align-items:center;font-weight:600}
 #screen{flex:1;overflow:auto;margin:0;min-height:240px;padding:8px;border-radius:6px;background:var(--bg);
 font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}
 #termkeys button{padding:4px 12px;margin:0 4px 4px 0}
@@ -66,16 +69,30 @@ background:var(--bg);color:var(--fg)}#attach{color:var(--mute);font-size:12px}
 <button id=add class=ghost type=button title="Add a project folder">+ Add project</button></nav>
 <main>
 <header><span id=name></span>
+<button id=keys class=ghost type=button title="Shortcuts and commands (?)">?</button>
 <button id=bell class=ghost type=button hidden>Enable notifications</button></header>
 <div id=wrap><div id=chat>
 <div id=log></div><div id=note></div><div id=err></div><div id=hint></div>
 <form id=f><div id=ac role=listbox hidden></div>
-<textarea id=t placeholder="Message (Enter sends, Shift+Enter new line; type @ to address someone)"></textarea>
+<textarea id=t placeholder="Message (Enter sends, Shift+Enter new line; @ addresses someone; / starts a command)"></textarea>
 <button>Send</button></form></div>
 <aside aria-label="Agents in this project"><button id=addagent class=ghost type=button
 title="Start an agent in this project">+ Agent</button><div id=members></div></aside></div>
 </main>
 <div id=menu role=menu hidden></div>
+<div id=help hidden><div class=box role=dialog aria-label="Shortcuts and commands">
+<div class=top><span>Shortcuts and commands</span><button id=helpclose class=ghost type=button>Close</button></div>
+<h3>Keys</h3><dl>
+<dt>Alt+↑ / Alt+↓</dt><dd>previous / next project</dd><dt>Alt+1 … Alt+9</dt><dd>project 1–9</dd>
+<dt>Alt+U</dt><dd>next project with unread messages</dd>
+<dt>Alt+N</dt><dd>terminal of the first agent that needs you</dd>
+<dt>Alt+A</dt><dd>start an agent</dd><dt>↑</dt><dd>in an empty message box: your last message again</dd>
+<dt>/</dt><dd>focus the message box</dd><dt>?</dt><dd>this list</dd><dt>Esc</dt><dd>close a menu or panel</dd></dl>
+<h3>Commands in the message box</h3><dl>
+<dt>/start claude</dt><dd>start Claude in this project (or <code>/start codex</code>)</dd>
+<dt>/stop &lt;name&gt;</dt><dd>stop an agent started from the page</dd>
+<dt>/term &lt;name&gt;</dt><dd>open its terminal</dd><dt>/remove &lt;name&gt;</dt><dd>remove it from the chat</dd>
+<dt>//text</dt><dd>post a message that starts with /</dd></dl></div></div>
 <div id=term hidden><div class=box role=dialog aria-label="Agent terminal">
 <div class=top><span id=termtitle></span><button id=termclose class=ghost type=button>Close</button></div>
 <pre id=screen></pre><div id=termkeys></div>
@@ -182,7 +199,8 @@ function startItems(){
 $('addagent').onclick=e=>{e.stopPropagation();openMenu(e,startItems());};
 $('members').parentElement.oncontextmenu=e=>openMenu(e,startItems());
 addEventListener('click',()=>{menu.hidden=true;});
-addEventListener('keydown',e=>{if(e.key==='Escape'){menu.hidden=true;if(!$('term').hidden&&document.activeElement!==$('ti'))closeTerm();}});
+addEventListener('keydown',e=>{if(e.key==='Escape'){menu.hidden=true;$('help').hidden=true;
+  if(!$('term').hidden&&document.activeElement!==$('ti'))closeTerm();}});
 function hint(){
   const lead=(t.value.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0];
   const to=lead.split(/[\s,:@]+/).filter(Boolean).map(x=>x.toLowerCase());
@@ -247,13 +265,59 @@ t.onkeydown=e=>{
       sel=(sel+(e.key==='ArrowDown'?1:matches.length-1))%matches.length;showAc();return;}
     if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();pick(sel);return;}
     if(e.key==='Escape'){ac.hidden=true;return;}}
+  if(e.key==='ArrowUp'&&!t.value&&lastSent){e.preventDefault();t.value=lastSent;return;}
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('f').requestSubmit();}};
 
 $('f').onsubmit=async e=>{e.preventDefault();
   const text=t.value.trim();if(!text||!cur)return;t.value='';ac.hidden=true;
-  try{await api(`api/projects/${cur}/messages`,{from:'user',text});$('err').textContent='';}
+  if(text.startsWith('/')&&!text.startsWith('//')){
+    try{$('note').textContent=await runCommand(text);$('err').textContent='';lastSent=text;}
+    catch(e){t.value=text;$('err').textContent=e.message;}
+    refresh();return;}
+  try{await api(`api/projects/${cur}/messages`,{from:'user',text:text.startsWith('//')?text.slice(1):text});
+    $('err').textContent='';lastSent=text;}
   catch(e){t.value=text;$('err').textContent='Not sent: '+e.message;}
   refresh();};
 api('api/tools').then(x=>{tools=x;}).catch(()=>{});
+// keyboard shortcuts (Alt, since the browser owns most Ctrl keys) and commands
+let lastSent='';
+const typing=()=>['TEXTAREA','INPUT'].includes((document.activeElement||{}).tagName);
+function stepProject(by){const i=projects.findIndex(p=>p.id===cur);
+  if(projects.length)select(projects[(i+by+projects.length)%projects.length].id);}
+function needsYou(){  // the first started agent of this project whose terminal asks
+  const s=spawned.find(s=>s.state==='needs_you');if(s)openTerm(s.token,s.name||(KIND[s.tool]||s.tool)+' (starting)');
+  else $('note').textContent='No agent here needs you.';}
+addEventListener('keydown',e=>{
+  if(e.altKey&&!e.ctrlKey&&!e.metaKey){
+    const go=f=>{e.preventDefault();f();};
+    if(e.key==='ArrowUp')return go(()=>stepProject(-1));
+    if(e.key==='ArrowDown')return go(()=>stepProject(1));
+    const digit=/^Digit([1-9])$/.exec(e.code);
+    if(digit)return go(()=>{const p=projects[digit[1]-1];if(p)select(p.id);});
+    if(e.code==='KeyU')return go(()=>{const i=projects.findIndex(p=>p.id===cur);
+      const p=[...projects.slice(i+1),...projects.slice(0,i+1)].find(p=>unread(p)&&p.id!==cur);
+      if(p)select(p.id);else $('note').textContent='No unread messages elsewhere.';});
+    if(e.code==='KeyN')return go(needsYou);
+    if(e.code==='KeyA')return go(()=>{const b=$('addagent').getBoundingClientRect();
+      openMenu({preventDefault(){},clientX:b.left||16,clientY:b.bottom||60},startItems());});
+  }
+  if(!typing()&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
+    if(e.key==='/'){e.preventDefault();t.focus();}
+    else if(e.key==='?'){e.preventDefault();$('help').hidden=false;}
+  }});
+$('keys').onclick=()=>{$('help').hidden=false;};$('helpclose').onclick=()=>{$('help').hidden=true;t.focus();};
+async function runCommand(text){
+  const [cmd,arg='']=text.slice(1).trim().split(/\s+/);
+  const agent=()=>{const a=agents.find(a=>a.name===arg.toLowerCase());
+    if(!a)throw new Error(arg?`No agent named ${arg} in this project.`:`Say which agent: /${cmd} <name>`);return a;};
+  const started=()=>{const a=agent();if(!a.spawn)throw new Error(`${a.name} was not started from the page.`);return a;};
+  if(cmd==='start'){
+    if(!['claude','codex'].includes(arg))throw new Error('Use /start claude or /start codex.');
+    await api(`api/projects/${cur}/spawned`,{tool:arg});return `Starting ${KIND[arg]}…`;}
+  if(cmd==='stop'){const a=started();await api(path(a.spawn,'stop'),{});return `Stopped ${a.name}.`;}
+  if(cmd==='term'){const a=started();openTerm(a.spawn,a.name);return '';}
+  if(cmd==='remove'){const a=agent();
+    await api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/remove`,{});return `Removed ${a.name}.`;}
+  throw new Error(`Unknown command /${cmd}. Press ? for the list; //text posts text starting with /.`);}
 refresh();setInterval(refresh,2000);t.focus();
 </script>
