@@ -79,4 +79,8 @@ class Deliverer:
 
     def run(self):
         while True:
-            deliver(self.store, *self.jobs.get())
+            job = self.jobs.get()
+            try:
+                deliver(self.store, *job)
+            except Exception as e:  # one bad job must not stop delivery to every Codex
+                print("agent-chat: Codex delivery failed: %s" % e, file=sys.stderr)

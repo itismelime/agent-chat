@@ -227,7 +227,10 @@ class ServerTest(unittest.TestCase):
         for path, data, code in ((base + "/cards", {"by": "user", "title": ""}, 400),
                                  (base + "/cards/7", {"by": "user", "column": "done"}, 404),
                                  (base + "/cards/x", {"by": "user"}, 404),
-                                 (base + "/cards", {"by": "ghost", "title": "t"}, 403)):
+                                 (base + "/cards", {"by": "ghost", "title": "t"}, 403),
+                                 (base + "/cards", {"by": "user", "title": "t", "column": ["x"]}, 400),
+                                 (base + "/cards", {"by": "user", "title": "t", "assignee": {"a": 1}}, 400),
+                                 (base + "/cards/%C2%B2", {"by": "user"}, 404)):
             with self.assertRaises(ApiError, msg=path) as e:
                 self.c.call("POST", path, data)
             self.assertEqual(e.exception.code, code, path)
@@ -260,6 +263,11 @@ class ServerTest(unittest.TestCase):
         stop(self.server)
         with self.assertRaises(ServiceDown):
             Client(self.port).call("GET", "/api/projects")
+
+    def test_board_notices_need_no_reply(self):
+        m = {"time": "2026-09-27T18:30:16+02:00", "from": "board", "text": 'kit moved #1 "x" to Done'}
+        self.assertEqual(label(m, "cody"), "board notice: no reply needed")
+        self.assertEqual(label(dict(m, text="@cody you were assigned #1"), "cody"), "addressed to you: reply")
 
     def test_fmt_and_label(self):
         m = {"time": "2026-09-27T18:30:16+02:00", "from": "user", "text": "@bob hi"}

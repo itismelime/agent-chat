@@ -138,7 +138,8 @@ def working(text):
 def format_message(m, name, personality=None):
     """One line to type into an OpenCode agent's terminal."""
     from .client import label
-    who = " Your personality: %s." % re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", personality) if personality else ""
+    who = (" Your personality: %s." % re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", personality).rstrip(".")
+           if personality else "")
     tail = " (%s)%s Reply with chat_post." % (label(m, name), who)
     # typed as keystrokes into a coding agent: no control characters, which
     # could erase the "[chat]" prefix, interrupt it, or start a "!" shell line

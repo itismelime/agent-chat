@@ -8,6 +8,7 @@ with a plain GET such as <img src=...>.
 """
 import json
 import os
+import re
 import select
 import socket
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -285,7 +286,7 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 card = board.add(pid, by, data.get("title"), data.get("description", ""),
                                  data.get("column") or "todo", data.get("assignee"))
                 return 201, {"card": card}
-            if not what[1].isdigit():
+            if not re.fullmatch(r"[0-9]+", what[1]):
                 raise StoreError(404, "no card %s" % what[1])
             n = int(what[1])
             if what[2:] == ["delete"]:

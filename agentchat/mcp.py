@@ -114,9 +114,13 @@ class Session:
             lines = []
             for key, label in b["columns"]:
                 cards = [c for c in b["cards"] if c["column"] == key]
-                lines.append("%s: %s" % (label, "; ".join(
-                    '#%d "%s"%s' % (c["id"], c["title"], " (%s)" % c["assignee"] if c["assignee"] else "")
-                    for c in cards) or "(empty)"))
+                lines.append("%s:%s" % (label, "" if cards else " (empty)"))
+                for c in cards:
+                    lines.append('  #%d "%s"%s' % (c["id"], c["title"],
+                                                  " (%s)" % c["assignee"] if c["assignee"] else ""))
+                    if c.get("description"):
+                        d = " ".join(c["description"].split())
+                        lines.append("      " + (d[:300] + "…" if len(d) > 300 else d))
             return "\n".join(lines)
         if tool == "board_add":
             card = self.client.call("POST", base + "/cards", {
@@ -176,7 +180,7 @@ class Session:
                            "a resumed session), so messages are not delivered to you; call "
                            "chat_read to see new ones.")
                 if body["agent"].get("personality"):
-                    joined += "Your personality: %s. " % body["agent"]["personality"]
+                    joined += "Your personality: %s. " % body["agent"]["personality"].rstrip(".")
                 return "%s%s\n\nRecent messages:\n%s" % (joined, how, recent), False
             if tool not in ("chat_post", "chat_read") + BOARD_TOOLS:
                 return "unknown tool: %s" % tool, True

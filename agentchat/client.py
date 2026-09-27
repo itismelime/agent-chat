@@ -66,6 +66,8 @@ def fmt(m):
 
 def label(m, name):
     to = addressed(m["text"])
+    if m["from"] == "board" and name not in to:
+        return "board notice: no reply needed"
     if not to:
         return "for everyone: reply"
     return "addressed to you: reply" if name in to else "for others: read only"

@@ -71,6 +71,24 @@ class DeliverTest(unittest.TestCase):
         text = self.out.read_text().split("--message\n", 1)[1]
         self.assertTrue(text.startswith("Your personality: You test things\n"), text)
 
+    def test_the_delivery_thread_survives_errors(self):
+        from agentchat.codex import Deliverer
+        self.stub(0)
+        d = Deliverer(self.store)
+        self.store.set_personality("proj", "cody", "x")
+        self.store.remove("proj", "cody")
+        self.store.forget("proj", "cody")   # forgotten while its delivery is queued
+        d("proj", "cody", T1, self.m)
+        self.store.join("proj", "cody2", "codex", thread=T1)
+        m2 = self.store.post("proj", "user", "@cody2 second")
+        d("proj", "cody2", T1, m2)
+        import time as _t
+        for _ in range(100):
+            if self.out.exists() and "second" in self.out.read_text():
+                break
+            _t.sleep(0.05)
+        self.assertIn("second", self.out.read_text())
+
     def test_failure_keeps_the_message_unread(self):
         self.stub(1)
         self.assertFalse(deliver(self.store, "proj", "cody", T1, self.m))

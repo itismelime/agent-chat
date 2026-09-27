@@ -17,7 +17,14 @@ class Board:
 
     def _load(self, pid):
         f = self._path(pid)
-        return json.loads(f.read_text()) if f.exists() else {"next": 1, "cards": {}}
+        if not f.exists():
+            return {"next": 1, "cards": {}}
+        try:
+            b = json.loads(f.read_text())
+            b["next"], b["cards"]  # noqa: B018 (the shape this file must have)
+            return b
+        except (ValueError, KeyError, TypeError):
+            raise StoreError(500, "the board file %s is damaged; fix or remove it" % f) from None
 
     def get(self, pid):
         b = self._load(pid)
@@ -33,6 +40,8 @@ class Board:
             raise StoreError(403, "only the user or an agent in this chat can change the board")
 
     def _assignee(self, pid, who):
+        if who is not None and not isinstance(who, str):
+            raise StoreError(400, "assignee must be a name")
         if who in (None, "", "user"):
             return who or None
         agent = self.store.agents(pid).get(who)
@@ -54,7 +63,7 @@ class Board:
 
     @staticmethod
     def _column(column):
-        if column not in COLUMNS:
+        if not isinstance(column, str) or column not in COLUMNS:
             raise StoreError(400, "column must be one of: " + ", ".join(COLUMNS))
         return column
 

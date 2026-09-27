@@ -148,7 +148,7 @@ let tools={},spawned=[],needed=new Set();
 
 // ```code blocks``` and `inline code` in messages; everything else stays plain text
 function renderText(text){
-  const frag=document.createDocumentFragment(),re=/```[^\n`]*\n?([\s\S]*?)```/g;let last=0,m;
+  const frag=document.createDocumentFragment(),re=/```(?:[^\n`]*\n)?([\s\S]*?)```/g;let last=0,m;
   const inline=s=>s.split(/(`[^`\n]+`)/).forEach((part,i)=>{
     if(i%2)frag.append(el('code','',part.slice(1,-1)));else if(part)frag.append(part);});
   while((m=re.exec(text))){

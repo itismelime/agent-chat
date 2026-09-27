@@ -295,7 +295,7 @@ class Store:
     def _check_role(role):
         if role is not None and not (isinstance(role, str) and len(role) <= MAX_ROLE):
             raise StoreError(400, "a personality is text of at most %d characters" % MAX_ROLE)
-        return (role or "").strip() or None
+        return " ".join((role or "").split()) or None  # one line: it heads wake-up texts
 
     def add_local(self, pid, name, model, role=None):
         """A local-model member: an agent of kind llm answered by talk.Talker."""
@@ -319,6 +319,10 @@ class Store:
         with self.changed:
             if not self._agent(pid, name, active=False).get("removed"):
                 raise StoreError(400, "only a removed agent can be forgotten; remove %s first" % name)
+            if self.waiting.get((pid, name)):
+                # its old session still waits: a new agent with this name would share it
+                raise StoreError(409, "%s's session is still running its chat wait; stop that "
+                                      "session first" % name)
             agents = self.agents(pid)
             del agents[name]
             write_json(self._dir(pid) / "agents.json", agents)
@@ -338,7 +342,8 @@ class Store:
     def delivered(self, pid, name, n):
         """A message up to n was queued into the agent's session."""
         with self.changed:
-            if self._agent(pid, name, active=False)["cursor"] < n:
+            agent = self.agents(pid).get(name)
+            if agent and agent["cursor"] < n:  # forgotten meanwhile: nothing to move
                 self._update(pid, name, cursor=n)
 
     def remove(self, pid, name):

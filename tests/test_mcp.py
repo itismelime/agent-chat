@@ -154,6 +154,8 @@ class McpTest(unittest.TestCase):
         text, _ = tool(self.s, "board_list", {})
         self.assertIn("Review", text)
         self.assertIn('#1 "Fix login" (alice)', text)
+        tool(self.s, "board_update", {"id": 1, "description": "Use the new token API"})
+        self.assertIn("Use the new token API", tool(self.s, "board_list", {})[0])
         self.assertTrue(tool(self.s, "board_update", {"id": 1, "column": "later"})[1])
         self.assertTrue(tool(self.s, "board_update", {"id": "x"})[1])
 

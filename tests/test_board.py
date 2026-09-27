@@ -78,6 +78,13 @@ class BoardTest(unittest.TestCase):
             self.board.add("proj", "kit", "x")
         self.assertEqual(e.exception.code, 403)
 
+    def test_a_corrupt_board_file_is_an_error_not_a_crash(self):
+        self.board.add("proj", "user", "x")
+        self.board._path("proj").write_text("{not json")
+        with self.assertRaises(StoreError) as e:
+            self.board.get("proj")
+        self.assertEqual(e.exception.code, 500)
+
     def test_titles_are_one_line(self):
         c = self.board.add("proj", "user", "two\nlines")
         self.assertEqual(c["title"], "two lines")
