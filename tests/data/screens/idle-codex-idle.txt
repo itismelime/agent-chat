@@ -1,0 +1,40 @@
+╭──────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.157.1)                       │
+│                                                  │
+│ model:     GPT-6-Luna medium   /model to change  │
+│ directory: /tmp/claude-1000/…/prompts/codex-proj │
+╰──────────────────────────────────────────────────╯
+
+
+› Say hi in one word.
+
+
+• Hi
+
+  7:49 PM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                         Tip: Moving from Claude Code? Use /import to bring over your setup, project, and recent chats.
+
+› Ask Codex to do anything
+
+  GPT-6-Luna medium · /tmp/claude-1000/-home-lime-Projects-OpenVIBES/05ff64d3-8d30-489a-adb2-a2b6d1caf4e5/scratchpad/pr…
+  ← for agents · ? for shortcuts                                                              ⚠ 2 warnings · f2 to view
