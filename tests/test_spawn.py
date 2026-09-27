@@ -99,7 +99,13 @@ class TmuxTest(unittest.TestCase):
         # Codex takes fast input as a paste and ignores an Enter that follows at once
         slept = []
         real = spawn.time.sleep
-        spawn.time.sleep = lambda t: slept.append((t, len(calls(self.d))))
+
+        def sleep(t):  # time.sleep is global: subprocess waits with it too, so pass those on
+            if t == spawn.PASTE_PAUSE:
+                slept.append((t, len(calls(self.d))))
+            else:
+                real(t)
+        spawn.time.sleep = sleep
         self.addCleanup(setattr, spawn.time, "sleep", real)
         spawn.send_text("s", "hi")
         self.assertEqual(slept, [(spawn.PASTE_PAUSE, 1)])  # after the text, before Enter
