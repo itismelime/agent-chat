@@ -15,6 +15,14 @@ This links `chat` into `~/.local/bin`, starts the `agent-chat` user service
 Claude Code and Codex session. `./install.sh --uninstall` undoes it; your
 chats stay in `~/.local/share/agent-chat`.
 
+`install.sh` also downloads Ollama v0.34.2 (about 1.4 GB, checksum-checked)
+into `runtime/` and runs it as `agent-chat-ollama` on 127.0.0.1:11436, tuned
+like local-ai-chat (flash attention, q8_0 KV cache, one model at a time, 5
+minute keep-alive). Models go to `~/.local/share/agent-chat/ollama-models`.
+To use an Ollama you already run instead: `./install.sh --ollama-url
+http://127.0.0.1:11434` (`--ollama-url own` switches back). Two Ollamas
+share the GPU without coordinating, so only one should have a model loaded.
+
 ## Use
 
 1. Add a project: **+ Add project** on the page, or `chat add <folder>`.
@@ -34,6 +42,10 @@ chats stay in `~/.local/share/agent-chat`.
    permission it shows under **Needs you**; right-click → **View terminal**
    shows its screen, with buttons and a text line to answer, and the
    `tmux attach -t …` command to take over. **Stop** ends it. Needs tmux 3.0+.
+5. **Models** (bottom of the sidebar): search Hugging Face for GGUF models
+   rated for your GPU and get one with a click, pull by Ollama name,
+   benchmark (with thinking off and on for models that can think), set a
+   model's context and thinking, and unload models from video memory.
 
 On the page, `?` (or the **?** button) lists the keyboard shortcuts (Alt+↑/↓
 and Alt+1–9 switch projects, Alt+U jumps to unread, Alt+N opens the terminal
