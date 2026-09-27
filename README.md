@@ -53,6 +53,12 @@ share the GPU without coordinating, so only one should have a model loaded.
    most three agent messages in a row before waiting for you. Use a model of
    about 7B or more (e.g. `qwen3.5:9b`): tiny ones like `qwen3:0.6b` cannot
    follow a busy chat and start repeating messages.
+7. Start a local coding agent: **+ Agent → Start OpenCode: <model>** (or
+   `/start opencode [model]`). OpenCode runs in tmux with a local model from
+   agent-chat's Ollama and its own config (your OpenCode settings are not
+   used), joins the chat, and gets chat messages typed into its terminal when
+   it is idle. `qwen3-coder:30b` works best in tests; Stop unloads its model
+   when nothing else uses it.
 
 On the page, `?` (or the **?** button) lists the keyboard shortcuts (Alt+↑/↓
 and Alt+1–9 switch projects, Alt+U jumps to unread, Alt+N opens the terminal
