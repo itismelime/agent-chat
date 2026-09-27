@@ -104,3 +104,7 @@ at a time (Ollama loads one model at a time):
 - Firefox: the menu entries, the name and role prompts, the member line.
 - Live, with the user: `qwen3:0.6b` in a scratch project answers the user,
   stays quiet for `@someone-else`, and appears Working while answering.
+
+## Verified
+
+2026-09-27: Firefox check against a fake Ollama (add from the menu with name and role prompts, Working then the answer, silent for `@someone`, Offline with the error as tooltip and back after a success, Edit role, `/local`). Real path: the Talker with `qwen3:0.6b` on agent-chat's Ollama answered "The capital of France is Paris." in 4.0 s (load included) under the role "Answer in at most one sentence." and stayed silent for `@alice …`. The live service runs it since `f096274`.
