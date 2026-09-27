@@ -91,6 +91,15 @@ class McpTest(unittest.TestCase):
         self.assertIn("call chat_read", text)
         self.assertIsNone(self.store.agents("proj")["cody"].get("thread"))
 
+    def test_join_sends_the_start_token(self):
+        # a session name no real tmux has: linking tries to rename it and must fail harmlessly
+        self.store.add_spawned("proj", "tok", "claude", "agent-chat-test-no-such-session")
+        s = Session(Client(self.port), str(self.dir), spawn_token="tok")
+        rpc(s, "initialize", {"clientInfo": {"name": "claude-code"}})
+        text, err = tool(s, "chat_join", {"name": "alice"})
+        self.assertFalse(err, text)
+        self.assertEqual(self.store.spawned("proj")["tok"]["name"], "alice")
+
     def test_name_taken(self):
         self.store.join("proj", "alice", "codex")
         text, err = tool(self.s, "chat_join", {"name": "alice"})

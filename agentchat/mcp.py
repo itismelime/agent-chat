@@ -35,9 +35,10 @@ def kind_of(client_name):
 
 
 class Session:
-    def __init__(self, client, cwd, find_thread=find_thread):
+    def __init__(self, client, cwd, find_thread=find_thread, spawn_token=None):
         self.client, self.name, self.kind = client, None, "llm"
         self.find_thread = find_thread
+        self.spawn_token = spawn_token  # set when the page started this agent
         try:
             self.project, self.down = client.resolve(cwd), False
         except (ServiceDown, ApiError):
@@ -91,6 +92,8 @@ class Session:
                 join = {"name": str(args.get("name", "")), "kind": self.kind}
                 if self.kind == "codex":
                     join["thread"] = self.find_thread()
+                if self.spawn_token:
+                    join["spawn"] = self.spawn_token
                 body = self.client.call("POST", "/api/projects/%s/agents" % pid, join)[1]
                 self.name = body["agent"]["name"]
                 recent = "\n".join(fmt(m) for m in body["recent"]) or "(no messages yet)"
@@ -150,7 +153,7 @@ def handle(session, req):
 
 
 def main():
-    session = Session(Client(), os.getcwd())
+    session = Session(Client(), os.getcwd(), spawn_token=os.environ.get("AGENT_CHAT_SPAWN"))
     for raw in sys.stdin:
         if not raw.strip():
             continue
