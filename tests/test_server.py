@@ -213,6 +213,25 @@ class ServerTest(unittest.TestCase):
                         {"tool": "claude", "personality": "You test"})[1]["spawned"]
         self.assertEqual(r["personality"], "You test")
 
+    def test_board_routes(self):
+        pid = self.add()
+        base = "/api/projects/%s/board" % pid
+        self.assertEqual(self.c.call("GET", base)[1]["cards"], [])
+        status, body = self.c.call("POST", base + "/cards", {"by": "user", "title": "Fix login"})
+        self.assertEqual((status, body["card"]["id"]), (201, 1))
+        card = self.c.call("POST", base + "/cards/1", {"by": "user", "column": "review"})[1]["card"]
+        self.assertEqual(card["column"], "review")
+        self.c.call("POST", base + "/cards/1", {"by": "user", "assignee": None})
+        self.c.call("POST", base + "/cards/1/delete", {"by": "user"})
+        self.assertEqual(self.c.call("GET", base)[1]["cards"], [])
+        for path, data, code in ((base + "/cards", {"by": "user", "title": ""}, 400),
+                                 (base + "/cards/7", {"by": "user", "column": "done"}, 404),
+                                 (base + "/cards/x", {"by": "user"}, 404),
+                                 (base + "/cards", {"by": "ghost", "title": "t"}, 403)):
+            with self.assertRaises(ApiError, msg=path) as e:
+                self.c.call("POST", path, data)
+            self.assertEqual(e.exception.code, code, path)
+
     def test_remove_and_readd_routes(self):
         pid = self.add()
         self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})

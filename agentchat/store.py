@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
-RESERVED = {"user", "all"}
+RESERVED = {"user", "all", "board"}
 KINDS = {"claude", "codex", "llm", "opencode"}
 THREAD = re.compile(r"^[0-9A-Za-z-]{1,64}$")
 BUSY_SECONDS = 600
@@ -146,12 +146,14 @@ class Store:
         msgs = self.messages(pid)
         return msgs[-1]["n"] if msgs else 0
 
-    def post(self, pid, sender, text):
+    def post(self, pid, sender, text, _board=False):
         text = text.strip()
         if not text:
             raise StoreError(400, "empty message")
         with self.changed:
-            if sender == "user":
+            if _board:
+                sender = kind = "board"  # board.Board's notices; nobody else posts as board
+            elif sender == "user":
                 kind = "user"
             else:
                 if sender not in self.agents(pid):
@@ -171,6 +173,10 @@ class Store:
                 elif a.get("model") and self.talk:
                     self.talk(pid, name, m)
             return m
+
+    def notice(self, pid, text):
+        """A message from "board": wakes only the names it addresses."""
+        return self.post(pid, "board", text, _board=True)
 
     # agents
 

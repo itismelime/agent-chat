@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
 from . import spawn, talk
+from .board import Board
 from .codex import Deliverer
 from .ollama import OllamaError
 from .store import Store, StoreError
@@ -44,6 +45,7 @@ def peer_uid(client_port, server_port, table=TCP_TABLE):
 
 def make_handler(store, port, wait_seconds, spawner, owner, models):
     hosts = {"127.0.0.1:%d" % port, "localhost:%d" % port}
+    board = Board(store)
 
     class Handler(BaseHTTPRequestHandler):
         def send(self, code, body=None, ctype="application/json"):
@@ -179,6 +181,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         raise StoreError(400, "%s is not installed in the Ollama in use" % model)
                     agent = store.add_local(pid, self.field(data, "name"), model, data.get("role"))
                     return 201, {"agent": agent}
+                if what[:1] == ["board"]:
+                    return self.board_route(method, pid, what[1:])
                 if what == ["spawned"] and method == "GET":
                     return 200, {"spawned": store.spawned_list(pid)}
                 if what == ["spawned"] and method == "POST":
@@ -268,6 +272,28 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
             if what == ["tune"]:
                 fields = {k: data[k] for k in ("num_ctx", "think") if k in data}
                 return 200, {"model": m.tuning.set(name, m.ollama, m.gpu_total(), **fields)}
+            raise StoreError(404, "not found")
+
+        def board_route(self, method, pid, what):
+            if method == "GET" and not what:
+                return 200, board.get(pid)
+            if method != "POST" or what[:1] != ["cards"]:
+                raise StoreError(404, "not found")
+            data = self.body()
+            by = self.field(data, "by")
+            if len(what) == 1:
+                card = board.add(pid, by, data.get("title"), data.get("description", ""),
+                                 data.get("column") or "todo", data.get("assignee"))
+                return 201, {"card": card}
+            if not what[1].isdigit():
+                raise StoreError(404, "no card %s" % what[1])
+            n = int(what[1])
+            if what[2:] == ["delete"]:
+                board.delete(pid, n, by)
+                return 200, {}
+            if len(what) == 2:
+                fields = {k: data[k] for k in ("title", "description", "column", "assignee") if k in data}
+                return 200, {"card": board.update(pid, n, by, **fields)}
             raise StoreError(404, "not found")
 
         def log_message(self, *args):
