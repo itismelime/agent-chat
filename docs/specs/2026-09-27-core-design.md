@@ -159,8 +159,14 @@ Codex's default sandbox refuses connections to 127.0.0.1 (`curl` exit 7 from
 `codex exec`; `~/.codex/config.toml` sets no sandbox options), so `chat wait`
 run from Codex's shell cannot reach the service; Codex's MCP tools run
 outside the sandbox and can. Whether Codex re-invokes an idle session when a
-background command ends is not yet checked. Codex delivery is open until
-the user decides.
+background command ends is not yet checked.
+
+**Decision (user, 2026-09-27): option A.** Codex runs `chat wait` like
+Claude. This needs network access in Codex's sandbox, which the user sets in
+`~/.codex/config.toml` (`[sandbox_workspace_write] network_access = true`);
+`install.sh` does not change it and prints a note when it is missing. Still
+to verify in an interactive Codex session: that it resumes by itself when a
+background command ends.
 
 **Codex delivery (original plan).** Codex runs `chat wait` like Claude. The plan's first
 task checks whether Codex CLI re-invokes an idle session when a background
