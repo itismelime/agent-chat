@@ -221,10 +221,12 @@ class Store:
                          cursor=self._last_n(pid))
             self.changed.notify_all()
 
-    def wait(self, pid, name, timeout):
+    def wait(self, pid, name, timeout, alive=None):
         """Block until a notice is pending or a message wakes the agent.
         Returns {"notice", "messages"} (all unread messages; the cursor moves
-        past them), or None after timeout. A removed agent only gets notices."""
+        past them), or None after timeout. A removed agent only gets notices.
+        alive() is checked every second and before anything is handed over,
+        so a waiter that went away does not consume messages."""
         deadline = time.monotonic() + timeout
         key = (pid, name)
         with self.changed:
@@ -233,6 +235,8 @@ class Store:
             self.waiting[key] = self.waiting.get(key, 0) + 1
             try:
                 while True:
+                    if alive is not None and not alive():
+                        return None
                     agent = self._agent(pid, name, active=False)
                     if agent.get("notice"):
                         self._update(pid, name, notice=None)
@@ -245,7 +249,7 @@ class Store:
                     left = deadline - time.monotonic()
                     if left <= 0:
                         return None
-                    self.changed.wait(left)
+                    self.changed.wait(min(left, 1))
             finally:
                 self.waiting[key] -= 1
 

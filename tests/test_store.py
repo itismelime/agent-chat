@@ -123,6 +123,13 @@ class StoreTest(unittest.TestCase):
         self.assertEqual([m["text"] for m in self.store.wait(self.pid, "alice", 1)["messages"]],
                          ["@carol not you", "@alice you"])
 
+    def test_wait_for_a_gone_client_keeps_messages(self):
+        self.store.join(self.pid, "alice", "claude")
+        threading.Timer(0.2, self.store.post, args=(self.pid, "user", "@alice important")).start()
+        self.assertIsNone(self.store.wait(self.pid, "alice", 2, alive=lambda: False))
+        time.sleep(0.3)
+        self.assertEqual([m["text"] for m in self.store.read(self.pid, "alice")], ["@alice important"])
+
     def test_remove_and_readd(self):
         self.store.join(self.pid, "alice", "claude")
         self.store.remove(self.pid, "alice")

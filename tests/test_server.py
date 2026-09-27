@@ -1,5 +1,6 @@
 import http.client
 import json
+import socket
 import threading
 import time
 import unittest
@@ -93,6 +94,21 @@ class ServerTest(unittest.TestCase):
         status, body = self.c.call("GET", path, timeout=5)
         self.assertLess(time.monotonic() - start, 1.0)
         self.assertEqual((status, body["messages"][0]["text"]), (200, "go"))
+
+    def test_abandoned_wait_keeps_messages(self):
+        pid = self.add()
+        self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})
+        sock = socket.create_connection(("127.0.0.1", self.port))
+        sock.sendall(("GET %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nX-Agent-Chat: 1\r\n\r\n"
+                      % (self.c.agent_path(pid, "alice", "wait"), self.port)).encode())
+        time.sleep(0.3)
+        sock.close()
+        self.c.call("POST", "/api/projects/%s/messages" % pid, {"from": "user", "text": "@alice important"})
+        time.sleep(1.5)
+        read = self.c.call("GET", self.c.agent_path(pid, "alice", "read"))[1]["messages"]
+        self.assertEqual([m["text"] for m in read], ["@alice important"])
+        agents = self.c.call("GET", "/api/projects/%s/agents" % pid)[1]["agents"]
+        self.assertNotEqual(agents[0]["status"], "waiting")
 
     def test_remove_and_readd_routes(self):
         pid = self.add()

@@ -6,6 +6,8 @@ never answer), so other websites cannot post into the agents' sessions.
 """
 import json
 import os
+import select
+import socket
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -26,13 +28,16 @@ def make_handler(store, port, wait_seconds):
                 data = body
             else:
                 data = b"" if body is None else json.dumps(body).encode()
-            self.send_response(code)
-            if data:
-                self.send_header("Content-Type", ctype)
-            self.send_header("Content-Length", str(len(data)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(data)
+            try:
+                self.send_response(code)
+                if data:
+                    self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # the client went away, e.g. a killed chat wait
 
         def body(self):
             if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
@@ -47,6 +52,14 @@ def make_handler(store, port, wait_seconds):
             if not isinstance(data, dict):
                 raise StoreError(400, "bad json")
             return data
+
+        def client_alive(self):
+            """False once the client closed its connection."""
+            try:
+                ready, _, _ = select.select([self.connection], [], [], 0)
+                return not ready or self.connection.recv(1, socket.MSG_PEEK) != b""
+            except OSError:
+                return False
 
         @staticmethod
         def field(data, key):
@@ -117,7 +130,7 @@ def make_handler(store, port, wait_seconds):
                     if what[2] == "read":
                         return 200, {"messages": store.read(pid, what[1])}
                     if what[2] == "wait":
-                        result = store.wait(pid, what[1], wait_seconds)
+                        result = store.wait(pid, what[1], wait_seconds, alive=self.client_alive)
                         return (204, None) if result is None else (200, result)
                 if len(what) == 3 and what[0] == "agents" and method == "POST" \
                         and what[2] in ("remove", "readd"):
