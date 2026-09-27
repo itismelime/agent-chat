@@ -220,3 +220,7 @@ The panel refreshes every 2 s while open.
 - One real test against a running Ollama with a tiny model (skipped when
   none answers).
 - Firefox: the panel against the fake servers.
+
+## Verified
+
+2026-09-27, live: `./install.sh` downloaded Ollama v0.34.2 (checksum matched), started `agent-chat-ollama` on 11436; the panel status shows it and the RTX 5070 Ti (15.9 GiB). Pulled `qwen3:0.6b` through the API; recommended context 32768; benchmark 5.8 s load + generate, 66 tok/s, about 2.8 GiB video memory; thinking off 0.03 s / 12 tokens, on 21.5 s / 5432 tokens (5239 thinking) for the same answer. `tests/test_real_ollama.py` passed against it.
