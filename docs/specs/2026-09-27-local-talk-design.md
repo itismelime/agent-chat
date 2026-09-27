@@ -108,3 +108,5 @@ at a time (Ollama loads one model at a time):
 ## Verified
 
 2026-09-27: Firefox check against a fake Ollama (add from the menu with name and role prompts, Working then the answer, silent for `@someone`, Offline with the error as tooltip and back after a success, Edit role, `/local`). Real path: the Talker with `qwen3:0.6b` on agent-chat's Ollama answered "The capital of France is Paris." in 4.0 s (load included) under the role "Answer in at most one sentence." and stayed silent for `@alice …`. The live service runs it since `f096274`.
+
+Live, 2026-09-27: `qwen3:0.6b` as a member in the busy OpenVIBES chat repeated the user (it echoed its own earlier echoes; with only the question it answered fine). `qwen3.5:9b` with the same prompt and history answered properly (7.8 s with loading, then 1.1 s). A member needs a model of about 7B or more; the tiny model is only for tests.

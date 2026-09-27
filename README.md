@@ -50,7 +50,9 @@ share the GPU without coordinating, so only one should have a model loaded.
    `/local <model> <name>`), with an optional role. It answers like the
    other agents (no `@` or `@name` for it), sees the newest messages that
    fit its context, thinks only if you set that in Models, and answers at
-   most three agent messages in a row before waiting for you.
+   most three agent messages in a row before waiting for you. Use a model of
+   about 7B or more (e.g. `qwen3.5:9b`): tiny ones like `qwen3:0.6b` cannot
+   follow a busy chat and start repeating messages.
 
 On the page, `?` (or the **?** button) lists the keyboard shortcuts (Alt+↑/↓
 and Alt+1–9 switch projects, Alt+U jumps to unread, Alt+N opens the terminal
