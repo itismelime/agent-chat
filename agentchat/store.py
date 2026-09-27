@@ -18,6 +18,7 @@ KINDS = {"claude", "codex", "llm"}
 THREAD = re.compile(r"^[0-9A-Za-z-]{1,64}$")
 BUSY_SECONDS = 600
 LINK_SECONDS = 300  # a join links to a start at most this old
+MAX_ROLE = 500
 
 
 class StoreError(Exception):
@@ -72,6 +73,9 @@ class Store:
         # is woken by queueing into its session (Codex); it must not block.
         self.deliver = None
         self.needs = set()  # (project id, start token) whose terminal asks the user
+        # talk(pid, name, message) wakes a local-model member (talk.Talker); must not block
+        self.talk = None
+        self.local = {}  # (project id, name) -> {"busy", "error"} of local-model members
 
     # projects
 
@@ -159,11 +163,13 @@ class Store:
             with open(self._dir(pid) / "messages.jsonl", "a") as f:
                 f.write(json.dumps(m) + "\n")
             self.changed.notify_all()
-            if self.deliver:
-                for name, a in self.agents(pid).items():
-                    if a.get("thread") and not a.get("removed") and not a.get("gone") \
-                            and wakes(m, name):
-                        self.deliver(pid, name, a["thread"], m)
+            for name, a in self.agents(pid).items():
+                if a.get("removed") or a.get("gone") or not wakes(m, name):
+                    continue
+                if a.get("thread") and self.deliver:
+                    self.deliver(pid, name, a["thread"], m)
+                elif a.get("model") and self.talk:
+                    self.talk(pid, name, m)
             return m
 
     # agents
@@ -275,6 +281,30 @@ class Store:
             out.append(dict(r, token=token, state=state))
         return out
 
+    @staticmethod
+    def _check_role(role):
+        if role is not None and not (isinstance(role, str) and len(role) <= MAX_ROLE):
+            raise StoreError(400, "a role is text of at most %d characters" % MAX_ROLE)
+        return (role or "").strip() or None
+
+    def add_local(self, pid, name, model, role=None):
+        """A local-model member: an agent of kind llm answered by talk.Talker."""
+        role = self._check_role(role)
+        with self.changed:
+            agent = self.join(pid, name, "llm")
+            self._update(pid, agent["name"], model=model, role=role)
+            return dict(agent, model=model, role=role)
+
+    def set_role(self, pid, name, role):
+        role = self._check_role(role)
+        with self.changed:
+            self._agent(pid, name, active=False)
+            self._update(pid, name, role=role)
+
+    def set_local(self, pid, name, **fields):
+        with self.changed:
+            self.local.setdefault((pid, name), {}).update(fields)
+
     def read(self, pid, name):
         """Messages after the agent's cursor; moves the cursor to the end."""
         with self.changed:
@@ -348,6 +378,9 @@ class Store:
                     status = "removed"
                 elif a.get("gone"):
                     status = "offline"
+                elif a.get("model"):
+                    state = self.local.get((pid, name), {})
+                    status = "offline" if state.get("error") else "busy" if state.get("busy") else "waiting"
                 elif token and (pid, token) in self.needs:
                     status = "needs_you"
                 elif self.waiting.get((pid, name)) or a.get("thread"):
@@ -357,5 +390,8 @@ class Store:
                 else:
                     status = "offline"
                 out.append({"name": name, "kind": a["kind"], "joined": a["joined"],
-                            "status": status, "spawn": token})
+                            "status": status, "spawn": token, "model": a.get("model"),
+                            "role": a.get("role"),
+                            "error": self.local.get((pid, name), {}).get("error")
+                            if a.get("model") else None})
         return out

@@ -223,6 +223,45 @@ class StoreTest(unittest.TestCase):
         self.store.post(self.pid, "user", "anyone there?")
         self.assertEqual(sent, [])  # nothing queued into a session that is gone
 
+    def test_local_members(self):
+        woken = []
+        self.store.talk = lambda pid, name, m: woken.append((name, m["text"]))
+        a = self.store.add_local(self.pid, " Qwen ", "qwen3:0.6b", role="You review plans")
+        self.assertEqual((a["name"], a["kind"], a["model"], a["role"]),
+                         ("qwen", "llm", "qwen3:0.6b", "You review plans"))
+        self.store.add_local(self.pid, "tiny", "qwen3:0.6b")
+        self.store.join(self.pid, "alice", "claude")
+        self.store.post(self.pid, "user", "hello all")          # wakes both
+        self.store.post(self.pid, "alice", "@qwen please look")  # wakes qwen only
+        self.store.post(self.pid, "qwen", "@qwen talking to myself")  # wakes nobody
+        self.store.remove(self.pid, "tiny")
+        self.store.post(self.pid, "user", "after removal")      # tiny is removed
+        self.assertEqual(sorted(woken), sorted([
+            ("qwen", "hello all"), ("tiny", "hello all"), ("qwen", "@qwen please look"),
+            ("qwen", "after removal")]))
+
+    def test_local_status_and_role(self):
+        self.store.add_local(self.pid, "qwen", "qwen3:0.6b")
+        row = lambda: next(a for a in self.store.status(self.pid) if a["name"] == "qwen")
+        self.assertEqual((row()["status"], row()["model"], row()["error"]), ("waiting", "qwen3:0.6b", None))
+        self.store.set_local(self.pid, "qwen", busy=True)
+        self.assertEqual(row()["status"], "busy")
+        self.store.set_local(self.pid, "qwen", busy=False, error="model not found")
+        self.assertEqual((row()["status"], row()["error"]), ("offline", "model not found"))
+        self.store.set_local(self.pid, "qwen", error=None)
+        self.assertEqual(row()["status"], "waiting")
+        self.store.set_role(self.pid, "qwen", "Be terse")
+        self.assertEqual(row()["role"], "Be terse")
+        self.store.set_role(self.pid, "qwen", "")
+        self.assertIsNone(row()["role"])
+        for bad in (lambda: self.store.set_role(self.pid, "qwen", "x" * 501),
+                    lambda: self.store.add_local(self.pid, "big", "m", role="x" * 501),
+                    lambda: self.store.set_role(self.pid, "nobody", "r")):
+            with self.assertRaises(StoreError):
+                bad()
+        self.store.join(self.pid, "alice", "claude")
+        self.assertIsNone(next(a for a in self.store.status(self.pid) if a["name"] == "alice")["model"])
+
     def test_remove_and_readd(self):
         self.store.join(self.pid, "alice", "claude")
         self.store.remove(self.pid, "alice")
