@@ -100,6 +100,14 @@ class McpTest(unittest.TestCase):
         self.assertFalse(err, text)
         self.assertEqual(self.store.spawned("proj")["tok"]["name"], "alice")
 
+    def test_join_takes_a_start_token_argument(self):
+        self.store.add_spawned("proj", "tok", "codex", "agent-chat-test-no-such-session")
+        self.store.add_spawned("proj", "other", "codex", "agent-chat-test-no-such-session-2")
+        s, _ = self.codex("01a0e3df-6b97-7233-b194-a7cb90765ce4")
+        text, err = tool(s, "chat_join", {"name": "cody", "spawn": "tok"})
+        self.assertFalse(err, text)
+        self.assertEqual(self.store.spawned("proj")["tok"]["name"], "cody")
+
     def test_name_taken(self):
         self.store.join("proj", "alice", "codex")
         text, err = tool(self.s, "chat_join", {"name": "alice"})

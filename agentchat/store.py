@@ -211,15 +211,16 @@ class Store:
             return dict(agents[name], name=name, spawn=self._link(pid, name, kind, spawn))
 
     def _link(self, pid, name, kind, spawn):
-        """Link a joining agent to the start it came from: by its token, or
-        else the only unlinked start of the same tool from the last
-        LINK_SECONDS (Codex's MCP servers do not see the start token)."""
+        """Link a joining agent to the start it came from. A known token always
+        wins. Without one, a Codex agent (whose MCP server may not see the
+        token) takes the only unlinked Codex start of the last LINK_SECONDS;
+        anyone else is not linked, so a hand-started agent takes nothing."""
         records = self.spawned(pid)
-        if not (isinstance(spawn, str) and records.get(spawn, {"name": 1})["name"] is None):
+        if not (isinstance(spawn, str) and spawn in records):
             recent = [t for t, r in records.items() if r["name"] is None and r["tool"] == kind
                       and time.time() - datetime.fromisoformat(r["started"]).timestamp()
                       < LINK_SECONDS]
-            spawn = recent[0] if len(recent) == 1 else None
+            spawn = recent[0] if kind == "codex" and len(recent) == 1 else None
         if spawn:
             self.update_spawned(pid, spawn, name=name)
         return spawn

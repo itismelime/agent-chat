@@ -54,6 +54,12 @@ class TmuxTest(unittest.TestCase):
             "new-session -d -s agent-chat-p-abc123 -c /proj dir -e AGENT_CHAT_SPAWN=tok "
             "-- claude join the chat"])
 
+    def test_codex_gets_its_start_token_in_the_prompt(self):
+        spawn.start("codex", "/p", "agent-chat-p-abc123", "tok")
+        self.assertEqual(calls(self.d), [
+            "new-session -d -s agent-chat-p-abc123 -c /p -e AGENT_CHAT_SPAWN=tok "
+            "-- codex join the chat (start tok)"])
+
     def test_start_errors(self):
         for tool, code in (("bash", 400),):
             with self.assertRaises(StoreError) as e:

@@ -169,9 +169,18 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(a["spawn"], "tok2")
         self.assertEqual(self.store.spawned(self.pid)["tok2"]["name"], "alice")
         b = self.store.join(self.pid, "bob", "claude", spawn="nope")  # unknown token: joins anyway
-        self.assertEqual(b["spawn"], "tok1")  # ...and is linked by the fallback (one unlinked claude)
+        self.assertIsNone(b["spawn"])  # no guessing for Claude: a hand-started one must not take tok1
         status = {s["name"]: s["spawn"] for s in self.store.status(self.pid)}
-        self.assertEqual(status, {"alice": "tok2", "bob": "tok1"})
+        self.assertEqual(status, {"alice": "tok2", "bob": None})
+
+    def test_a_known_token_always_wins(self):
+        self.store.add_spawned(self.pid, "tok1", "claude", "s1")
+        self.store.add_spawned(self.pid, "tok2", "claude", "s2")
+        self.store.join(self.pid, "alice", "claude", spawn="tok1")
+        # the same session joins again under a new name (e.g. its MCP server restarted)
+        self.assertEqual(self.store.join(self.pid, "alice2", "claude", spawn="tok1")["spawn"], "tok1")
+        self.assertEqual(self.store.spawned(self.pid)["tok1"]["name"], "alice2")
+        self.assertIsNone(self.store.spawned(self.pid)["tok2"]["name"])
 
     def test_join_fallback_needs_exactly_one_recent_start(self):
         self.store.add_spawned(self.pid, "c1", "codex", "s1")

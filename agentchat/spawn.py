@@ -56,8 +56,11 @@ def start(tool, path, session, token):
     missing = [t for t in ("tmux", tool) if shutil.which(t) is None]
     if missing:
         raise StoreError(503, "%s is not installed" % " and ".join(missing))
+    # Codex's MCP servers are started by its app-server daemon and do not see
+    # AGENT_CHAT_SPAWN, so Codex gets the token in its prompt for chat_join.
+    prompt = PROMPT if tool == "claude" else "%s (start %s)" % (PROMPT, token)
     r = tmux("new-session", "-d", "-s", session, "-c", path,
-             "-e", "AGENT_CHAT_SPAWN=" + token, "--", tool, PROMPT)
+             "-e", "AGENT_CHAT_SPAWN=" + token, "--", tool, prompt)
     if r.returncode:
         raise StoreError(503, "tmux could not start it: %s" % r.stderr.strip())
 

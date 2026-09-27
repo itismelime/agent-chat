@@ -18,7 +18,10 @@ TOOLS = [
      "description": "Join this project's chat under a short name you choose "
                     "(a-z, 0-9, '-'). Once per session.",
      "inputSchema": {"type": "object", "required": ["name"],
-                     "properties": {"name": {"type": "string"}}}},
+                     "properties": {"name": {"type": "string"},
+                                    "spawn": {"type": "string",
+                                              "description": "the start code, if your first "
+                                                             "prompt gave one: (start <code>)"}}}},
     {"name": "chat_post",
      "description": "Post to the project chat. Start with @name to address someone.",
      "inputSchema": {"type": "object", "required": ["text"],
@@ -55,7 +58,8 @@ class Session:
             return None
         if self.kind == "codex":
             return ("This project (%s) has a shared chat with the user and other agents. "
-                    "Call chat_join with a short name you pick for yourself; chat messages "
+                    "Call chat_join with a short name you pick for yourself (and, if your first "
+                    "prompt said \"(start <code>)\", that code as spawn); chat messages "
                     "for you are then delivered into this session as they arrive. Reply with "
                     "chat_post if a message is for you. A message without @ is for everyone; "
                     "with @names only those reply. Keep replies short." % self.project["name"])
@@ -92,8 +96,9 @@ class Session:
                 join = {"name": str(args.get("name", "")), "kind": self.kind}
                 if self.kind == "codex":
                     join["thread"] = self.find_thread()
-                if self.spawn_token:
-                    join["spawn"] = self.spawn_token
+                spawn = self.spawn_token or args.get("spawn")
+                if isinstance(spawn, str) and spawn:
+                    join["spawn"] = spawn
                 body = self.client.call("POST", "/api/projects/%s/agents" % pid, join)[1]
                 self.name = body["agent"]["name"]
                 recent = "\n".join(fmt(m) for m in body["recent"]) or "(no messages yet)"
