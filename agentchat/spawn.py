@@ -19,6 +19,9 @@ PROMPT = "join the chat"
 KEYS = {"1": "1", "2": "2", "3": "3", "up": "Up", "down": "Down",
         "enter": "Enter", "esc": "Escape"}
 MAX_TEXT = 2000
+# Codex treats fast input as a paste and swallows an Enter sent right after it;
+# half a second apart it submits (checked with Codex 0.157 and Claude Code 2.1).
+PASTE_PAUSE = 0.5
 SCREEN_LINES = 25
 JOIN_GRACE = 60   # seconds a start may take to join before it needs the user
 POLL_SECONDS = 2
@@ -86,6 +89,7 @@ def send_text(session, text):
     if not 0 < len(text) <= MAX_TEXT:
         raise StoreError(400, "text must be 1-%d characters" % MAX_TEXT)
     tmux("send-keys", "-t", pane(session), "-l", "--", text)
+    time.sleep(PASTE_PAUSE)
     tmux("send-keys", "-t", pane(session), "Enter")
 
 

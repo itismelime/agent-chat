@@ -95,6 +95,16 @@ class TmuxTest(unittest.TestCase):
                 bad()
             self.assertEqual(e.exception.code, 400)
 
+    def test_text_pauses_before_enter(self):
+        # Codex takes fast input as a paste and ignores an Enter that follows at once
+        slept = []
+        real = spawn.time.sleep
+        spawn.time.sleep = lambda t: slept.append((t, len(calls(self.d))))
+        self.addCleanup(setattr, spawn.time, "sleep", real)
+        spawn.send_text("s", "hi")
+        self.assertEqual(slept, [(spawn.PASTE_PAUSE, 1)])  # after the text, before Enter
+        self.assertGreaterEqual(spawn.PASTE_PAUSE, 0.5)
+
     def test_screen_alive_rename_stop(self):
         (self.d / "screen").write_text("hello\n")
         self.assertEqual(spawn.screen("s"), "hello\n")
