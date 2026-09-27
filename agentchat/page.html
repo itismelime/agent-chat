@@ -1,1 +1,198 @@
-<!doctype html><meta charset=utf-8><title>agent-chat</title><p>agent-chat
+<!doctype html><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>agent-chat</title>
+<style>
+:root{--bg:#f6f6f4;--fg:#1d1d1b;--mute:#77756f;--card:#fff;--line:#e2e0da;--side:#ecebe7;
+--user:#2f6f4f;--claude:#b4572e;--codex:#2e5fb4;--llm:#7a4fb0;--ok:#3a9d5d;--busy:#c9950c}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--fg:#e8e6e1;--mute:#8e8b84;--card:#21201e;
+--line:#34322f;--side:#1c1b1a;--user:#6fbf93;--claude:#e08a5f;--codex:#7aa2ea;--llm:#b893e0}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);
+font:15px/1.5 system-ui,sans-serif;display:flex;height:100vh}
+nav{width:220px;flex:none;background:var(--side);border-right:1px solid var(--line);
+display:flex;flex-direction:column}
+nav h1{font-size:13px;margin:0;padding:12px 14px 6px;color:var(--mute);font-weight:600}
+#projects{flex:1;overflow-y:auto}
+.p{display:flex;justify-content:space-between;gap:6px;padding:6px 10px;margin:1px 6px;
+border-radius:6px;cursor:pointer;overflow:hidden;white-space:nowrap}
+.p:hover{background:var(--line)}.p.on{background:var(--line);font-weight:600}.p.missing{opacity:.5}
+.badge{background:var(--claude);color:#fff;border-radius:9px;padding:0 7px;font-size:12px;font-weight:600}
+#add{margin:8px}
+main{flex:1;display:flex;flex-direction:column;min-width:0}
+header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;
+align-items:center;flex-wrap:wrap}
+#name{font-weight:600;flex:1}
+#wrap{flex:1;display:flex;min-height:0}#chat{flex:1;display:flex;flex-direction:column;min-width:0}
+aside{width:200px;flex:none;border-left:1px solid var(--line);overflow-y:auto;padding:4px 0 8px}
+aside h2{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);
+margin:12px 14px 4px;font-weight:600}
+.a{padding:4px 14px;cursor:context-menu;white-space:nowrap;overflow:hidden}.a:hover{background:var(--line)}
+.a small{display:block;color:var(--mute);font-size:12px;margin-left:13px}.a.removed{opacity:.5}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;
+background:var(--mute);vertical-align:middle}
+.waiting .dot{background:var(--ok)}.busy .dot{background:var(--busy)}
+#menu{position:fixed;min-width:170px;background:var(--card);border:1px solid var(--line);
+border-radius:8px;padding:4px;box-shadow:0 4px 16px #0003;z-index:9}
+#menu div{padding:5px 12px;border-radius:6px;cursor:pointer}#menu div:hover{background:var(--line)}
+#log{flex:1;overflow-y:auto;padding:12px 16px}
+.m{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;
+margin:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;max-width:900px}
+.h{font-size:13px;color:var(--mute);margin-bottom:2px}.n{font-weight:600}
+.user .n{color:var(--user)}.claude .n{color:var(--claude)}.codex .n{color:var(--codex)}.llm .n{color:var(--llm)}
+form{position:relative;display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
+textarea{flex:1;resize:none;height:64px;font:inherit;padding:8px;border-radius:8px;
+border:1px solid var(--line);background:var(--card);color:var(--fg)}
+button{font:inherit;padding:0 18px;border-radius:8px;border:0;background:var(--user);color:#fff;cursor:pointer}
+.ghost{background:none;color:var(--mute);border:1px solid var(--line);padding:3px 10px;font-size:13px}
+#err,#note,#hint{font-size:13px;padding:0 16px}#err{color:var(--claude)}#note{color:var(--mute)}
+#hint{color:var(--busy)}
+#ac{position:absolute;bottom:calc(100% - 6px);left:16px;min-width:200px;background:var(--card);
+border:1px solid var(--line);border-radius:8px;padding:4px;box-shadow:0 4px 16px #0003}
+#ac div{padding:5px 10px;border-radius:6px;cursor:pointer}#ac .sel{background:var(--line)}
+#ac small{color:var(--mute);margin-left:8px}[hidden]{display:none!important}
+@media (max-width:800px){aside{display:none}}@media (max-width:640px){nav{width:130px}}
+</style>
+<nav><h1>Projects</h1><div id=projects></div>
+<button id=add class=ghost type=button title="Add a project folder">+ Add project</button></nav>
+<main>
+<header><span id=name></span>
+<button id=bell class=ghost type=button hidden>Enable notifications</button></header>
+<div id=wrap><div id=chat>
+<div id=log></div><div id=note></div><div id=err></div><div id=hint></div>
+<form id=f><div id=ac role=listbox hidden></div>
+<textarea id=t placeholder="Message (Enter sends, Shift+Enter new line; type @ to address someone)"></textarea>
+<button>Send</button></form></div>
+<aside id=members aria-label="Agents in this project"></aside></div>
+</main>
+<div id=menu role=menu hidden></div>
+<script>
+const $=id=>document.getElementById(id),log=$('log'),t=$('t'),ac=$('ac'),bell=$('bell');
+const saved={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v===null?d:v}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+let projects=[],cur=saved.get('cur',null),msgs={},agents=[],seen=saved.get('seen',{}),notified={},drawn='',busy=false,down=false;
+
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;
+  if(text!==undefined)e.textContent=text;return e;}
+async function api(path,body){
+  const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)}:{});
+  const x=r.status===204?null:await r.json();
+  if(!r.ok)throw new Error(x&&x.error||r.statusText);return x;}
+function away(){return document.hidden||!document.hasFocus();}
+function lastN(id){const l=msgs[id]||[];return l.length?l[l.length-1].n:0;}
+function unread(p){return (msgs[p.id]||[]).filter(m=>m.n>(seen[p.id]||0)&&m.from!=='user').length;}
+function notify(p,m){if(window.Notification&&Notification.permission==='granted')
+  new Notification(m.from+' · '+p.name,{body:m.text.slice(0,300),tag:'agent-chat-'+p.id+'-'+m.n});}
+
+async function refresh(){
+  if(busy)return;busy=true;
+  try{
+    projects=(await api('api/projects')).projects;
+    if(!projects.some(p=>p.id===cur))cur=projects.length?projects[0].id:null;
+    for(const p of projects){
+      const list=msgs[p.id]||(msgs[p.id]=[]);
+      const fresh=(await api(`api/projects/${p.id}/messages?after=${lastN(p.id)}`)).messages;
+      list.push(...fresh);
+      if(notified[p.id]===undefined){  // first load: history is not new
+        notified[p.id]=lastN(p.id);if(seen[p.id]===undefined)seen[p.id]=lastN(p.id);continue;}
+      for(const m of fresh)if(m.from!=='user'&&m.n>notified[p.id]&&(away()||p.id!==cur))notify(p,m);
+      notified[p.id]=lastN(p.id);
+    }
+    agents=cur?(await api(`api/projects/${cur}/agents`)).agents:[];
+    if(cur&&!away())seen[cur]=lastN(cur);
+    saved.set('seen',seen);if(down){$('err').textContent='';down=false;}render();
+  }catch(e){down=true;$('err').textContent='Service not reachable: '+e.message;}
+  finally{busy=false;}
+}
+
+function select(id){cur=id;saved.set('cur',cur);$('note').textContent='';refresh();}
+function render(){
+  $('projects').replaceChildren(...projects.map(p=>{
+    const d=el('div','p'+(p.id===cur?' on':'')+(p.missing?' missing':''));
+    d.title=p.path+(p.missing?' (folder missing)':'');d.append(el('span','',p.name));
+    const n=unread(p);if(n)d.append(el('span','badge',String(n)));d.onclick=()=>select(p.id);return d;}));
+  const total=projects.reduce((s,p)=>s+unread(p),0);
+  document.title=(total?`(${total}) `:'')+'agent-chat';
+  const p=projects.find(p=>p.id===cur);
+  $('name').textContent=p?p.name:'Add a project to start';
+  $('members').replaceChildren(...GROUPS.flatMap(([st,title])=>{
+    const g=agents.filter(a=>a.status===st);if(!g.length)return [];
+    return [el('h2','',title+' — '+g.length),...g.map(a=>{const d=el('div','a '+a.status);
+      d.title='Right-click for options';d.append(el('i','dot'),a.name,el('small','',KIND[a.kind]||a.kind));
+      d.oncontextmenu=e=>openMenu(e,a);return d;})];}));
+  hint();
+  const key=cur+':'+lastN(cur);if(key===drawn)return;
+  const switched=!drawn.startsWith(cur+':');drawn=key;
+  const atEnd=log.scrollHeight-log.scrollTop-log.clientHeight<40;
+  log.replaceChildren(...(p?msgs[p.id]:[]).map(m=>{const d=el('div','m '+m.kind),h=el('div','h');
+    h.append(el('span','n',m.from),' · '+m.time.slice(11,19));d.append(h,m.text);return d;}));
+  if(atEnd||switched)log.scrollTop=log.scrollHeight;
+}
+
+// members: groups, right-click menu, hint for agents that will not answer now
+const GROUPS=[['waiting','Available'],['busy','Working'],['offline','Offline'],['removed','Removed']];
+const KIND={claude:'Claude',codex:'Codex',llm:'local LLM'},menu=$('menu');
+function openMenu(e,a){
+  e.preventDefault();
+  const [text,action]=a.status==='removed'?['Add back','readd']:['Remove from chat','remove'];
+  const item=el('div','',text);item.setAttribute('role','menuitem');
+  item.onclick=async()=>{menu.hidden=true;
+    try{await api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/${action}`,{});}
+    catch(err){$('err').textContent=err.message;}
+    refresh();};
+  menu.replaceChildren(item);
+  menu.style.left=Math.min(e.clientX,innerWidth-190)+'px';menu.style.top=e.clientY+'px';menu.hidden=false;}
+addEventListener('click',()=>{menu.hidden=true;});
+addEventListener('keydown',e=>{if(e.key==='Escape')menu.hidden=true;});
+function hint(){
+  const lead=(t.value.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0];
+  const to=lead.split(/[\s,:@]+/).filter(Boolean).map(x=>x.toLowerCase());
+  $('hint').textContent=agents.filter(a=>to.includes(a.name)&&a.status!=='waiting').map(a=>
+    a.status==='busy'?`${a.name} is working and will see this when its current task ends.`:
+    a.status==='removed'?`${a.name} was removed from this chat.`:`${a.name} is offline.`).join(' ');}
+
+$('add').onclick=async()=>{
+  const path=prompt('Project folder (absolute path)');if(!path||!path.trim())return;
+  try{const r=await api('api/projects',{path:path.trim()});
+    select(r.project.id);
+    $('err').textContent='';$('note').textContent=r.existing?`${r.project.name} already exists; opened it.`:`Added ${r.project.name}.`;
+  }catch(e){$('note').textContent='';$('err').textContent='Not added: '+e.message;}};
+
+function bellLabel(){
+  if(!window.Notification){bell.hidden=true;return;}
+  bell.hidden=Notification.permission==='granted';
+  bell.textContent=Notification.permission==='denied'?'Notifications blocked in browser':'Enable notifications';}
+bell.onclick=async()=>{await Notification.requestPermission();bellLabel();};bellLabel();
+addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
+
+// @ autocomplete over this project's agents
+let matches=[],sel=0;
+function token(){const m=t.value.slice(0,t.selectionStart).match(/(^|\s)@([\w-]*)$/);return m?m[2]:null;}
+function showAc(){
+  const q=token();
+  matches=q===null?[]:agents.filter(a=>a.status!=='removed'&&a.name.startsWith(q.toLowerCase()));
+  if(!matches.length){ac.hidden=true;return;}
+  sel=Math.min(sel,matches.length-1);
+  ac.replaceChildren(...matches.map((a,i)=>{const d=el('div',i===sel?'sel':'','@'+a.name);
+    d.append(el('small','',a.kind));d.setAttribute('role','option');
+    d.onmousedown=e=>{e.preventDefault();pick(i);};return d;}));
+  ac.hidden=false;}
+function pick(i){
+  const pos=t.selectionStart,q=token(),start=pos-q.length-1,ins='@'+matches[i].name+' ';
+  t.value=t.value.slice(0,start)+ins+t.value.slice(pos);
+  t.selectionStart=t.selectionEnd=start+ins.length;ac.hidden=true;sel=0;t.focus();}
+t.oninput=()=>{sel=0;showAc();hint();};t.onclick=showAc;t.onblur=()=>{ac.hidden=true;};
+t.onkeydown=e=>{
+  if(!ac.hidden){
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();
+      sel=(sel+(e.key==='ArrowDown'?1:matches.length-1))%matches.length;showAc();return;}
+    if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();pick(sel);return;}
+    if(e.key==='Escape'){ac.hidden=true;return;}}
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('f').requestSubmit();}};
+
+$('f').onsubmit=async e=>{e.preventDefault();
+  const text=t.value.trim();if(!text||!cur)return;t.value='';ac.hidden=true;
+  try{await api(`api/projects/${cur}/messages`,{from:'user',text});$('err').textContent='';}
+  catch(e){t.value=text;$('err').textContent='Not sent: '+e.message;}
+  refresh();};
+refresh();setInterval(refresh,2000);t.focus();
+</script>
