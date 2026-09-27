@@ -139,7 +139,7 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.c.call("GET", base + "/screen")[1], {"screen": "hello\n"})
         self.c.call("POST", base + "/keys", {"key": "enter"})
         self.c.call("POST", base + "/keys", {"text": "hi"})
-        self.assertIn("send-keys -t %s Enter" % body["spawned"]["session"],
+        self.assertIn("send-keys -t =%s: Enter" % body["spawned"]["session"],
                       (d / "calls").read_text())
         joined = self.c.call("POST", "/api/projects/%s/agents" % pid,
                              {"name": "alice", "kind": "claude", "spawn": token})[1]

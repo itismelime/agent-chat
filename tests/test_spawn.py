@@ -80,9 +80,9 @@ class TmuxTest(unittest.TestCase):
         spawn.send_key("s", "esc")
         spawn.send_key("s", "1")
         spawn.send_text("s", "-rf is not an option")
-        self.assertEqual(calls(self.d), ["send-keys -t s Escape", "send-keys -t s 1",
-                                         "send-keys -t s -l -- -rf is not an option",
-                                         "send-keys -t s Enter"])
+        self.assertEqual(calls(self.d), ["send-keys -t =s: Escape", "send-keys -t =s: 1",
+                                         "send-keys -t =s: -l -- -rf is not an option",
+                                         "send-keys -t =s: Enter"])
         for bad in (lambda: spawn.send_key("s", "F12"), lambda: spawn.send_text("s", ""),
                     lambda: spawn.send_text("s", "x" * 2001)):
             with self.assertRaises(StoreError) as e:
@@ -95,7 +95,7 @@ class TmuxTest(unittest.TestCase):
         self.assertTrue(spawn.alive("s"))
         self.assertTrue(spawn.rename("s", "t"))
         spawn.stop("s")
-        self.assertEqual(calls(self.d)[-2:], ["rename-session -t s t", "kill-session -t s"])
+        self.assertEqual(calls(self.d)[-2:], ["rename-session -t =s t", "kill-session -t =s"])
         (self.d / "dead").touch()
         self.assertFalse(spawn.alive("s"))
         with self.assertRaises(StoreError) as e:
@@ -224,6 +224,15 @@ class RealTmuxTest(unittest.TestCase):
                 return got
             time.sleep(0.1)
         self.fail("%r never appeared in:\n%s" % (text, got))
+
+    def test_names_are_matched_exactly_not_as_prefixes(self):
+        spawn.tmux("new-session", "-d", "-s", "x2", "--", "sleep", "30")
+        self.assertTrue(spawn.alive("x2"))
+        self.assertFalse(spawn.alive("x"))
+        with self.assertRaises(StoreError):
+            spawn.screen("x")
+        spawn.stop("x")
+        self.assertTrue(spawn.alive("x2"))
 
     def test_start_read_answer_stop(self):
         r = self.sp.start("proj", "claude")

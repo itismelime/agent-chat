@@ -35,6 +35,16 @@ def tmux(*args):
     return subprocess.run(["tmux", *args], capture_output=True, text=True, timeout=10)
 
 
+# tmux treats a target it cannot find as a prefix ("x" would hit "x2"); "="
+# makes it match the session name exactly, and ":" names its current pane.
+def exact(session):
+    return "=" + session
+
+
+def pane(session):
+    return "=" + session + ":"
+
+
 def available():
     return {t: shutil.which(t) is not None for t in ("tmux",) + TOOLS}
 
@@ -53,11 +63,11 @@ def start(tool, path, session, token):
 
 
 def alive(session):
-    return tmux("has-session", "-t", session).returncode == 0
+    return tmux("has-session", "-t", exact(session)).returncode == 0
 
 
 def screen(session):
-    r = tmux("capture-pane", "-p", "-t", session)
+    r = tmux("capture-pane", "-p", "-t", pane(session))
     if r.returncode:
         raise StoreError(404, "the agent's terminal has ended")
     return r.stdout
@@ -66,22 +76,22 @@ def screen(session):
 def send_key(session, key):
     if key not in KEYS:
         raise StoreError(400, "key must be one of: " + " ".join(KEYS))
-    tmux("send-keys", "-t", session, KEYS[key])
+    tmux("send-keys", "-t", pane(session), KEYS[key])
 
 
 def send_text(session, text):
     if not 0 < len(text) <= MAX_TEXT:
         raise StoreError(400, "text must be 1-%d characters" % MAX_TEXT)
-    tmux("send-keys", "-t", session, "-l", "--", text)
-    tmux("send-keys", "-t", session, "Enter")
+    tmux("send-keys", "-t", pane(session), "-l", "--", text)
+    tmux("send-keys", "-t", pane(session), "Enter")
 
 
 def rename(session, new):
-    return tmux("rename-session", "-t", session, new).returncode == 0
+    return tmux("rename-session", "-t", exact(session), new).returncode == 0
 
 
 def stop(session):
-    tmux("kill-session", "-t", session)  # already gone is fine
+    tmux("kill-session", "-t", exact(session))  # already gone is fine
 
 
 def needs_you(text):

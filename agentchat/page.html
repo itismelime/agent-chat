@@ -204,7 +204,7 @@ async function tick(){
 function openTerm(token,name){
   termToken=token;$('termtitle').textContent=name+' — terminal';
   const s=spawned.find(s=>s.token===token);
-  $('attach').textContent=s?`Take over in a terminal: tmux attach -t ${s.session}`:'';
+  $('attach').textContent=s?`Take over in a terminal: tmux attach -t =${s.session}`:'';
   $('term').hidden=false;$('ti').value='';tick();clearInterval(termTimer);termTimer=setInterval(tick,1500);$('ti').focus();}
 function closeTerm(){$('term').hidden=true;termToken=null;clearInterval(termTimer);t.focus();}
 $('termclose').onclick=closeTerm;
