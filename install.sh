@@ -45,6 +45,7 @@ Description=agent-chat service (127.0.0.1:$port)
 
 [Service]
 Environment=AGENT_CHAT_PORT=$port
+Environment=PATH=$PATH
 ExecStart=/usr/bin/env python3 "$here/bin/chat" serve
 Restart=on-failure
 RestartSec=5

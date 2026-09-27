@@ -46,6 +46,8 @@ class InstallTest(unittest.TestCase):
         self.assertEqual(os.readlink(link), str(ROOT / "bin/chat"))
         self.assertIn('ExecStart=/usr/bin/env python3 "%s/bin/chat" serve' % ROOT, unit.read_text())
         self.assertIn("Environment=AGENT_CHAT_PORT=%d" % self.port, unit.read_text())
+        # the service runs `codex queue`, so it needs the PATH the tools were found on
+        self.assertIn("Environment=PATH=%s:/usr/bin:/bin" % self.stubs, unit.read_text())
         self.assertIn("running on http://127.0.0.1:%d" % self.port, r.stdout)
         calls = self.calls_made()
         self.assertIn("systemctl --user restart agent-chat", calls)
