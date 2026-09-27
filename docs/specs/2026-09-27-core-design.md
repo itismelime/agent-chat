@@ -3,7 +3,8 @@
 Status: draft for review, 2026-09-27. Covers features 2 and 3 of the
 roadmap, plus the minimum install needed to run them. Later parts get their
 own specs: install polish (1), starting agents from the page (4), shortcuts
-(5), local LLMs (6).
+(5), local LLMs (6), and **Forget** in the right-click menu of a removed
+agent, which deletes its entry and frees its name (user, 2026-09-27).
 
 ## Goal
 
