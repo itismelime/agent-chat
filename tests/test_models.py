@@ -164,6 +164,20 @@ class HubTest(unittest.TestCase):
         hub.search("good", 16 * GIB)
         self.assertEqual(len(calls), n)  # cached
 
+    def test_results_with_failed_sizes_are_not_cached(self):
+        calls = []
+
+        def fetch(url):
+            calls.append(url)
+            if "/api/models?" in url:
+                return [{"id": "a/x", "siblings": []}]
+            raise OSError("rate limited")
+        hub = models.Hub(fetch=fetch)
+        hub.search("x", 0)
+        n = len(calls)
+        hub.search("x", 0)
+        self.assertGreater(len(calls), n)
+
     def test_search_error_keeps_old_results(self):
         state = {"fail": False}
 

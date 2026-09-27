@@ -17,7 +17,9 @@ UNSUPPORTED = re.compile(r"(?:mtp|\.part|\.split|-\d{5}-of-\d{5}\.gguf$)", re.I)
 QUANTS = [(re.compile(p, re.I), q) for p, q in (
     (r"F(?:16|32)", 100), (r"Q8(?:_0)?", 92), (r"Q6_K", 86), (r"Q5_K_M", 82), (r"Q5_K_S", 79),
     (r"Q5(?:_\d)?", 76), (r"Q4_K_M", 73), (r"Q4_K_S", 70), (r"(?:IQ4|Q4)(?:_\w+)?", 68),
-    (r"(?:IQ3|Q3)(?:_\w+)?", 57), (r"(?:IQ2|Q2|PQ2|PTQ1)(?:_\w+)?", 46))]
+    (r"(?:IQ3|Q3)(?:_\w+)?", 57), (r"(?:IQ2|Q2|PQ2|PTQ1)(?:_\w+)?", 46), (r"IQ1(?:_\w+)?", 30))]
+# speculative-decoding helpers, not the model itself (e.g. eagle3-…-BF16.gguf)
+HELPER_FILE = re.compile(r"eagle|draft|dflash", re.I)
 QUANT_TAG = re.compile(r"IQ\d_[A-Z0-9]+(?:_[A-Z0-9]+)*|Q\d_K_[SML]|Q\d_K|Q\d_\d|BF16|F16|F32", re.I)
 
 
@@ -32,7 +34,7 @@ def quant_quality(name):
 def usable(f):
     """A single, plain GGUF chat-model file (the import refuses paths)."""
     name = f.get("rfilename") or ""
-    return (name.lower().endswith(".gguf") and "/" not in name
+    return (name.lower().endswith(".gguf") and "/" not in name and not HELPER_FILE.search(name)
             and not SUPPORT_FILE.search(name) and not UNSUPPORTED.search(name))
 
 

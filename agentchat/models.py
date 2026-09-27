@@ -183,14 +183,15 @@ class Hub:
                     raise StoreError(502, "Hugging Face search failed: %s" % e) from None
                 found = hit[1]  # keep the last results
             else:
-                self.cache[key] = (time.time(), found)
+                if not any(m.get("_no_sizes") for m in found):  # a failed lookup: ask again next time
+                    self.cache[key] = (time.time(), found)
         return sorted((rating.rate(m, gpu_total) for m in found), key=lambda r: -r["score"])
 
     def _with_sizes(self, m):
         try:
             detail = self.fetch("%s/api/models/%s?blobs=true" % (HF, m["id"]))
         except (OSError, ValueError):
-            return m
+            return dict(m, _no_sizes=True)
         return dict(m, siblings=detail.get("siblings") or m.get("siblings") or [])
 
 

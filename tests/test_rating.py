@@ -65,6 +65,17 @@ class RatingTest(unittest.TestCase):
         self.assertLessEqual(rating.community({"downloads": 10 ** 9, "likes": 10 ** 6,
                                                "trendingScore": 10 ** 6}), 20)
 
+    def test_iq1_ranks_lowest_and_helper_files_are_skipped(self):
+        self.assertEqual(rating.quant_quality("m-IQ1_M.gguf"), 30)
+        coder = dict(CHAT, siblings=[{"rfilename": "c-UD-IQ1_M.gguf", "size": 7 * GIB},
+                                     {"rfilename": "c-Q4_K_M.gguf", "size": 12 * GIB}])
+        self.assertEqual(rating.best_file(coder, 16 * GIB)["rfilename"], "c-Q4_K_M.gguf")
+        oss = dict(CHAT, siblings=[{"rfilename": "eagle3-gpt-oss-20b-BF16.gguf", "size": GIB},
+                                   {"rfilename": "x-DRAFT-0.5B.f16.gguf", "size": GIB},
+                                   {"rfilename": "model-dflash.gguf", "size": GIB},
+                                   {"rfilename": "gpt-oss-20b-Q8_0.gguf", "size": 12 * GIB}])
+        self.assertEqual(rating.best_file(oss, 16 * GIB)["rfilename"], "gpt-oss-20b-Q8_0.gguf")
+
     def test_suggest_name(self):
         self.assertEqual(rating.suggest_name("Qwen/Qwen3.5-9B-GGUF", "Qwen3.5-9B-Q4_K_M.gguf"),
                          "qwen3.5-9b:q4_k_m")
