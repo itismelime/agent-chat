@@ -153,7 +153,16 @@ Install). On start it resolves its working directory:
   - Every `chat_post`/`chat_read` result ends with a reminder when the
     agent's status is not `waiting`.
 
-**Codex delivery.** Codex runs `chat wait` like Claude. The plan's first
+**Probe results (2026-09-27).** Claude Code starts a stdio MCP server in
+the session's working directory (checked with `claude -p` in a subfolder).
+Codex's default sandbox refuses connections to 127.0.0.1 (`curl` exit 7 from
+`codex exec`; `~/.codex/config.toml` sets no sandbox options), so `chat wait`
+run from Codex's shell cannot reach the service; Codex's MCP tools run
+outside the sandbox and can. Whether Codex re-invokes an idle session when a
+background command ends is not yet checked. Codex delivery is open until
+the user decides.
+
+**Codex delivery (original plan).** Codex runs `chat wait` like Claude. The plan's first
 task checks whether Codex CLI re-invokes an idle session when a background
 command ends. If it does not, the service instead queues wake messages into
 the agent's Codex thread with `codex queue --thread`; `chat_join` then
