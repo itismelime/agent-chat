@@ -199,6 +199,15 @@ class JobsTest(unittest.TestCase):
         gate.set()
         self.assertEqual(wait_done(jobs, v["id"])["state"], "done")
 
+    def test_an_unexpected_error_still_ends_the_job(self):
+        import http.client
+        jobs = models.Jobs()
+        j = jobs.start("import", "m", lambda job: (_ for _ in ()).throw(http.client.IncompleteRead(b"x", 10)))
+        done = wait_done(jobs, j["id"])
+        self.assertEqual(done["state"], "failed")
+        self.assertIn("IncompleteRead", done["message"])
+        jobs.start("import", "m", lambda job: None)  # a retry is not refused
+
     def test_failures_become_messages(self):
         jobs = models.Jobs()
         j = jobs.start("pull", "m", lambda job: (_ for _ in ()).throw(OllamaError("boom")))
@@ -250,6 +259,19 @@ class ImportTest(OllamaSetup):
         done, work = self.run_import(os.urandom(64 * 1024 * 40), delay=0.05, cancel_after=0.3)
         self.assertEqual(done["state"], "cancelled")
         self.assertEqual(list(work.iterdir()), [])
+
+    def test_unreachable_ollama_fails_before_downloading(self):
+        host = FileHost(os.urandom(64 * 1024 * 20), chunk_delay=0.05)
+        self.addCleanup(host.close)
+        jobs, work = models.Jobs(), self.root / "imports"
+        start = time.monotonic()
+        v = jobs.start("import", "x", lambda job: models.import_gguf(
+            job, Ollama("http://127.0.0.1:1"), host.url_for("r/resolve/main/x.gguf"), "x.gguf",
+            "x", work))
+        done = wait_done(jobs, v["id"])
+        self.assertEqual(done["state"], "failed")
+        self.assertIn("not reachable", done["message"])
+        self.assertLess(time.monotonic() - start, 0.9)  # the 1.3 MB file at 20 chunks/s was not fetched
 
     def test_check_import(self):
         ok = ("https://huggingface.co/a/b-GGUF/resolve/main/b-Q4_K_M.gguf", "b-Q4_K_M.gguf", "b:q4_k_m")

@@ -242,6 +242,8 @@ class Jobs:
                 job.state, job.message = "cancelled", "cancelled"
             except (OllamaError, StoreError, OSError, ValueError) as e:
                 job.state, job.message = "failed", str(e)
+            except Exception as e:  # e.g. http.client.IncompleteRead: a job must always end
+                job.state, job.message = "failed", "%s: %s" % (type(e).__name__, e)
         threading.Thread(target=run, daemon=True).start()
         return job.view()
 
@@ -278,6 +280,7 @@ def check_import(url, filename, model):
 def import_gguf(job, ollama, url, filename, model, work_dir,
                 free=lambda p: shutil.disk_usage(p).free):
     """Download a GGUF file (hashing it), hand it to Ollama, create the model."""
+    ollama.version()  # fail in a second, not after a 20 GB download, if Ollama is down
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     tmp = work_dir / (uuid.uuid4().hex + ".gguf.part")
