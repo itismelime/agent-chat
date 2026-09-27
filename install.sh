@@ -49,6 +49,9 @@ Environment=PATH=$PATH
 ExecStart=/usr/bin/env python3 "$here/bin/chat" serve
 Restart=on-failure
 RestartSec=5
+# agents started from the page live in tmux servers this service may start;
+# a restart must stop only the service, not them
+KillMode=process
 
 [Install]
 WantedBy=default.target
