@@ -11,7 +11,6 @@ from tests.helpers import start, stop
 ROOT = Path(__file__).resolve().parent.parent
 STUB = """#!/bin/sh
 echo "{tool} $*" >> {calls}
-[ "$2" = get ] && exit 1
 exit 0
 """
 
@@ -74,6 +73,9 @@ class InstallTest(unittest.TestCase):
         self.assertIn("systemctl --user restart agent-chat", calls)
         self.assertIn("claude mcp add --scope user agent-chat -- %s/bin/chat mcp" % ROOT, calls)
         self.assertIn("codex mcp add agent-chat -- %s/bin/chat mcp" % ROOT, calls)
+        # an old registration (a moved clone) is replaced, not kept
+        self.assertLess(calls.index("claude mcp remove --scope user agent-chat"),
+                        calls.index("claude mcp add --scope user agent-chat -- %s/bin/chat mcp" % ROOT))
         self.assertIn("is not on your PATH", r.stdout)
 
         r = self.install("--uninstall")

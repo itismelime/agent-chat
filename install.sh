@@ -163,12 +163,13 @@ say "service agent-chat running on http://127.0.0.1:$port"
 
 for tool in claude codex; do
     if ! command -v "$tool" >/dev/null; then say "$tool not found: skipped"; continue; fi
-    if "$tool" mcp get agent-chat >/dev/null 2>&1; then
-        say "$tool: agent-chat already registered"
-    elif [[ $tool == claude ]]; then
+    # re-register every time: a moved clone leaves the old path behind
+    if [[ $tool == claude ]]; then
+        claude mcp remove --scope user agent-chat >/dev/null 2>&1 || true
         claude mcp add --scope user agent-chat -- "$here/bin/chat" mcp >/dev/null
         say "claude: registered agent-chat for all your sessions"
     else
+        codex mcp remove agent-chat >/dev/null 2>&1 || true
         codex mcp add agent-chat -- "$here/bin/chat" mcp >/dev/null
         say "codex: registered agent-chat for all your sessions"
     fi
