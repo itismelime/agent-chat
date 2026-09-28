@@ -2,8 +2,8 @@
 // Uses the page's $, el, api and KIND; loaded after the page's own script.
 const mp=$('modelspanel'),GB=b=>b==null?'?':(b/1024**3).toFixed(1)+' GB';
 let mtab='installed',mtimer=null,mdrawn='';
-function openModels(){mp.hidden=false;showTab(mtab);clearInterval(mtimer);mtimer=setInterval(mrefresh,2000);}
-function closeModels(){mp.hidden=true;clearInterval(mtimer);t.focus();}
+function openModels(){mp.showModal();showTab(mtab);clearInterval(mtimer);mtimer=setInterval(mrefresh,2000);}
+mp.addEventListener('close',()=>{clearInterval(mtimer);loadLocals();t.focus();});
 function showTab(tab){mtab=tab;mdrawn='';
   for(const b of mp.querySelectorAll('.mtab'))b.classList.toggle('on',b.dataset.tab===tab);
   for(const s of mp.querySelectorAll('.mview'))s.hidden=s.dataset.tab!==tab;mrefresh();}
@@ -11,9 +11,9 @@ function merr(e){$('merr').textContent=e?e.message||String(e):'';}
 async function mrefresh(){
   try{
     const s=await api('api/models/status');
-    $('mstatus').textContent=(s.own?"agent-chat's Ollama":'External Ollama')+' at '+s.url+' · '+
+    $('mstatus').textContent=(s.own?"agent-chat's Ollama":'External Ollama')+' at '+s.url+', '+
       (s.reachable?'v'+s.version:'not reachable: '+(s.own?'systemctl --user start agent-chat-ollama':
-        'check the address (./install.sh --ollama-url)'))+' · '+
+        'check the address (./install.sh --ollama-url)'))+'. '+
       (s.gpu?`${s.gpu.name}, ${GB(s.gpu.used)} of ${GB(s.gpu.total)} used`:'GPU unknown');
     if(mtab==='installed'&&s.reachable)drawInstalled((await api('api/models')).models);
     if(mtab==='jobs')drawJobs((await api('api/models/jobs')).jobs);
@@ -61,11 +61,10 @@ function drawJobs(jobs){
     if(j.state==='running'&&['import','pull'].includes(j.kind))
       d.append(button('Cancel',()=>api(`api/models/jobs/${j.id}/cancel`,{})));
     return d;}));}
-$('modelsbtn').onclick=openModels;$('mclose').onclick=closeModels;
+$('modelsbtn').onclick=openModels;
 for(const b of mp.querySelectorAll('.mtab'))b.onclick=()=>showTab(b.dataset.tab);
 $('msearch').onsubmit=e=>{e.preventDefault();search();};
 $('mpull').onsubmit=async e=>{e.preventDefault();const v=$('mpullname').value.trim();if(!v)return;
   try{merr();await api('api/models/pull',{model:v});$('mpullname').value='';showTab('jobs');}catch(err){merr(err);}};
 $('munload').onclick=async()=>{try{merr();const r=await api('api/models/unload',{});
   $('merr').textContent=r.unloaded.length?'Unloaded '+r.unloaded.join(', '):'Nothing was loaded.';}catch(e){merr(e);}mrefresh();};
-addEventListener('keydown',e=>{if(e.key==='Escape'&&!mp.hidden&&!['INPUT','SELECT'].includes(document.activeElement.tagName))closeModels();});

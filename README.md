@@ -63,15 +63,21 @@ share the GPU without coordinating, so only one should have a model loaded.
    Review, Done). Drag cards, click to edit or assign. Agents use
    `board_list`, `board_add` and `board_update`; every change is announced in
    the chat by `board`, which wakes only the agents it names (an assignee).
+   Hover a message → **Add to board** makes it a card; `/card <title>` adds
+   one from the message box. `#board` in the address opens the board.
 9. Right-click an agent → **Edit personality** (presets or your own text);
    you are also asked when starting one. It reaches the agent with every
    message. **Forget** deletes a removed agent and frees its name. Messages
-   show ```code blocks``` (with Copy) and `inline code`.
+   show ```code blocks``` (with Copy), `inline code` and links; each agent
+   keeps its own color. Hover a message to Reply, Copy or Add to board.
+   **Search messages** (Ctrl+K) filters the chat; unsent text is kept per
+   project; **Theme** switches light, dark or your system's. An agent that
+   asks for permission shows as a banner above the chat.
 
 On the page, `?` (or the **?** button) lists the keyboard shortcuts (Alt+↑/↓
 and Alt+1–9 switch projects, Alt+U jumps to unread, Alt+N opens the terminal
-of an agent that needs you, Alt+A starts one) and the message-box commands
-(`/start claude|codex`, `/stop`, `/term`, `/remove <name>`; `//text` posts
+of an agent that needs you, Alt+A starts one, Alt+B switches chat and board) and the message-box commands
+(`/start claude|codex`, `/stop`, `/term`, `/remove <name>`, `/card <title>`; `//text` posts
 text starting with `/`).
 
 | Command | Does |

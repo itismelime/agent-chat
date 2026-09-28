@@ -1,421 +1,95 @@
 <!doctype html><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
+<meta name=color-scheme content="light dark">
 <title>agent-chat</title>
-<style>
-:root{--bg:#f6f6f4;--fg:#1d1d1b;--mute:#77756f;--card:#fff;--line:#e2e0da;--side:#ecebe7;
---user:#2f6f4f;--claude:#b4572e;--codex:#2e5fb4;--llm:#7a4fb0;--ok:#3a9d5d;--busy:#c9950c}
-@media (prefers-color-scheme:dark){:root{--bg:#161615;--fg:#e8e6e1;--mute:#8e8b84;--card:#21201e;
---line:#34322f;--side:#1c1b1a;--user:#6fbf93;--claude:#e08a5f;--codex:#7aa2ea;--llm:#b893e0}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);
-font:15px/1.5 system-ui,sans-serif;display:flex;height:100vh}
-nav{width:220px;flex:none;background:var(--side);border-right:1px solid var(--line);
-display:flex;flex-direction:column}
-nav h1{font-size:13px;margin:0;padding:12px 14px 6px;color:var(--mute);font-weight:600}
-#projects{flex:1;overflow-y:auto}
-.p{display:flex;justify-content:space-between;gap:6px;padding:6px 10px;margin:1px 6px;
-border-radius:6px;cursor:pointer;overflow:hidden;white-space:nowrap}
-.p:hover{background:var(--line)}.p.on{background:var(--line);font-weight:600}.p.missing{opacity:.5}
-.badge{background:var(--claude);color:#fff;border-radius:9px;padding:0 7px;font-size:12px;font-weight:600}
-#add{margin:8px}#modelsbtn{margin:0 8px 8px}
-main{flex:1;display:flex;flex-direction:column;min-width:0}
-header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;
-align-items:center;flex-wrap:wrap}
-#name{font-weight:600;flex:1}
-#wrap{flex:1;display:flex;min-height:0}#chat{flex:1;display:flex;flex-direction:column;min-width:0}
-aside{width:200px;flex:none;border-left:1px solid var(--line);overflow-y:auto;padding:4px 0 8px}
-aside h2{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);
-margin:12px 14px 4px;font-weight:600}
-.a{padding:4px 14px;cursor:context-menu;white-space:nowrap;overflow:hidden}.a:hover{background:var(--line)}
-.a small{display:block;color:var(--mute);font-size:12px;margin-left:13px}.a.removed{opacity:.5}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;
-background:var(--mute);vertical-align:middle}
-.waiting .dot{background:var(--ok)}.busy .dot{background:var(--busy)}
-#menu{position:fixed;min-width:170px;background:var(--card);border:1px solid var(--line);
-border-radius:8px;padding:4px;box-shadow:0 4px 16px #0003;z-index:9}
-#menu div{padding:5px 12px;border-radius:6px;cursor:pointer}#menu div:hover{background:var(--line)}
-#log{flex:1;overflow-y:auto;padding:12px 16px}
-.m{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;
-margin:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;max-width:900px}
-.h{font-size:13px;color:var(--mute);margin-bottom:2px}.n{font-weight:600}
-.user .n{color:var(--user)}.claude .n{color:var(--claude)}.codex .n{color:var(--codex)}.llm .n{color:var(--llm)}
-form{position:relative;display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
-textarea{flex:1;resize:none;height:64px;font:inherit;padding:8px;border-radius:8px;
-border:1px solid var(--line);background:var(--card);color:var(--fg)}
-button{font:inherit;padding:0 18px;border-radius:8px;border:0;background:var(--user);color:#fff;cursor:pointer}
-.ghost{background:none;color:var(--mute);border:1px solid var(--line);padding:3px 10px;font-size:13px}
-#err,#note,#hint{font-size:13px;padding:0 16px}#err{color:var(--claude)}#note{color:var(--mute)}
-#hint{color:var(--busy)}
-#ac{position:absolute;bottom:calc(100% - 6px);left:16px;min-width:200px;background:var(--card);
-border:1px solid var(--line);border-radius:8px;padding:4px;box-shadow:0 4px 16px #0003}
-#ac div{padding:5px 10px;border-radius:6px;cursor:pointer}#ac .sel{background:var(--line)}
-#ac small{color:var(--mute);margin-left:8px}[hidden]{display:none!important}
-.needs_you .dot{background:var(--claude)}#menu .off{opacity:.45;cursor:default}
-#addagent{float:right;margin:8px 10px 0}
-#term,#help,#modelspanel,#cardpanel{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:8}
-#help dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0;font-size:14px}
-#help dt{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}#help dd{margin:0}
-#help h3{margin:10px 0 4px;font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
-#term .box,#help .box,#modelspanel .box,#cardpanel .box{background:var(--card);border:1px solid var(--line);border-radius:10px;width:min(920px,96vw);
-max-height:92vh;display:flex;flex-direction:column;gap:8px;padding:12px}
-#term .top,#help .top,#modelspanel .top,#cardpanel .top{display:flex;justify-content:space-between;align-items:center;font-weight:600}
-#screen{flex:1;overflow:auto;margin:0;min-height:240px;padding:8px;border-radius:6px;background:var(--bg);
-font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}
-#termkeys button{padding:4px 12px;margin:0 4px 4px 0}
-#ti{width:100%;font:inherit;padding:6px 8px;border-radius:6px;border:1px solid var(--line);
-background:var(--bg);color:var(--fg)}#attach{color:var(--mute);font-size:12px}
-.mtabs{display:flex;gap:6px}.mtab.on{background:var(--line);color:var(--fg)}
-.mview{overflow:auto;max-height:60vh}.mrow{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;
-padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}.mrow input,.mrow select{font:inherit;
-padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
-.mrow input[type=number]{width:7em}#mstatus{color:var(--mute);font-size:13px}#merr{color:var(--claude);font-size:13px}
-#msearch,#mpull{display:flex;gap:8px;margin:6px 0;padding:0;border:0}
-#msearch input,#mpull input{flex:1;font:inherit;padding:5px 8px;border-radius:6px;border:1px solid var(--line);
-background:var(--bg);color:var(--fg)}#msearch button,#mpull button{padding:0 14px}
-.m code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);padding:0 4px;border-radius:4px}
-.codeblock{position:relative;margin:6px 0;white-space:normal}.codeblock pre{margin:0;padding:8px 10px;background:var(--bg);
-border:1px solid var(--line);border-radius:6px;overflow:auto;font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}
-.codeblock .copy{position:absolute;top:4px;right:4px;padding:1px 8px;font-size:12px}.board .n{color:var(--mute)}
-.views{display:flex;gap:4px}.views .on{background:var(--line);color:var(--fg)}
-#boardview{flex:1;display:flex;gap:10px;padding:12px 16px;overflow:auto;align-items:flex-start}
-.col{flex:1;min-width:170px;background:var(--side);border:1px solid var(--line);border-radius:8px;padding:8px;
-display:flex;flex-direction:column;gap:6px;min-height:120px}.col.over{outline:2px dashed var(--user)}
-.col h3{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin:0 0 4px;color:var(--mute)}
-.col h3 button{padding:0 8px}.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:6px 8px;
-cursor:grab;font-size:14px;overflow-wrap:anywhere}.card small{display:block;color:var(--mute)}
-#cardpanel input,#cardpanel textarea,#cardpanel select{font:inherit;padding:6px 8px;border-radius:6px;border:1px solid var(--line);
-background:var(--bg);color:var(--fg)}#cardpanel textarea{height:140px;resize:vertical}#cardpanel .row{display:flex;gap:8px;align-items:center}
-@media (max-width:800px){aside{display:none}}@media (max-width:640px){nav{width:130px}}
-</style>
-<nav><h1>Projects</h1><div id=projects></div>
-<button id=add class=ghost type=button title="Add a project folder">+ Add project</button>
-<button id=modelsbtn class=ghost type=button title="Local models">Models</button></nav>
+<link rel=stylesheet href=page.css>
+<nav id=rail aria-label=Projects>
+<div class=brand><span class=mark aria-hidden=true></span>agent-chat</div>
+<div class=railhead><span>Projects</span><button id=add class=icon type=button title="Add a project folder" aria-label="Add project">+</button></div>
+<div id=projects></div>
+<div class=railfoot><button id=modelsbtn class=ghost type=button>Local models</button>
+<button id=theme class=ghost type=button title="Switch between light, dark and your system's theme">Theme: auto</button></div>
+</nav>
 <main>
-<header><span id=name></span><span class=views><button id=viewchat class="ghost on" type=button>Chat</button>
-<button id=viewboard class=ghost type=button>Board</button></span>
-<button id=keys class=ghost type=button title="Shortcuts and commands (?)">?</button>
-<button id=bell class=ghost type=button hidden>Enable notifications</button></header>
+<header>
+<button id=menubtn class=icon type=button aria-label="Show projects">☰</button>
+<div class=title><h1 id=name></h1><span id=path></span></div>
+<div class=views role=tablist><button id=viewchat class=on type=button role=tab>Chat</button>
+<button id=viewboard type=button role=tab>Board <span id=boardcount></span></button></div>
+<input id=search type=search placeholder="Search messages" aria-label="Search messages">
+<button id=bell class=ghost type=button hidden>Enable notifications</button>
+<button id=rosterbtn class=ghost type=button>Agents</button>
+<button id=keys class=icon type=button title="Shortcuts and commands (?)" aria-label="Shortcuts and commands">?</button>
+</header>
 <div id=wrap><div id=chat>
-<div id=log></div><div id=note></div><div id=err></div><div id=hint></div>
+<div id=needs></div>
+<div id=log aria-live=polite></div>
+<button id=jump type=button hidden>New messages</button>
+<div id=status><span id=note></span><span id=err role=alert></span><span id=hint></span></div>
 <form id=f><div id=ac role=listbox hidden></div>
-<textarea id=t placeholder="Message (Enter sends, Shift+Enter new line; @ addresses someone; / starts a command)"></textarea>
-<button>Send</button></form></div>
+<div id=to></div>
+<div class=box><textarea id=t rows=1 placeholder="Message everyone, or start with @name"></textarea>
+<button id=send>Send</button></div></form></div>
 <div id=boardview hidden></div>
-<aside aria-label="Agents in this project"><button id=addagent class=ghost type=button
-title="Start an agent in this project">+ Agent</button><div id=members></div></aside></div>
+<aside id=roster aria-label="Agents in this project">
+<div class=rosterhead><h2>Agents</h2><button id=addagent type=button title="Start an agent in this project">Start agent</button></div>
+<div id=members></div></aside></div>
 </main>
 <div id=menu role=menu hidden></div>
-<div id=help hidden><div class=box role=dialog aria-label="Shortcuts and commands">
-<div class=top><span>Shortcuts and commands</span><button id=helpclose class=ghost type=button>Close</button></div>
+
+<dialog id=help aria-label="Shortcuts and commands">
+<div class=top><h2>Shortcuts and commands</h2><button class=icon type=button value=close aria-label=Close>×</button></div>
 <h3>Keys</h3><dl>
 <dt>Alt+↑ / Alt+↓</dt><dd>previous / next project</dd><dt>Alt+1 … Alt+9</dt><dd>project 1–9</dd>
 <dt>Alt+U</dt><dd>next project with unread messages</dd>
 <dt>Alt+N</dt><dd>terminal of the first agent that needs you</dd>
-<dt>Alt+A</dt><dd>start an agent</dd><dt>↑</dt><dd>in an empty message box: your last message again</dd>
+<dt>Alt+A</dt><dd>start an agent</dd><dt>Alt+B</dt><dd>switch between chat and board</dd>
+<dt>Ctrl+K</dt><dd>search messages</dd>
+<dt>↑</dt><dd>in an empty message box: your last message again</dd>
 <dt>/</dt><dd>focus the message box</dd><dt>?</dt><dd>this list</dd><dt>Esc</dt><dd>close a menu or panel</dd></dl>
 <h3>Commands in the message box</h3><dl>
 <dt>/start claude</dt><dd>start Claude in this project (or <code>/start codex</code>, <code>/start opencode [model]</code>)</dd>
 <dt>/stop &lt;name&gt;</dt><dd>stop an agent started from the page</dd>
 <dt>/term &lt;name&gt;</dt><dd>open its terminal</dd><dt>/remove &lt;name&gt;</dt><dd>remove it from the chat</dd>
 <dt>/local &lt;model&gt; &lt;name&gt;</dt><dd>add an installed local model as a member</dd>
-<dt>//text</dt><dd>post a message that starts with /</dd></dl></div></div>
-<div id=term hidden><div class=box role=dialog aria-label="Agent terminal">
-<div class=top><span id=termtitle></span><button id=termclose class=ghost type=button>Close</button></div>
+<dt>/card &lt;title&gt;</dt><dd>add a card to the board's To do column</dd>
+<dt>//text</dt><dd>post a message that starts with /</dd></dl></dialog>
+
+<dialog id=term aria-label="Agent terminal">
+<div class=top><h2 id=termtitle></h2><button class=icon type=button value=close aria-label=Close>×</button></div>
 <pre id=screen></pre><div id=termkeys></div>
 <form id=tf><input id=ti placeholder="Type a line for the terminal; Enter sends it" maxlength=2000></form>
-<span id=attach></span></div></div>
-<div id=cardpanel hidden><div class=box role=dialog aria-label="Card">
-<div class=top><span id=cardtitle></span><button id=cardclose class=ghost type=button>Close</button></div>
-<input id=ctitle maxlength=200 placeholder=Title><textarea id=cdesc maxlength=4000 placeholder=Description></textarea>
-<div class=row><label for=cassignee>Assignee</label><select id=cassignee></select><span style=flex:1></span>
-<button id=cdelete class=ghost type=button>Delete</button><button id=csave type=button>Save</button></div></div></div>
-<div id=modelspanel hidden><div class=box role=dialog aria-label="Local models">
-<div class=top><span>Local models</span><button id=mclose class=ghost type=button>Close</button></div>
+<code id=attach></code></dialog>
+
+<dialog id=ask><form method=dialog>
+<div class=top><h2 id=asktitle></h2><button class=icon type=button value=close aria-label=Close>×</button></div>
+<label id=asklabel for=askinput></label>
+<div id=askpresets></div>
+<input id=askinput><textarea id=askarea rows=4></textarea>
+<p id=askhelp></p>
+<div class=row><span></span><button type=button value=close class=ghost>Cancel</button><button id=askok value=ok>OK</button></div>
+</form></dialog>
+
+<dialog id=cardpanel aria-label=Card>
+<div class=top><h2 id=cardtitle></h2><button class=icon type=button value=close aria-label=Close>×</button></div>
+<input id=ctitle maxlength=200 placeholder=Title aria-label=Title>
+<textarea id=cdesc maxlength=4000 placeholder="Description" aria-label=Description></textarea>
+<div class=row><label for=ccolumn>Column</label><select id=ccolumn></select>
+<label for=cassignee>Assignee</label><select id=cassignee></select></div>
+<div class=row><button id=cdelete class="ghost danger" type=button>Delete card</button><span></span>
+<button id=csave type=button>Save</button></div></dialog>
+
+<dialog id=modelspanel aria-label="Local models">
+<div class=top><h2>Local models</h2><button class=icon type=button value=close aria-label=Close>×</button></div>
 <div id=mstatus></div>
-<div class=mtabs><button class="ghost mtab" data-tab=installed type=button>Installed</button>
-<button class="ghost mtab" data-tab=get type=button>Get models</button>
-<button class="ghost mtab" data-tab=jobs type=button>Jobs</button></div><div id=merr></div>
-<section class=mview data-tab=installed><button id=munload class=ghost type=button>Unload now</button><div id=mlist></div></section>
+<div class=views><button class=mtab data-tab=installed type=button>Installed</button>
+<button class=mtab data-tab=get type=button>Get models</button>
+<button class=mtab data-tab=jobs type=button>Jobs</button></div><div id=merr></div>
+<section class=mview data-tab=installed><button id=munload class=ghost type=button>Unload from video memory</button><div id=mlist></div></section>
 <section class=mview data-tab=get hidden><form id=msearch><input id=mq placeholder="Search Hugging Face for GGUF models">
 <button>Search</button></form><form id=mpull><input id=mpullname placeholder="Or pull from Ollama's library, e.g. qwen3:0.6b">
 <button>Pull</button></form><div id=mresults></div></section>
-<section class=mview data-tab=jobs hidden><div id=mjobs></div></section></div></div>
-<script>
-const $=id=>document.getElementById(id),log=$('log'),t=$('t'),ac=$('ac'),bell=$('bell');
-const saved={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v===null?d:v}catch(e){return d}},
-  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-let projects=[],cur=saved.get('cur',null),msgs={},agents=[],seen=saved.get('seen',{}),notified={},drawn='',busy=false,down=false;
-let tools={},spawned=[],needed=new Set();
-
-// ```code blocks``` and `inline code` in messages; everything else stays plain text
-function renderText(text){
-  const frag=document.createDocumentFragment(),re=/```(?:[^\n`]*\n)?([\s\S]*?)```/g;let last=0,m;
-  const inline=s=>s.split(/(`[^`\n]+`)/).forEach((part,i)=>{
-    if(i%2)frag.append(el('code','',part.slice(1,-1)));else if(part)frag.append(part);});
-  while((m=re.exec(text))){
-    inline(text.slice(last,m.index).replace(/\n$/,''));last=re.lastIndex+(text[re.lastIndex]==='\n'?1:0);
-    const code=m[1].replace(/\n$/,''),box=el('div','codeblock'),copy=el('button','ghost copy','Copy');copy.type='button';
-    copy.onclick=()=>navigator.clipboard.writeText(code).then(()=>{copy.textContent='Copied';setTimeout(()=>{copy.textContent='Copy';},1200);});
-    box.append(el('pre','',code),copy);frag.append(box);}
-  inline(text.slice(last));return frag;}
-function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;
-  if(text!==undefined)e.textContent=text;return e;}
-async function api(path,body){
-  const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json','X-Agent-Chat':'1'},
-    body:JSON.stringify(body)}:{headers:{'X-Agent-Chat':'1'}});
-  const x=r.status===204?null:await r.json();
-  if(!r.ok)throw new Error(x&&x.error||r.statusText);return x;}
-function away(){return document.hidden||!document.hasFocus();}
-function lastN(id){const l=msgs[id]||[];return l.length?l[l.length-1].n:0;}
-function unread(p){return (msgs[p.id]||[]).filter(m=>m.n>(seen[p.id]||0)&&m.from!=='user').length;}
-function notify(p,m){if(window.Notification&&Notification.permission==='granted')
-  new Notification(m.from+' · '+p.name,{body:m.text.slice(0,300),tag:'agent-chat-'+p.id+'-'+m.n});}
-
-async function refresh(){
-  if(busy)return;busy=true;
-  try{
-    projects=(await api('api/projects')).projects;
-    if(!projects.some(p=>p.id===cur))cur=projects.length?projects[0].id:null;
-    for(const p of projects){
-      const list=msgs[p.id]||(msgs[p.id]=[]);
-      const fresh=(await api(`api/projects/${p.id}/messages?after=${lastN(p.id)}`)).messages;
-      list.push(...fresh);
-      if(notified[p.id]===undefined){  // first load: history is not new
-        notified[p.id]=lastN(p.id);if(seen[p.id]===undefined)seen[p.id]=lastN(p.id);continue;}
-      for(const m of fresh)if(m.from!=='user'&&m.n>notified[p.id]&&(away()||p.id!==cur))notify(p,m);
-      notified[p.id]=lastN(p.id);
-    }
-    agents=cur?(await api(`api/projects/${cur}/agents`)).agents:[];
-    spawned=cur?(await api(`api/projects/${cur}/spawned`)).spawned:[];
-    const p=projects.find(p=>p.id===cur);
-    for(const s of spawned)if(s.state==='needs_you'&&!needed.has(s.token)&&p)
-      notify(p,{from:s.name||('new '+(KIND[s.tool]||s.tool)),text:'needs you',n:'need-'+s.token});
-    needed=new Set(spawned.filter(s=>s.state==='needs_you').map(s=>s.token));
-    if(cur&&!away())seen[cur]=lastN(cur);
-    saved.set('seen',seen);if(down){$('err').textContent='';down=false;}render();
-  }catch(e){down=true;$('err').textContent='Service not reachable: '+e.message;}
-  finally{busy=false;}
-}
-
-function select(id){cur=id;saved.set('cur',cur);$('note').textContent='';refresh();}
-function render(){
-  $('projects').replaceChildren(...projects.map(p=>{
-    const d=el('div','p'+(p.id===cur?' on':'')+(p.missing?' missing':''));
-    d.title=p.path+(p.missing?' (folder missing)':'');d.append(el('span','',p.name));
-    const n=unread(p);if(n)d.append(el('span','badge',String(n)));d.onclick=()=>select(p.id);return d;}));
-  const total=projects.reduce((s,p)=>s+unread(p),0);
-  document.title=(total?`(${total}) `:'')+'agent-chat';
-  const p=projects.find(p=>p.id===cur);
-  $('name').textContent=p?p.name:'Add a project to start';
-  const starting=spawned.filter(s=>!s.name).map(s=>({name:'starting…',kind:s.tool,starting:true,
-    spawn:s.token,status:s.state==='needs_you'?'needs_you':'starting'}));
-  const members=[...starting,...agents];
-  $('members').replaceChildren(...GROUPS.flatMap(([st,title])=>{
-    const g=members.filter(a=>a.status===st);if(!g.length)return [];
-    return [el('h2','',title+' — '+g.length),...g.map(a=>{const d=el('div','a '+a.status);
-      d.title=a.error?'Offline: '+a.error:(a.personality?'Personality: '+a.personality+'\n':'')+'Right-click for options';
-      d.append(el('i','dot'),a.name,el('small','',a.model?'local LLM · '+a.model:a.kind==='opencode'?'OpenCode · '+((spawned.find(s=>s.token===a.spawn)||{}).model||''):KIND[a.kind]||a.kind));
-      d.oncontextmenu=e=>{e.stopPropagation();openMenu(e,agentItems(a));};return d;})];}));
-  hint();
-  const key=cur+':'+lastN(cur);if(key===drawn)return;
-  const switched=!drawn.startsWith(cur+':');drawn=key;
-  const atEnd=log.scrollHeight-log.scrollTop-log.clientHeight<40;
-  log.replaceChildren(...(p?msgs[p.id]:[]).map(m=>{const d=el('div','m '+m.kind),h=el('div','h');
-    h.append(el('span','n',m.from),' · '+m.time.slice(11,19));d.append(h,renderText(m.text));return d;}));
-  if(atEnd||switched)log.scrollTop=log.scrollHeight;
-}
-
-// members: groups, right-click menu, hint for agents that will not answer now
-const GROUPS=[['needs_you','Needs you'],['starting','Starting'],['waiting','Available'],
-  ['busy','Working'],['offline','Offline'],['removed','Removed']];
-const KIND={claude:'Claude',codex:'Codex',llm:'local LLM',opencode:'OpenCode'},menu=$('menu');
-function openMenu(e,items){
-  e.preventDefault();
-  menu.replaceChildren(...items.map(([text,fn,off])=>{const item=el('div',off?'off':'',text);
-    item.setAttribute('role','menuitem');if(off)item.title=off;
-    item.onclick=async ev=>{ev.stopPropagation();if(off)return;menu.hidden=true;
-      try{await fn();}catch(err){$('err').textContent=err.message;}refresh();};return item;}));
-  menu.style.left=Math.min(e.clientX,innerWidth-200)+'px';menu.style.top=e.clientY+'px';menu.hidden=false;}
-const path=(token,x)=>`api/projects/${cur}/spawned/${token}/${x}`;
-function agentItems(a){
-  const items=[];
-  const who=a.starting?(KIND[a.kind]||a.kind)+' (starting)':a.name;
-  if(a.spawn){items.push(['View terminal',()=>openTerm(a.spawn,who)]);
-    items.push(['Stop',()=>{if(confirm(`Stop ${who}? Its tmux session ends.`))return api(path(a.spawn,'stop'),{});}]);}
-  if(a.starting)return items;
-  items.push(['Edit personality',()=>{const p=askPersonality(a.personality,a.name);
-    if(p!==null)return api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/personality`,{personality:p||null});}]);
-  const [text,action]=a.status==='removed'?['Add back','readd']:['Remove from chat','remove'];
-  items.push([text,()=>api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/${action}`,{})]);
-  if(a.status==='removed')items.push(['Forget',()=>{if(confirm(`Forget ${a.name}? Its name becomes free again; its messages stay.`))
-    return api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/forget`,{});}]);
-  return items;}
-const PRESETS=[['Reviewer','You review changes critically: correctness first, then clarity. Point to exact lines.'],
-  ['Architect','You think about structure and trade-offs before code, and keep designs small.'],
-  ['Tester','You look for how things break and write the smallest test that shows it.'],
-  ['Terse helper','You answer in as few words as possible.']];
-function askPersonality(current,who){  // null: cancelled; '' : none
-  const r=prompt(`Personality for ${who}: your own text, or a preset number:\n`+
-    PRESETS.map(([n],i)=>`${i+1}  ${n}`).join('\n')+'\n(leave empty for none)',current||'');
-  if(r===null)return null;const i=/^\s*([1-4])\s*$/.exec(r);return i?PRESETS[i[1]-1][1]:r.trim();}
-function startWith(tool,model){
-  const p=askPersonality('',model?`OpenCode (${model})`:KIND[tool]);if(p===null)return;
-  return api(`api/projects/${cur}/spawned`,{tool,model,personality:p||null});}
-function startItems(){
-  const items=['claude','codex'].map(tool=>{
-    const off=!cur?'Add a project first':!tools.tmux?'tmux is not installed':!tools[tool]?`${KIND[tool]} is not installed`:'';
-    return ['Start '+KIND[tool],()=>startWith(tool),off];});
-  const ocOff=!cur?'Add a project first':!tools.tmux?'tmux is not installed':!tools.opencode?'OpenCode is not installed':
-    !locals.ok?locals.reason:'';
-  if(ocOff||!oc.models.length)items.push(['Start OpenCode',()=>{},ocOff||'No model that can call tools; get one in Models']);
-  else for(const m of oc.models)items.push(['Start OpenCode: '+m+(m===oc.default?' (default)':''),
-    ()=>startWith('opencode',m),'']);
-  if(!locals.ok)items.push(['Add local model',()=>{},locals.reason]);
-  else if(!locals.names.length)items.push(['Add local model',()=>{},'No models installed; get one in Models']);
-  else for(const n of locals.names)items.push(['Add local model: '+n,()=>addLocal(n),cur?'':'Add a project first']);
-  return items;}
-$('addagent').onclick=e=>{e.stopPropagation();openMenu(e,startItems());};
-$('members').parentElement.oncontextmenu=e=>openMenu(e,startItems());
-addEventListener('click',()=>{menu.hidden=true;});
-addEventListener('keydown',e=>{if(e.key==='Escape'){menu.hidden=true;$('help').hidden=true;
-  if(!$('term').hidden&&document.activeElement!==$('ti'))closeTerm();}});
-function hint(){
-  const lead=(t.value.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0];
-  const to=lead.split(/[\s,:@]+/).filter(Boolean).map(x=>x.toLowerCase());
-  $('hint').textContent=agents.filter(a=>to.includes(a.name)&&a.status!=='waiting').map(a=>
-    a.status==='busy'?`${a.name} is working and will see this when its current task ends.`:
-    a.status==='removed'?`${a.name} was removed from this chat.`:`${a.name} is offline.`).join(' ');}
-
-// terminal panel for an agent started from the page
-let termToken=null,termTimer=null;
-const KEYBTNS=[['1','1'],['2','2'],['3','3'],['↑','up'],['↓','down'],['Enter','enter'],['Esc','esc']];
-$('termkeys').replaceChildren(...KEYBTNS.map(([label,key])=>{const b=el('button','ghost',label);b.type='button';
-  b.onclick=()=>sendKeys({key});return b;}));
-async function sendKeys(body){
-  try{await api(path(termToken,'keys'),body);tick();}catch(e){$('screen').textContent+='\n['+e.message+']';}}
-async function tick(){
-  if(!termToken)return;
-  try{$('screen').textContent=(await api(path(termToken,'screen'))).screen;}
-  catch(e){$('screen').textContent='The terminal has ended.';clearInterval(termTimer);}}
-function openTerm(token,name){
-  termToken=token;$('termtitle').textContent=name+' — terminal';
-  const s=spawned.find(s=>s.token===token);
-  $('attach').textContent=s?`Take over in a terminal: tmux attach -t =${s.session}`:'';
-  $('term').hidden=false;$('ti').value='';tick();clearInterval(termTimer);termTimer=setInterval(tick,1500);$('ti').focus();}
-function closeTerm(){$('term').hidden=true;termToken=null;clearInterval(termTimer);t.focus();}
-$('termclose').onclick=closeTerm;
-$('tf').onsubmit=e=>{e.preventDefault();const text=$('ti').value;if(!text)return;$('ti').value='';sendKeys({text});};
-
-$('add').onclick=async()=>{
-  const path=prompt('Project folder (absolute path)');if(!path||!path.trim())return;
-  try{const r=await api('api/projects',{path:path.trim()});
-    select(r.project.id);
-    $('err').textContent='';$('note').textContent=r.existing?`${r.project.name} already exists; opened it.`:`Added ${r.project.name}.`;
-  }catch(e){$('note').textContent='';$('err').textContent='Not added: '+e.message;}};
-
-function bellLabel(){
-  if(!window.Notification){bell.hidden=true;return;}
-  bell.hidden=Notification.permission==='granted';
-  bell.textContent=Notification.permission==='denied'?'Notifications blocked in browser':'Enable notifications';}
-bell.onclick=async()=>{await Notification.requestPermission();bellLabel();};bellLabel();
-addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
-
-// @ autocomplete over this project's agents
-let matches=[],sel=0;
-function token(){const m=t.value.slice(0,t.selectionStart).match(/(^|\s)@([\w-]*)$/);return m?m[2]:null;}
-function showAc(){
-  const q=token();
-  matches=q===null?[]:agents.filter(a=>a.status!=='removed'&&a.name.startsWith(q.toLowerCase()));
-  if(!matches.length){ac.hidden=true;return;}
-  sel=Math.min(sel,matches.length-1);
-  ac.replaceChildren(...matches.map((a,i)=>{const d=el('div',i===sel?'sel':'','@'+a.name);
-    d.append(el('small','',a.kind));d.setAttribute('role','option');
-    d.onmousedown=e=>{e.preventDefault();pick(i);};return d;}));
-  ac.hidden=false;}
-function pick(i){
-  const pos=t.selectionStart,q=token(),start=pos-q.length-1,ins='@'+matches[i].name+' ';
-  t.value=t.value.slice(0,start)+ins+t.value.slice(pos);
-  t.selectionStart=t.selectionEnd=start+ins.length;ac.hidden=true;sel=0;t.focus();}
-t.oninput=()=>{sel=0;showAc();hint();};t.onclick=showAc;t.onblur=()=>{ac.hidden=true;};
-t.onkeydown=e=>{
-  if(!ac.hidden){
-    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();
-      sel=(sel+(e.key==='ArrowDown'?1:matches.length-1))%matches.length;showAc();return;}
-    if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();pick(sel);return;}
-    if(e.key==='Escape'){ac.hidden=true;return;}}
-  if(e.key==='ArrowUp'&&!t.value&&lastSent){e.preventDefault();t.value=lastSent;return;}
-  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('f').requestSubmit();}};
-
-$('f').onsubmit=async e=>{e.preventDefault();
-  const text=t.value.trim();if(!text||!cur)return;t.value='';ac.hidden=true;
-  if(text.startsWith('/')&&!text.startsWith('//')){
-    try{$('note').textContent=await runCommand(text);$('err').textContent='';lastSent=text;}
-    catch(e){t.value=text;$('err').textContent=e.message;}
-    refresh();return;}
-  try{await api(`api/projects/${cur}/messages`,{from:'user',text:text.startsWith('//')?text.slice(1):text});
-    $('err').textContent='';lastSent=text;}
-  catch(e){t.value=text;$('err').textContent='Not sent: '+e.message;}
-  refresh();};
-api('api/tools').then(x=>{tools=x;}).catch(()=>{});
-// installed local models for the start menu, refreshed every 30 s
-let locals={ok:false,reason:'Checking Ollama…',names:[]},oc={models:[],default:null};
-async function loadLocals(){
-  try{const s=await api('api/models/status');
-    if(!s.reachable){locals={ok:false,reason:'Ollama is not reachable',names:[]};return;}
-    locals={ok:true,reason:'',names:(await api('api/models')).models.map(m=>m.name)};
-    oc=await api('api/opencode/models').catch(()=>({models:[],default:null}));}
-  catch(e){locals={ok:false,reason:e.message,names:[]};oc={models:[],default:null};}}
-loadLocals();setInterval(loadLocals,30000);
-function suggestName(model){return model.split(':')[0].split('/').pop().toLowerCase()
-  .replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'')||'local';}
-async function addLocal(model,name){
-  if(name===undefined){name=prompt(`Name for ${model} in this chat`,suggestName(model));if(!name)return;}
-  const role=name&&arguments.length<2?askPersonality('',name):null;
-  await api(`api/projects/${cur}/locals`,{model,name:name.trim(),role:role||null});
-  return `Added ${name.trim()} (${model}).`;}
-// keyboard shortcuts (Alt, since the browser owns most Ctrl keys) and commands
-let lastSent='';
-const typing=()=>['TEXTAREA','INPUT'].includes((document.activeElement||{}).tagName);
-function stepProject(by){const i=projects.findIndex(p=>p.id===cur);
-  if(projects.length)select(projects[(i+by+projects.length)%projects.length].id);}
-function needsYou(){  // the first started agent of this project whose terminal asks
-  const s=spawned.find(s=>s.state==='needs_you');if(s)openTerm(s.token,s.name||(KIND[s.tool]||s.tool)+' (starting)');
-  else $('note').textContent='No agent here needs you.';}
-addEventListener('keydown',e=>{
-  if(e.altKey&&!e.ctrlKey&&!e.metaKey){
-    const go=f=>{e.preventDefault();f();};
-    if(e.key==='ArrowUp')return go(()=>stepProject(-1));
-    if(e.key==='ArrowDown')return go(()=>stepProject(1));
-    const digit=/^Digit([1-9])$/.exec(e.code);
-    if(digit)return go(()=>{const p=projects[digit[1]-1];if(p)select(p.id);});
-    if(e.code==='KeyU')return go(()=>{const i=projects.findIndex(p=>p.id===cur);
-      const p=[...projects.slice(i+1),...projects.slice(0,i+1)].find(p=>unread(p)&&p.id!==cur);
-      if(p)select(p.id);else $('note').textContent='No unread messages elsewhere.';});
-    if(e.code==='KeyN')return go(needsYou);
-    if(e.code==='KeyA')return go(()=>{const b=$('addagent').getBoundingClientRect();
-      openMenu({preventDefault(){},clientX:b.left||16,clientY:b.bottom||60},startItems());});
-  }
-  if(!typing()&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
-    if(e.key==='/'){e.preventDefault();t.focus();}
-    else if(e.key==='?'){e.preventDefault();$('help').hidden=false;}
-  }});
-$('keys').onclick=()=>{$('help').hidden=false;};$('helpclose').onclick=()=>{$('help').hidden=true;t.focus();};
-async function runCommand(text){
-  const [cmd,arg='',arg2='']=text.slice(1).trim().split(/\s+/);
-  const agent=()=>{const a=agents.find(a=>a.name===arg.toLowerCase());
-    if(!a)throw new Error(arg?`No agent named ${arg} in this project.`:`Say which agent: /${cmd} <name>`);return a;};
-  const started=()=>{const a=agent();if(!a.spawn)throw new Error(`${a.name} was not started from the page.`);return a;};
-  if(cmd==='start'){
-    if(arg==='opencode'){const model=arg2||oc.default;if(!model)throw new Error('No model that can call tools; get one in Models.');
-      await api(`api/projects/${cur}/spawned`,{tool:'opencode',model});return `Starting OpenCode with ${model}…`;}
-    if(!['claude','codex'].includes(arg))throw new Error('Use /start claude, /start codex or /start opencode [model].');
-    await api(`api/projects/${cur}/spawned`,{tool:arg});return `Starting ${KIND[arg]}…`;}
-  if(cmd==='stop'){const a=started();await api(path(a.spawn,'stop'),{});return `Stopped ${a.name}.`;}
-  if(cmd==='term'){const a=started();openTerm(a.spawn,a.name);return '';}
-  if(cmd==='remove'){const a=agent();
-    await api(`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/remove`,{});return `Removed ${a.name}.`;}
-  if(cmd==='local'){if(!arg||!arg2)throw new Error('Use /local <model> <name>.');return addLocal(arg,arg2);}
-  throw new Error(`Unknown command /${cmd}. Press ? for the list; //text posts text starting with /.`);}
-refresh();setInterval(refresh,2000);t.focus();
-</script>
+<section class=mview data-tab=jobs hidden><div id=mjobs></div></section></dialog>
+<script src=page.js></script>
 <script src=models.js></script>
 <script src=board.js></script>

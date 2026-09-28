@@ -352,13 +352,18 @@ class ModelRoutesTest(unittest.TestCase):
                                 {"tool": "opencode", "model": "coder:30b"})
         self.assertEqual((status, r["spawned"]["model"]), (201, "coder:30b"))
 
-    def test_models_js_is_served(self):
-        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
-        conn.request("GET", "/models.js")
-        r = conn.getresponse()
-        self.assertEqual(r.status, 200)
-        self.assertIn(b"openModels", r.read())
-        conn.close()
+    def test_page_assets_are_served(self):
+        for name, marker, ctype in [("models.js", b"openModels", "text/javascript"),
+                                    ("board.js", b"drawBoard", "text/javascript"),
+                                    ("page.js", b"function refresh", "text/javascript"),
+                                    ("page.css", b"--paper", "text/css")]:
+            conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+            conn.request("GET", "/" + name)
+            r = conn.getresponse()
+            self.assertEqual(r.status, 200, name)
+            self.assertTrue(r.getheader("Content-Type").startswith(ctype), name)
+            self.assertIn(marker, r.read())
+            conn.close()
 
 if __name__ == "__main__":
     unittest.main()

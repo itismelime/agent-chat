@@ -421,6 +421,7 @@ class Store:
                     status = "offline"
                 out.append({"name": name, "kind": a["kind"], "joined": a["joined"],
                             "status": status, "spawn": token, "model": a.get("model"),
+                            "last_seen": a["last_seen"],
                             "role": a.get("role"), "personality": a.get("role"),
                             "error": self.local.get((pid, name), {}).get("error")
                             if a.get("model") else None})
