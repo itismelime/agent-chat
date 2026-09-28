@@ -42,6 +42,18 @@ class CliTest(unittest.TestCase):
         self.assertIn("(addressed to you: reply)", r.stdout)
         self.assertIn("%s wait --as alice --project proj" % CHAT, r.stdout)
 
+    def test_rename_then_wait_under_the_old_name(self):
+        self.chat("add", ".")
+        Client(self.port).call("POST", "/api/projects/proj/agents", {"name": "alice", "kind": "claude"})
+        r = self.chat("rename", "--as", "alice", "Tester")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("renamed alice to tester", r.stdout)
+        self.store.post("proj", "user", "@tester ping")
+        r = self.chat("wait", "--as", "alice")  # a wait started before the rename
+        self.assertIn("You were renamed: you are tester now.", r.stdout)
+        self.assertIn("(addressed to you: reply)", r.stdout)
+        self.assertIn("wait --as tester --project proj", r.stdout)
+
     def test_wait_prints_removed_notice(self):
         self.chat("add", ".")
         Client(self.port).call("POST", "/api/projects/proj/agents", {"name": "alice", "kind": "claude"})

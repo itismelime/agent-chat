@@ -119,6 +119,16 @@ class Board:
                 self.store.notice(pid, '%s%s edited #%s "%s"' % (at, by, n, card["title"]))
         return dict(card, id=int(n))
 
+    def rename(self, pid, old, new):
+        """An agent renamed: its cards follow it."""
+        with self.store.changed:
+            b = self._load(pid)
+            mine = [c for c in b["cards"].values() if c["assignee"] == old]
+            for c in mine:
+                c["assignee"] = new
+            if mine:
+                write_json(self._path(pid), b)
+
     def unassign(self, pid, name):
         """After an agent is forgotten: its cards lose their assignee."""
         with self.store.changed:

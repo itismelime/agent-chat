@@ -58,7 +58,7 @@ function words(frag,pid,base){
     parts.forEach((part,i)=>{if(!(i%2)){if(part)out.append(part);return;}
       if(part[0]==='@'){const name=part.slice(1).toLowerCase();
         out.append(name==='user'||name==='you'?el('span','mention me',part):
-          agents.some(a=>a.name===name)?who(el('span','mention',part),name):part);return;}
+          (agentsBy[pid]||[]).some(a=>a.name===current(name,pid))?who(el('span','mention',part),name,pid):part);return;}
       const f=asPath(part);out.append(f?fileLink([part],pid,f,base):part);});
     n.replaceWith(out);}}
 const rawCache=new Map();

@@ -116,6 +116,31 @@ class StoreTest(unittest.TestCase):
         self.assertTrue(wakes(agent_to_b, "b"))
         self.assertFalse(wakes(agent_to_b, "alice"))
 
+    def test_rename(self):
+        self.store.join(self.pid, "alice", "claude")
+        self.store.join(self.pid, "bob", "claude")
+        self.store.add_spawned(self.pid, "tok", "claude", "sess")
+        self.store.update_spawned(self.pid, "tok", name="alice")
+        self.store.set_personality(self.pid, "alice", "You review")
+        self.store.post(self.pid, "alice", "before")
+        joined = self.store.agents(self.pid)["alice"]["joined"]
+        self.store.rename(self.pid, "alice", "Reviewer")
+        agents = self.store.agents(self.pid)
+        self.assertNotIn("alice", agents)
+        self.assertEqual((agents["reviewer"]["joined"], agents["reviewer"]["role"]), (joined, "You review"))
+        self.assertEqual(self.store.spawned(self.pid)["tok"]["name"], "reviewer")
+        msgs = self.store.messages(self.pid)
+        self.assertEqual([(m["from"], m["text"]) for m in msgs[-2:]],
+                         [("alice", "before"), ("reviewer", "alice is now reviewer")])
+        self.assertEqual(self.store.resolve(self.pid, "alice"), "reviewer")
+        self.store.rename(self.pid, "reviewer", "critic")
+        self.assertEqual(self.store.resolve(self.pid, "alice"), "critic")
+        for old, new, code in (("critic", "alice", 409), ("critic", "bob", 409), ("critic", "user", 400), ("critic", "no way", 400),
+                               ("ghost", "x", 404)):
+            with self.assertRaises(StoreError) as e:
+                self.store.rename(self.pid, old, new)
+            self.assertEqual(e.exception.code, code, (old, new))
+
     def test_private_messages(self):
         for name in ("alice", "bob"):
             self.store.join(self.pid, name, "claude")

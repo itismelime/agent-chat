@@ -223,18 +223,23 @@ class Store:
             fields["cursor"] = cursor
         self._update(pid, name, **fields)
 
-    def join(self, pid, name, kind, thread=None, spawn=None):
-        name = (name or "").strip().lower()
+    @staticmethod
+    def _check_name(name):
+        name = (name or "").strip().lower() if isinstance(name, str) else ""
         if not NAME.match(name) or name in RESERVED:
             raise StoreError(400, "a name is 1-32 of a-z, 0-9 and '-', starting with a "
                                   "letter or digit, and not 'user' or 'all'")
+        return name
+
+    def join(self, pid, name, kind, thread=None, spawn=None):
+        name = self._check_name(name)
         if kind not in KINDS:
             raise StoreError(400, "kind must be one of: claude, codex, llm, opencode")
         if thread is not None and not (isinstance(thread, str) and THREAD.match(thread)):
             raise StoreError(400, "thread must be a session id")
         with self.changed:
             agents = self.agents(pid)
-            if name in agents:
+            if name in agents or name in self.renames(pid):
                 raise StoreError(409, "the name %s is taken in this project; pick another" % name)
             agents[name] = {"kind": kind, "joined": now(), "last_seen": now(),
                             "cursor": self._last_n(pid), "removed": False, "notice": None,
@@ -332,6 +337,42 @@ class Store:
             self._update(pid, name, role=role)
 
     set_personality = set_role
+
+    def rename(self, pid, old, new):
+        """The agent takes a new name, keeping its record (color, personality,
+        cursor), its start and its local state; its past messages keep the old
+        name, and a message tells the chat."""
+        new = self._check_name(new)
+        with self.changed:
+            self._agent(pid, old)
+            agents = self.agents(pid)
+            renames = self.renames(pid)
+            if new in agents or new in renames:
+                raise StoreError(409, "the name %s is taken in this project; pick another" % new)
+            agents[new] = agents.pop(old)
+            write_json(self._dir(pid) / "agents.json", agents)
+            # sessions that still use the old name (a running chat wait, an older MCP server) keep working
+            renames[old] = new
+            write_json(self._dir(pid) / "renames.json", renames)
+            for token, r in self.spawned(pid).items():
+                if r["name"] == old:
+                    self.update_spawned(pid, token, name=new)
+            if (pid, old) in self.local:
+                self.local[(pid, new)] = self.local.pop((pid, old))
+            self.post(pid, new, "%s is now %s" % (old, new))
+        return new
+
+    def renames(self, pid):
+        f = self._dir(pid) / "renames.json"
+        return json.loads(f.read_text()) if f.exists() else {}
+
+    def resolve(self, pid, name):
+        """The current name of an agent that may have been renamed since."""
+        renames, seen = self.renames(pid), set()
+        while name in renames and name not in seen:
+            seen.add(name)
+            name = renames[name]
+        return name
 
     def forget(self, pid, name):
         """Delete a removed agent's entry; its name is free again, its messages stay."""

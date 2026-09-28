@@ -33,7 +33,7 @@ class McpTest(unittest.TestCase):
     def test_in_project(self):
         self.assertIn("This project (proj) has a shared chat", self.instructions)
         names = [t["name"] for t in rpc(self.s, "tools/list")["result"]["tools"]]
-        self.assertEqual(names, ["chat_join", "chat_post", "chat_read",
+        self.assertEqual(names, ["chat_join", "chat_post", "chat_rename", "chat_read",
                                  "board_list", "board_add", "board_update"])
 
     def test_outside_project(self):
@@ -67,7 +67,14 @@ class McpTest(unittest.TestCase):
         text, _ = tool(self.s, "chat_read", {})
         self.assertIn("user: @alice ok  (addressed to you: reply)", text)
         self.assertNotIn("hello", text)
-        self.store.remove("proj", "alice")
+        text, err = tool(self.s, "chat_rename", {"name": "tester"})
+        self.assertFalse(err, text)
+        self.assertIn("You are now tester", text)
+        self.assertIn("wait --as tester --project proj", text)
+        self.assertIn("posted #", tool(self.s, "chat_post", {"text": "as tester"})[0])
+        self.assertEqual(self.store.messages("proj")[-1]["from"], "tester")
+        self.assertTrue(tool(self.s, "chat_rename", {"name": "user"})[1])
+        self.store.remove("proj", "tester")
         self.assertEqual(tool(self.s, "chat_post", {"text": "x"}),
                          ("you were removed from this chat", True))
 

@@ -11,15 +11,17 @@ const KIND={claude:'Claude',codex:'Codex',llm:'local model',opencode:'OpenCode',
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;
   if(text!==undefined)e.textContent=text;return e;}
 function btn(text,fn,cls){const b=el('button',cls||'',text);b.type='button';b.onclick=fn;return b;}
-// a name's own color: a hue from its letters, the same everywhere on the page
-// agents of the project get distinct hues in join order; other names hash to one
-const HUES=[250,25,145,300,75,195,345,110,225,50,170,275];let hues={};
+// a name's own color and avatar, the same in chat, Agents and Needs an answer: per project, agents get
+// distinct hues in join order (other names hash to one), and a renamed agent's old name shows as its new one
+const HUES=[250,25,145,300,75,195,345,110,225,50,170,275];let huesBy={},renamesBy={},agentsBy={};
 function hash(name){let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return h;}
-function hue(name){return name in hues?hues[name]:HUES[hash(name)%HUES.length];}
-function assignHues(){hues={};
-  [...agents].sort((x,y)=>x.joined<y.joined?-1:1).forEach((a,i)=>{hues[a.name]=HUES[i%HUES.length];});}
-function who(node,name){node.classList.add('who');node.style.setProperty('--h',hue(name||'?'));return node;}
-function avatar(name){return who(el('div','av',name==='user'?'Y':(name||'?')[0]),name);}
+function current(name,pid=cur){const r=renamesBy[pid]||{},seen=new Set();
+  while(name in r&&!seen.has(name)){seen.add(name);name=r[name];}return name;}
+function hue(name,pid=cur){name=current(name,pid);const h=huesBy[pid]||{};return name in h?h[name]:HUES[hash(name)%HUES.length];}
+function assignHues(){huesBy={};for(const [pid,list] of Object.entries(agentsBy)){const h=huesBy[pid]={};
+  [...list].sort((x,y)=>x.joined<y.joined?-1:1).forEach((a,i)=>{h[a.name]=HUES[i%HUES.length];});}}
+function who(node,name,pid=cur){node.classList.add('who');node.style.setProperty('--h',hue(name||'?',pid));return node;}
+function avatar(name,pid=cur){name=current(name||'?',pid);return who(el('div','av',name==='user'?'Y':name[0]),name,pid);}
 function ago(iso){const s=(Date.now()-Date.parse(iso))/1000;
   return s<60?'just now':s<3600?Math.floor(s/60)+'m ago':s<86400?Math.floor(s/3600)+'h ago':Math.floor(s/86400)+'d ago';}
 function day(iso){const d=new Date(iso),today=new Date(),y=new Date(today-864e5);
@@ -52,8 +54,11 @@ async function refresh(){
       notified[p.id]=lastN(p.id);
     }
     const p=projects.find(p=>p.id===cur);
-    [agents,spawned,boardData]=cur?await Promise.all([api(`api/projects/${cur}/agents`).then(x=>x.agents),
-      api(`api/projects/${cur}/spawned`).then(x=>x.spawned),api(`api/projects/${cur}/board`)]):[[],[],null];
+    const lists=await Promise.all(projects.map(p=>api(`api/projects/${p.id}/agents`)));  // every project's, for colors
+    agentsBy={};renamesBy={};projects.forEach((p,i)=>{agentsBy[p.id]=lists[i].agents;renamesBy[p.id]=lists[i].renames||{};});
+    agents=agentsBy[cur]||[];
+    [spawned,boardData]=cur?await Promise.all([api(`api/projects/${cur}/spawned`).then(x=>x.spawned),
+      api(`api/projects/${cur}/board`)]):[[],null];
     assignHues();
     for(const s of spawned)if(s.state==='needs_you'&&!needed.has(s.token)&&p)
       notify(p,{from:s.name||('new '+(KIND[s.tool]||s.tool)),text:'needs you',n:'need-'+s.token});
@@ -109,11 +114,12 @@ function drawLog(p){
         f.open=folds.has(id);f.ontoggle=()=>{folds[f.open?'add':'delete'](id);};
         f.append(el('summary','','3 board changes'),inner);out.splice(-2,2,f);}
       else out.push(n);continue;}
-    if(!g||g.from!==m.from||Date.parse(m.time)-g.at>5*60e3){
-      g={from:m.from,at:Date.parse(m.time),node:who(el('div','g '+m.kind),m.from)};
-      const h=el('div','gh');h.append(el('span','n',m.from==='user'?'you':m.from),
+    const from=current(m.from);
+    if(!g||g.from!==from||Date.parse(m.time)-g.at>5*60e3){
+      g={from,at:Date.parse(m.time),node:who(el('div','g '+m.kind),from)};
+      const h=el('div','gh'),n=el('span','n',from==='user'?'you':from);if(from!==m.from)n.title='posted as '+m.from;h.append(n,
         el('span','',(m.kind!=='user'?(KIND[m.kind]||m.kind)+'  ':'')+time));
-      g.node.append(avatar(m.from),h);out.push(g.node);}
+      g.node.append(avatar(from),h);out.push(g.node);}
     g.at=Date.parse(m.time);g.node.append(message(m,time,q));}
   log.replaceChildren(...out);}
 function empty(title,text){const d=el('div','empty');d.append(el('h2','',title),el('p','',text));return d;}
@@ -125,14 +131,14 @@ function message(m,time,q){
   d.append(renderText(m.text),el('span','t',time));
   d.title=new Date(m.time).toLocaleString();
   const acts=el('div','acts');
-  acts.append(btn('Reply',()=>{replyTo={n:m.n,from:m.from,text:m.text};dmTo=m.dm||null;drawReply();
-    if(m.from!=='user')t.value='@'+m.from+' '+t.value.replace(/^@[\w-]+\s*/,'');t.focus();grow();hint();}));
+  acts.append(btn('Reply',()=>{const from=current(m.from);replyTo={n:m.n,from,text:m.text};dmTo=m.dm?current(m.dm):null;drawReply();
+    if(from!=='user')t.value='@'+from+' '+t.value.replace(/^@[\w-]+\s*/,'');t.focus();grow();hint();}));
   acts.append(btn('Copy',()=>navigator.clipboard.writeText(m.text)),
     btn('Add to board',()=>cardFrom(m)));
   d.append(acts);return d;}
 // a reply's quote of the message it answers; a click shows that message
 function quote(r){const q=who(el('button','quote'),r.from);q.type='button';q.title='Show the message this answers';
-  q.append(el('b','',r.from==='user'?'you':r.from),el('span','',' '+r.text.replace(/\s+/g,' ').slice(0,140)));
+  q.append(el('b','',r.from==='user'?'you':current(r.from)),el('span','',' '+r.text.replace(/\s+/g,' ').slice(0,140)));
   q.onclick=()=>{const o=$('m'+r.n);if(!o){say('That message is not shown; clear the search.');return;}
     o.scrollIntoView({block:'center'});o.classList.remove('flash');void o.offsetWidth;o.classList.add('flash');};return q;}
 let replyTo=null,dmTo=null;  // the message the composer answers; the agent it writes to privately
@@ -203,6 +209,9 @@ function agentItems(a){
   if(a.spawn){items.push(['View terminal',()=>openTerm(a.spawn,a.starting?a.name+' (starting)':a.name)]);
     items.push(['Stop',()=>{if(confirm(`Stop ${a.name}? Its tmux session ends.`))return api(path(a.spawn,'stop'),{});}]);}
   if(a.starting)return items;
+  items.push(['Rename',async()=>{const n=await ask({title:'Rename '+a.name,label:'New name',value:a.name,
+    help:"a-z, 0-9 and '-'. Its color, personality and board cards move along, and its running session keeps working."});
+    if(n&&n.trim().toLowerCase()!==a.name){await api(agentPath(a,'rename'),{name:n.trim()});return `${a.name} is now ${n.trim().toLowerCase()}.`;}}]);
   items.push(['Edit personality',async()=>{const p=await askPersonality(a.personality,a.name);
     if(p!==null)return api(agentPath(a,'personality'),{personality:p||null});}],null);
   const [text,action]=a.status==='removed'?['Add back','readd']:['Remove from chat','remove'];

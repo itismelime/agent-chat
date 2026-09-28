@@ -184,12 +184,12 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     return 200, {"messages": store.messages(pid, after)}
                 if what == ["messages"] and method == "POST":
                     data = self.body()
-                    sender = self.field(data, "from")
+                    sender = store.resolve(pid, self.field(data, "from"))
                     dm = data.get("dm") if sender == "user" else sender if data.get("private") is True else None
                     m = store.post(pid, sender, self.field(data, "text"), reply=data.get("reply"), dm=dm)
                     return 201, {"message": m}
                 if what == ["agents"] and method == "GET":
-                    return 200, {"agents": store.status(pid)}
+                    return 200, {"agents": store.status(pid), "renames": store.renames(pid)}
                 if what == ["agents"] and method == "POST":
                     data = self.body()
                     agent = store.join(pid, self.field(data, "name"), self.field(data, "kind"),
@@ -243,6 +243,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         self.body()
                         spawner.stop(pid, token)
                         return 200, {"spawned": store.spawned_list(pid)}
+                if len(what) == 3 and what[0] == "agents":  # an old name still works after a rename
+                    what = [what[0], store.resolve(pid, what[1]), what[2]]
                 if len(what) == 3 and what[0] == "agents" and method == "GET":
                     if what[2] == "read":
                         return 200, {"messages": store.read(pid, what[1])}
@@ -251,12 +253,14 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         if result is None:
                             return 204, None
                         role = store.agents(pid).get(what[1], {}).get("role")
-                        return 200, dict(result, personality=role)
+                        return 200, dict(result, personality=role, name=what[1])
                 if len(what) == 3 and what[0] == "agents" and method == "POST" \
-                        and what[2] in ("remove", "readd", "role", "personality", "forget"):
+                        and what[2] in ("remove", "readd", "role", "personality", "forget", "rename"):
                     data = self.body()
                     if what[2] in ("role", "personality"):
                         store.set_personality(pid, what[1], data.get(what[2]))
+                    elif what[2] == "rename":
+                        board.rename(pid, what[1], store.rename(pid, what[1], data.get("name")))
                     elif what[2] == "forget":
                         store.forget(pid, what[1])
                         board.unassign(pid, what[1])

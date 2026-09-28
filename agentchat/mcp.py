@@ -28,6 +28,11 @@ TOOLS = [
                     "for questions or reports meant only for the user, and to answer their private messages.",
      "inputSchema": {"type": "object", "required": ["text"],
                      "properties": {"text": {"type": "string"}, "private": {"type": "boolean"}}}},
+    {"name": "chat_rename",
+     "description": "Change your name in the chat. Your color, personality, board cards and unread "
+                    "messages move with you; messages you already posted keep the old name.",
+     "inputSchema": {"type": "object", "required": ["name"],
+                     "properties": {"name": {"type": "string"}}}},
     {"name": "chat_read",
      "description": "Chat messages you have not seen yet.",
      "inputSchema": {"type": "object", "properties": {}}},
@@ -157,7 +162,7 @@ class Session:
         try:
             if tool == "chat_join":
                 if self.name:
-                    return "already joined as %s; one session has one name" % self.name, True
+                    return "already joined as %s; use chat_rename to change your name" % self.name, True
                 join = {"name": str(args.get("name", "")), "kind": self.kind}
                 if self.kind == "codex":
                     join["thread"] = self.find_thread()
@@ -184,12 +189,21 @@ class Session:
                 if body["agent"].get("personality"):
                     joined += "Your personality: %s. " % body["agent"]["personality"].rstrip(".")
                 return "%s%s\n\nRecent messages:\n%s" % (joined, how, recent), False
-            if tool not in ("chat_post", "chat_read") + BOARD_TOOLS:
+            if tool not in ("chat_post", "chat_read", "chat_rename") + BOARD_TOOLS:
                 return "unknown tool: %s" % tool, True
             if not self.name:
                 return "call chat_join first", True
             if tool in BOARD_TOOLS:
                 return self.board(pid, tool, args), False
+            if tool == "chat_rename":
+                self.client.call("POST", self.client.agent_path(pid, self.name, "rename"),
+                                 {"name": str(args.get("name", ""))})
+                old, self.name = self.name, str(args.get("name", "")).strip().lower()  # as the store has it
+                text = "You are now %s (was %s)." % (self.name, old)
+                if self.kind not in ("codex", "opencode"):
+                    text += (" A chat wait still running as %s keeps working; start the next one "
+                             "as:\n%s" % (old, self.wait_command()))
+                return text, False
             if tool == "chat_post":
                 m = self.client.call("POST", "/api/projects/%s/messages" % pid,
                                      {"from": self.name, "text": str(args.get("text", "")),

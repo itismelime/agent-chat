@@ -5,11 +5,12 @@
   chat add <path>                  register a project folder
   chat post --as <name> <text>     post (--as user for yourself)
   chat wait --as <name>            block until a message wakes <name>
+  chat rename --as <name> <new>    take a new name; a running wait keeps working
   chat serve                       run the service
   chat mcp                         run the MCP server (agent tools)
   chat config ollama-url [<url>|own]  show or set the Ollama agent-chat uses
 
-post and wait use the project of the working directory, or --project <id>.
+post, wait and rename use the project of the working directory, or --project <id>.
 """
 import argparse
 import os
@@ -64,6 +65,9 @@ def wait(client, pid, name):
         down_since = None
         if status == 200:
             break
+    if body.get("name", name) != name:
+        name = body["name"]
+        print("You were renamed: you are %s now." % name)
     if body.get("personality"):
         print("Your personality: %s" % body["personality"])
     if body["notice"] == "removed":
@@ -83,12 +87,14 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd")
     sub.add_parser("add").add_argument("path")
-    for cmd in ("post", "wait"):
+    for cmd in ("post", "wait", "rename"):
         p = sub.add_parser(cmd)
         p.add_argument("--as", dest="name", required=True)
         p.add_argument("--project")
         if cmd == "post":
             p.add_argument("text", nargs="+")
+        if cmd == "rename":
+            p.add_argument("new")
     sub.add_parser("serve")
     sub.add_parser("mcp")
     cfg = sub.add_parser("config")
@@ -123,6 +129,11 @@ def main():
         elif args.cmd == "post":
             client.call("POST", "/api/projects/%s/messages" % project_id(client, args.project),
                         {"from": args.name, "text": " ".join(args.text)})
+        elif args.cmd == "rename":
+            pid = project_id(client, args.project)
+            client.call("POST", client.agent_path(pid, args.name, "rename"), {"name": args.new})
+            print("renamed %s to %s; next time wait with: %s wait --as %s --project %s"
+                  % (args.name, args.new.strip().lower(), CHAT, args.new.strip().lower(), pid))
         elif args.cmd == "wait":
             wait(client, project_id(client, args.project), args.name)
         else:

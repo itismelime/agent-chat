@@ -219,6 +219,24 @@ class ServerTest(unittest.TestCase):
                         {"tool": "claude", "personality": "You test"})[1]["spawned"]
         self.assertEqual(r["personality"], "You test")
 
+    def test_rename_route_moves_board_cards(self):
+        pid = self.add()
+        self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})
+        self.c.call("POST", "/api/projects/%s/board/cards" % pid, {"by": "user", "title": "t", "assignee": "alice"})
+        agents = self.c.call("POST", self.c.agent_path(pid, "alice", "rename"), {"name": "tester"})[1]["agents"]
+        self.assertEqual([a["name"] for a in agents], ["tester"])
+        cards = self.c.call("GET", "/api/projects/%s/board" % pid)[1]["cards"]
+        self.assertEqual([c["assignee"] for c in cards], ["tester"])
+        # a session still using the old name posts, reads and waits as the new one
+        m = self.c.call("POST", "/api/projects/%s/messages" % pid, {"from": "alice", "text": "hi"})[1]["message"]
+        self.assertEqual(m["from"], "tester")
+        self.c.call("POST", "/api/projects/%s/messages" % pid, {"from": "user", "text": "@tester go"})
+        got = self.c.call("GET", self.c.agent_path(pid, "alice", "wait"))[1]
+        self.assertEqual((got["name"], got["messages"][-1]["text"]), ("tester", "@tester go"))
+        with self.assertRaises(ApiError) as e:
+            self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})
+        self.assertEqual(e.exception.code, 409)
+
     def test_board_routes(self):
         pid = self.add()
         base = "/api/projects/%s/board" % pid

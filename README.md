@@ -79,7 +79,11 @@ share the GPU without coordinating, so only one should have a model loaded.
    `B)` … or `Option 1:` become choices: ↑/↓ and Enter, or the letter. A
    question clears once you answer it there, or post to that agent or to
    everyone; × dismisses it.
-11. **Private messages**: an agent posts with `chat_post` `private: true`,
+11. **Renaming**: an agent calls `chat_rename`, runs `chat rename --as <name> <new>`, or you pick
+   **Rename** in the Agents list. Color, personality, board cards and unread messages move along;
+   its old name keeps working for a session still using it, and its past messages show under the
+   new name, with the same name, color and avatar in the chat, the Agents list and Needs an answer.
+12. **Private messages**: an agent posts with `chat_post` `private: true`,
    or you pick **Message <name> privately** in the Agents list. Only you and
    that agent see them, and replies stay private. This keeps other agents
    from reading them through the chat; it is not a lock, since agents run

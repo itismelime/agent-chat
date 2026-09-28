@@ -7,10 +7,10 @@ const answerNodes=new Map();
 function pending(){const out=[];
   for(const p of projects){const list=msgs[p.id]||[],gone=new Set(dismissed[p.id]||[]),answered=new Set();let all=false;
     for(let i=list.length-1;i>=0&&!all;i--){const m=list[i];  // newest first: who you have posted to since
-      if(m.from==='user'&&m.dm){answered.add(m.dm);continue;}
+      if(m.from==='user'&&m.dm){answered.add(current(m.dm,p.id));continue;}
       if(m.from==='user'){if(!lead(m.text).length)all=true;
-        for(const x of m.text.matchAll(/@([\w-]+)/g))answered.add(x[1].toLowerCase());continue;}
-      if(m.kind!=='board'&&!answered.has(m.from)&&!gone.has(m.n)&&(m.dm||lead(m.text).some(n=>n==='user'||n==='you')))out.push({p,m});}}
+        for(const x of m.text.matchAll(/@([\w-]+)/g))answered.add(current(x[1].toLowerCase(),p.id));continue;}
+      if(m.kind!=='board'&&!answered.has(current(m.from,p.id))&&!gone.has(m.n)&&(m.dm||lead(m.text).some(n=>n==='user'||n==='you')))out.push({p,m});}}
   return out.sort((a,b)=>a.m.time<b.m.time?-1:a.m.time>b.m.time?1:a.m.n-b.m.n);}
 // options: lines like "A) …", "**B.** …", "- C: …", "Option 1: …", in order from A or 1, at least two
 const OPT_RE=/^\s*(?:[-*]\s+)?(?:\*\*)?(?:option\s+([A-Za-z]|\d)|\(?([A-H])\))(?:\*\*)?\s*[.):—–-]?\s*(?:\*\*)?\s*(.+)$|^\s*(?:[-*]\s+)?(?:\*\*)?([A-H])(?:\*\*)?\s*[.:—–-]\s*(?:\*\*)?\s*(.+)$/i;
@@ -40,23 +40,24 @@ function drawAnswers(){
   requestAnimationFrame(()=>{for(const d of $('answerlist').children){const body=d.querySelector('.body'),more=d.querySelector('.more');
     more.hidden=body.classList.contains('open')||body.scrollHeight<=body.clientHeight+4;}});}
 function answerItem(p,m){
-  const d=who(el('article','ans'),m.from),h=el('div','ah'),body=el('div','body rich'),box=el('div','box'),ta=el('textarea');
+  const from=current(m.from,p.id),d=who(el('article','ans'),from,p.id),h=el('div','ah'),body=el('div','body rich'),box=el('div','box'),ta=el('textarea');
   const x=btn('×',()=>dismiss(p.id,m.n),'icon');x.title='Dismiss without answering';x.setAttribute('aria-label','Dismiss');
-  h.append(avatar(m.from),el('b','',m.from),...(m.dm?[el('span','dmtag','Private')]:[]),
+  const nm=el('b','',from);if(from!==m.from)nm.title='posted as '+m.from;
+  h.append(avatar(from,p.id),nm,...(m.dm?[el('span','dmtag','Private')]:[]),
     el('small','',(projects.length>1?p.name+' · ':'')+m.time.slice(11,16)),x);
   body.append(renderText(m.text,{pid:p.id}));
   const more=btn('Show more',()=>{body.classList.toggle('open');more.textContent=body.classList.contains('open')?'Show less':'Show more';},'more');
-  ta.rows=1;ta.value='@'+m.from+' ';ta.setAttribute('aria-label','Answer '+m.from);mentions(ta);
+  ta.rows=1;ta.value='@'+from+' ';ta.setAttribute('aria-label','Answer '+from);mentions(ta);
   const fit=()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';};
   const send=async text=>{text=text.trim();if(!text||ta.disabled)return;ta.disabled=true;
-    try{await api(`api/projects/${p.id}/messages`,{from:'user',text,reply:m.n,...(m.dm?{dm:m.dm}:{})});dismiss(p.id,m.n);refresh();}
+    try{await api(`api/projects/${p.id}/messages`,{from:'user',text,reply:m.n,...(m.dm?{dm:current(m.dm,p.id)}:{})});dismiss(p.id,m.n);refresh();}
     catch(e){ta.disabled=false;say('','Not sent: '+e.message);}};
-  const opts=options(m.text),list=opts.length?choices(opts,o=>send(`@${m.from} ${o.key}: ${o.label.slice(0,100)}`),
+  const opts=options(m.text),list=opts.length?choices(opts,o=>send(`@${from} ${o.key}: ${o.label.slice(0,100)}`),
     ()=>{ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}):null;
   ta.oninput=()=>{field=ta;sel=0;showAc();fit();};
   ta.onkeydown=e=>{if(acKeys(e))return;
     if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(ta.value);}
-    else if(e.key==='ArrowUp'&&list&&ta.value.trim()==='@'+m.from){e.preventDefault();list.focus();}};
+    else if(e.key==='ArrowUp'&&list&&ta.value.trim()==='@'+from){e.preventDefault();list.focus();}};
   box.append(ta,btn('Send',()=>send(ta.value)));
   d.append(h,body,more,...(list?[list]:[]),box);return d;}
 function choices(opts,pick,chat){
