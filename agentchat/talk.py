@@ -8,7 +8,7 @@ import sys
 import threading
 
 from .ollama import OllamaError
-from .store import StoreError, addressed
+from .store import StoreError, addressed, sees
 
 CHARS_PER_TOKEN = 3     # a rough guide for the prompt budget
 PROMPT_SHARE = 0.75     # of num_ctx for the prompt; the rest is left for the answer
@@ -102,7 +102,7 @@ class Talker:
             return
         others = [n for n, a in agents.items() if n != name and not a.get("removed")]
         project = self.store.project(pid)["name"]
-        history = [x for x in self.store.messages(pid) if x["n"] <= m["n"]]
+        history = [x for x in self.store.messages(pid) if x["n"] <= m["n"] and sees(x, name)]
         self.store.set_local(pid, name, busy=True)
         try:
             ollama = self.models.ollama

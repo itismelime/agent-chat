@@ -61,6 +61,8 @@ class McpTest(unittest.TestCase):
         self.assertFalse(err)
         self.assertIn("posted #2", text)
         self.assertIn("Reminder: your chat wait is not running", text)
+        self.assertIn("posted #3", tool(self.s, "chat_post", {"text": "@user psst", "private": True})[0])
+        self.assertEqual(self.store.messages("proj")[-1]["dm"], "alice")
         self.store.post("proj", "user", "@alice ok")
         text, _ = tool(self.s, "chat_read", {})
         self.assertIn("user: @alice ok  (addressed to you: reply)", text)

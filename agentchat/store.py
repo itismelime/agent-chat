@@ -50,9 +50,14 @@ def addressed(text):
     return names
 
 
+def sees(message, name):
+    """Private messages (dm: the agent in them) are for the user and that agent only."""
+    return message.get("dm") in (None, name)
+
+
 def wakes(message, name):
     """User messages wake every agent; agent messages only those addressed."""
-    if message["from"] == name:
+    if message["from"] == name or not sees(message, name):
         return False
     return message["from"] == "user" or name in addressed(message["text"])
 
@@ -146,10 +151,15 @@ class Store:
         msgs = self.messages(pid)
         return msgs[-1]["n"] if msgs else 0
 
-    def post(self, pid, sender, text, _board=False):
+    def post(self, pid, sender, text, _board=False, reply=None, dm=None):
+        """reply: the n of the message this answers; the new message keeps a
+        short quote of it, so agents see what is being answered. dm: the agent
+        of a private message, the sender itself or, from the user, its reader."""
         text = text.strip()
         if not text:
             raise StoreError(400, "empty message")
+        if reply is not None and (type(reply) is not int or reply < 1):
+            raise StoreError(400, "reply must be a message number")
         with self.changed:
             if _board:
                 sender = kind = "board"  # board.Board's notices; nobody else posts as board
@@ -160,8 +170,17 @@ class Store:
                     raise StoreError(403, "join the chat before posting")
                 kind = self._agent(pid, sender)["kind"]
                 self._touch(pid, sender)
+            if dm is not None and not (dm == sender != "user" or sender == "user" and dm in self.agents(pid)):
+                raise StoreError(400, "a private message is between the user and one agent of this chat")
             m = {"n": self._last_n(pid) + 1, "time": now(), "from": sender,
                  "kind": kind, "text": text}
+            if dm is not None:
+                m["dm"] = dm
+            if reply is not None:
+                q = next((x for x in self.messages(pid, reply - 1) if x["n"] == reply), None)
+                if q is None:
+                    raise StoreError(400, "no message #%d to reply to" % reply)
+                m["reply"] = {"n": reply, "from": q["from"], "text": q["text"][:200]}
             with open(self._dir(pid) / "messages.jsonl", "a") as f:
                 f.write(json.dumps(m) + "\n")
             self.changed.notify_all()
@@ -337,7 +356,7 @@ class Store:
         with self.changed:
             msgs = self.messages(pid, self._agent(pid, name)["cursor"])
             self._touch(pid, name, msgs[-1]["n"] if msgs else None)
-            return msgs
+            return [m for m in msgs if sees(m, name)]
 
     def delivered(self, pid, name, n):
         """A message up to n was queued into the agent's session."""
@@ -387,7 +406,7 @@ class Store:
                         msgs = self.messages(pid, agent["cursor"])
                         if any(wakes(m, name) for m in msgs):
                             self._touch(pid, name, msgs[-1]["n"])
-                            return {"notice": None, "messages": msgs}
+                            return {"notice": None, "messages": [m for m in msgs if sees(m, name)]}
                     left = deadline - time.monotonic()
                     if left <= 0:
                         return None

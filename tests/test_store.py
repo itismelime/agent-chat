@@ -61,6 +61,17 @@ class StoreTest(unittest.TestCase):
                 self.store.post(self.pid, sender, text)
             self.assertEqual(e.exception.code, code)
 
+    def test_reply_quotes_the_message(self):
+        self.store.post(self.pid, "user", "first " + "x" * 300)
+        m = self.store.post(self.pid, "user", "second", reply=1)
+        self.assertEqual(m["reply"], {"n": 1, "from": "user", "text": ("first " + "x" * 300)[:200]})
+        self.assertEqual(self.store.messages(self.pid)[-1]["reply"]["n"], 1)
+        self.assertNotIn("reply", self.store.post(self.pid, "user", "third"))
+        for bad in (99, 0, "1", True):
+            with self.assertRaises(StoreError) as e:
+                self.store.post(self.pid, "user", "x", reply=bad)
+            self.assertEqual(e.exception.code, 400)
+
     def test_multiline_unicode_roundtrip(self):
         self.store.post(self.pid, "user", "line one\nline två ✓")
         raw = (self.tmp / "data/projects/openvibes/messages.jsonl").read_text()
@@ -104,6 +115,23 @@ class StoreTest(unittest.TestCase):
         self.assertFalse(wakes(agent_all, "b"))
         self.assertTrue(wakes(agent_to_b, "b"))
         self.assertFalse(wakes(agent_to_b, "alice"))
+
+    def test_private_messages(self):
+        for name in ("alice", "bob"):
+            self.store.join(self.pid, name, "claude")
+        self.assertEqual(self.store.post(self.pid, "alice", "a question", dm="alice")["dm"], "alice")
+        self.store.post(self.pid, "user", "only alice", dm="alice")
+        self.assertIsNone(self.store.wait(self.pid, "bob", 0.3))  # neither wakes bob
+        self.store.post(self.pid, "user", "everyone")
+        self.assertEqual([m["text"] for m in self.store.read(self.pid, "bob")], ["everyone"])
+        self.assertEqual([m["text"] for m in self.store.read(self.pid, "alice")],
+                         ["a question", "only alice", "everyone"])
+        self.assertFalse(wakes({"from": "user", "text": "x", "dm": "alice"}, "bob"))
+        self.assertTrue(wakes({"from": "user", "text": "x", "dm": "alice"}, "alice"))
+        for sender, dm in (("alice", "bob"), ("user", "ghost"), ("user", "user")):
+            with self.assertRaises(StoreError) as e:
+                self.store.post(self.pid, sender, "x", dm=dm)
+            self.assertEqual(e.exception.code, 400)
 
     def test_wait_returns_soon_after_post(self):
         self.store.join(self.pid, "alice", "claude")

@@ -68,15 +68,29 @@ share the GPU without coordinating, so only one should have a model loaded.
 9. Right-click an agent → **Edit personality** (presets or your own text);
    you are also asked when starting one. It reaches the agent with every
    message. **Forget** deletes a removed agent and frees its name. Messages
-   show ```code blocks``` (with Copy), `inline code` and links; each agent
-   keeps its own color. Hover a message to Reply, Copy or Add to board.
+   render as Markdown (code blocks with Copy, lists, tables, links); each
+   agent keeps its own color. Hover a message to Reply (your message then
+   quotes it, for agents too), Copy or Add to board. A file path in a
+   message opens in a viewer, Markdown rendered, if it lies inside the
+   project folder.
+10. **Needs an answer**: a column listing every agent message that starts
+   with `@user`, and every private one, in all projects, oldest first. Each
+   has its own reply box (with `@` completion). Options written as `A)`,
+   `B)` … or `Option 1:` become choices: ↑/↓ and Enter, or the letter. A
+   question clears once you answer it there, or post to that agent or to
+   everyone; × dismisses it.
+11. **Private messages**: an agent posts with `chat_post` `private: true`,
+   or you pick **Message <name> privately** in the Agents list. Only you and
+   that agent see them, and replies stay private. This keeps other agents
+   from reading them through the chat; it is not a lock, since agents run
+   as your user and could read the chat files.
    **Search messages** (Ctrl+K) filters the chat; unsent text is kept per
    project; **Theme** switches light, dark or your system's. An agent that
    asks for permission shows as a banner above the chat.
 
 On the page, `?` (or the **?** button) lists the keyboard shortcuts (Alt+↑/↓
-and Alt+1–9 switch projects, Alt+U jumps to unread, Alt+N opens the terminal
-of an agent that needs you, Alt+A starts one, Alt+B switches chat and board) and the message-box commands
+and Alt+1–9 switch projects, Alt+U jumps to unread, Alt+N goes to the first question for you, else the
+terminal of an agent that needs you, Alt+A starts one, Alt+B switches chat and board) and the message-box commands
 (`/start claude|codex`, `/stop`, `/term`, `/remove <name>`, `/card <title>`; `//text` posts
 text starting with `/`).
 

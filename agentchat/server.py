@@ -7,6 +7,7 @@ websites can neither post into the agents' sessions nor move their cursors
 with a plain GET such as <img src=...>.
 """
 import json
+import mimetypes
 import os
 import re
 import select
@@ -20,13 +21,15 @@ from . import spawn, talk
 from .board import Board
 from .codex import Deliverer
 from .ollama import OllamaError
-from .store import Store, StoreError
+from .store import Store, StoreError, sees
 
 PAGE = Path(__file__).with_name("page.html")
 ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "text/javascript",
-          "board.js": "text/javascript"}
+          "board.js": "text/javascript", "marked.js": "text/javascript",
+          "markdown.js": "text/javascript", "answers.js": "text/javascript"}
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
+MAX_FILE = 5_000_000
 WAIT_SECONDS = 300
 
 
@@ -43,6 +46,20 @@ def peer_uid(client_port, server_port, table=TCP_TABLE):
         if len(f) > 7 and (f[1].rsplit(":", 1)[-1], f[2].rsplit(":", 1)[-1]) == want:
             return int(f[7])
     return -1
+
+
+def project_file(root, name):
+    """The file name (relative to root or absolute) if it lies inside the
+    project folder root, symlinks resolved, so agents' links cannot open ~/.ssh."""
+    root = Path(root).resolve()
+    path = (root / Path(name).expanduser()).resolve()
+    if root not in path.parents and path != root:
+        raise StoreError(403, "only files inside the project folder open here")
+    if not path.is_file():
+        raise StoreError(404, "no such file: %s" % name)
+    if path.stat().st_size > MAX_FILE:
+        raise StoreError(413, "the file is over %d MB" % (MAX_FILE // 1_000_000))
+    return root, path
 
 
 def make_handler(store, port, wait_seconds, spawner, owner, models):
@@ -164,7 +181,9 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     return 200, {"messages": store.messages(pid, after)}
                 if what == ["messages"] and method == "POST":
                     data = self.body()
-                    m = store.post(pid, self.field(data, "from"), self.field(data, "text"))
+                    sender = self.field(data, "from")
+                    dm = data.get("dm") if sender == "user" else sender if data.get("private") is True else None
+                    m = store.post(pid, sender, self.field(data, "text"), reply=data.get("reply"), dm=dm)
                     return 201, {"message": m}
                 if what == ["agents"] and method == "GET":
                     return 200, {"agents": store.status(pid)}
@@ -175,7 +194,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     if agent["spawn"]:
                         spawner.linked(pid, agent["spawn"], agent["name"])
                     agent["personality"] = store.agents(pid)[agent["name"]].get("role")
-                    return 201, {"agent": agent, "recent": store.messages(pid)[-20:]}
+                    recent = [m for m in store.messages(pid) if sees(m, agent["name"])][-20:]
+                    return 201, {"agent": agent, "recent": recent}
                 if what == ["locals"] and method == "POST":
                     data = self.body()
                     model = self.field(data, "model")
@@ -183,6 +203,18 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         raise StoreError(400, "%s is not installed in the Ollama in use" % model)
                     agent = store.add_local(pid, self.field(data, "name"), model, data.get("role"))
                     return 201, {"agent": agent}
+                if what == ["file"] and method == "GET":
+                    root, path = project_file(store.project(pid)["path"], query.get("path", ""))
+                    if query.get("raw"):  # images a Markdown file shows
+                        ctype = mimetypes.guess_type(path.name)[0] or ""
+                        if not ctype.startswith("image/"):
+                            raise StoreError(415, "only images are sent raw")
+                        return 200, path.read_bytes(), ctype
+                    try:
+                        text = path.read_text(encoding="utf-8")
+                    except UnicodeDecodeError:
+                        raise StoreError(415, "not a text file") from None
+                    return 200, {"path": str(path.relative_to(root)), "text": text}
                 if what[:1] == ["board"]:
                     return self.board_route(method, pid, what[1:])
                 if what == ["spawned"] and method == "GET":

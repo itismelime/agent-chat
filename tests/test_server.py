@@ -92,6 +92,12 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.c.call("GET", self.c.agent_path(pid, "alice", "read"))[1]["messages"][0]["text"], "@user hi")
         agents = self.c.call("GET", "/api/projects/%s/agents" % pid)[1]["agents"]
         self.assertEqual([(a["name"], a["status"]) for a in agents], [("alice", "busy")])
+        # private: an agent's to the user, the user's to one agent; others never see them
+        post = lambda body: self.c.call("POST", "/api/projects/%s/messages" % pid, body)[1]["message"]
+        self.assertEqual(post({"from": "alice", "text": "psst", "private": True})["dm"], "alice")
+        self.assertEqual(post({"from": "user", "text": "ok", "dm": "alice"})["dm"], "alice")
+        bob = self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "bob", "kind": "claude"})[1]
+        self.assertEqual([m["text"] for m in bob["recent"]], ["first", "@user hi"])
         for path in ("/api/projects/%s/messages?after=x" % pid, "/api/nope", "/api/projects/nope/messages"):
             with self.assertRaises(ApiError):
                 self.c.call("GET", path)
@@ -275,6 +281,28 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(label(m, "bob"), "addressed to you: reply")
         self.assertEqual(label(m, "alice"), "for others: read only")
         self.assertEqual(label(dict(m, text="hi"), "alice"), "for everyone: reply")
+        self.assertIn("private", label(dict(m, dm="bob"), "bob"))
+        m["reply"] = {"n": 3, "from": "bob", "text": "Pick A or B?\nMore"}
+        self.assertEqual(fmt(m), '[18:30:16] user (replying to bob #3 "Pick A or B? More"): @bob hi')
+
+    def test_project_files(self):
+        pid = self.add()
+        (self.dir / "sub" / "notes.md").write_text("# Notes\n")
+        (self.dir / "pic.png").write_bytes(b"\x89PNG")
+        (self.dir / "blob.bin").write_bytes(b"\xff\xfe\x00")
+        (self.tmp / "secret.txt").write_text("no")
+        (self.dir / "out").symlink_to(self.tmp / "secret.txt")
+        get = lambda q: self.raw("GET", "/api/projects/%s/file?%s" % (pid, q), headers=API)
+        status, body = get("path=sub/notes.md")
+        self.assertEqual((status, json.loads(body)), (200, {"path": "sub/notes.md", "text": "# Notes\n"}))
+        self.assertEqual(get("path=" + str(self.dir / "sub/notes.md"))[0], 200)  # absolute inside
+        self.assertEqual(get("path=pic.png&raw=1"), (200, b"\x89PNG"))
+        for q, code in [("path=../secret.txt", 403), ("path=" + str(self.tmp / "secret.txt"), 403),
+                        ("path=out", 403), ("path=nope.md", 404), ("path=sub", 404),
+                        ("path=blob.bin", 415), ("path=sub/notes.md&raw=1", 415), ("path=", 404)]:
+            self.assertEqual(get(q)[0], code, q)
+        # like every API route, a plain GET from another site is refused
+        self.assertEqual(self.raw("GET", "/api/projects/%s/file?path=pic.png&raw=1" % pid)[0], 403)
 
 
 class ModelRoutesTest(unittest.TestCase):
@@ -356,7 +384,10 @@ class ModelRoutesTest(unittest.TestCase):
         for name, marker, ctype in [("models.js", b"openModels", "text/javascript"),
                                     ("board.js", b"drawBoard", "text/javascript"),
                                     ("page.js", b"function refresh", "text/javascript"),
-                                    ("page.css", b"--paper", "text/css")]:
+                                    ("page.css", b"--paper", "text/css"),
+                                    ("marked.js", b"marked", "text/javascript"),
+                                    ("markdown.js", b"function renderText", "text/javascript"),
+                                    ("answers.js", b"function drawAnswers", "text/javascript")]:
             conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
             conn.request("GET", "/" + name)
             r = conn.getresponse()
@@ -364,6 +395,7 @@ class ModelRoutesTest(unittest.TestCase):
             self.assertTrue(r.getheader("Content-Type").startswith(ctype), name)
             self.assertIn(marker, r.read())
             conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -61,10 +61,14 @@ class Client:
 
 
 def fmt(m):
-    return "[%s] %s: %s" % (m["time"][11:19], m["from"], m["text"])
+    r = m.get("reply")
+    quote = ' (replying to %s #%d "%s")' % (r["from"], r["n"], " ".join(r["text"].split())[:80]) if r else ""
+    return "[%s] %s%s: %s" % (m["time"][11:19], m["from"], quote, m["text"])
 
 
 def label(m, name):
+    if m.get("dm") and m["from"] == "user":
+        return "private, from the user to you: reply with chat_post private true"
     to = addressed(m["text"])
     if m["from"] == "board" and name not in to:
         return "board notice: no reply needed"

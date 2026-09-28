@@ -23,9 +23,11 @@ TOOLS = [
                                               "description": "the start code, if your first "
                                                              "prompt gave one: (start <code>)"}}}},
     {"name": "chat_post",
-     "description": "Post to the project chat. Start with @name to address someone.",
+     "description": "Post to the project chat. Start with @name to address someone. private: true "
+                    "sends it to the user alone (a direct message the other agents never see); use it "
+                    "for questions or reports meant only for the user, and to answer their private messages.",
      "inputSchema": {"type": "object", "required": ["text"],
-                     "properties": {"text": {"type": "string"}}}},
+                     "properties": {"text": {"type": "string"}, "private": {"type": "boolean"}}}},
     {"name": "chat_read",
      "description": "Chat messages you have not seen yet.",
      "inputSchema": {"type": "object", "properties": {}}},
@@ -190,7 +192,8 @@ class Session:
                 return self.board(pid, tool, args), False
             if tool == "chat_post":
                 m = self.client.call("POST", "/api/projects/%s/messages" % pid,
-                                     {"from": self.name, "text": str(args.get("text", ""))})[1]
+                                     {"from": self.name, "text": str(args.get("text", "")),
+                                      "private": args.get("private") is True})[1]
                 return "posted #%d%s" % (m["message"]["n"], self.reminder()), False
             msgs = self.client.call("GET", self.client.agent_path(pid, self.name, "read"))[1]
             text = "\n".join("%s  (%s)" % (fmt(m), label(m, self.name))

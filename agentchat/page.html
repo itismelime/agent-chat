@@ -17,6 +17,7 @@
 <div class=views role=tablist><button id=viewchat class=on type=button role=tab>Chat</button>
 <button id=viewboard type=button role=tab>Board <span id=boardcount></span></button></div>
 <input id=search type=search placeholder="Search messages" aria-label="Search messages">
+<button id=answerchip class=ghost type=button hidden title="Show the questions (Alt+N)"></button>
 <button id=bell class=ghost type=button hidden>Enable notifications</button>
 <button id=rosterbtn class=ghost type=button>Agents</button>
 <button id=keys class=icon type=button title="Shortcuts and commands (?)" aria-label="Shortcuts and commands">?</button>
@@ -27,27 +28,28 @@
 <button id=jump type=button hidden>New messages</button>
 <div id=status><span id=note></span><span id=err role=alert></span><span id=hint></span></div>
 <form id=f>
-<div id=to></div>
+<div id=to></div><div id=replybar hidden></div>
 <div class=box><textarea id=t rows=1 placeholder="Message everyone, or start with @name"></textarea>
 <button id=send>Send</button></div></form></div>
 <div id=boardview hidden></div>
+<section id=answers aria-label="Needs an answer" hidden>
+<div class=top><h2>Needs an answer <span id=answercount></span></h2>
+<button id=answertoggle class=icon type=button title="Hide; the header shows how many wait" aria-label="Hide the questions">→</button></div>
+<div id=answerlist></div></section>
 <aside id=roster aria-label="Agents in this project">
 <div class=rosterhead><h2>Agents</h2><button id=addagent type=button title="Start an agent in this project">Start agent</button></div>
 <div id=members></div></aside></div>
 </main>
 <div id=menu role=menu hidden></div>
 <div id=ac role=listbox hidden></div>
-<section id=answers aria-label="Needs an answer" hidden>
-<div class=top><h2>Needs an answer <span id=answercount></span></h2>
-<button id=answertoggle class=icon type=button aria-label="Hide or show the questions" aria-expanded=true>–</button></div>
-<div id=answerlist></div></section>
 
 <dialog id=help aria-label="Shortcuts and commands">
 <div class=top><h2>Shortcuts and commands</h2><button class=icon type=button value=close aria-label=Close>×</button></div>
 <h3>Keys</h3><dl>
 <dt>Alt+↑ / Alt+↓</dt><dd>previous / next project</dd><dt>Alt+1 … Alt+9</dt><dd>project 1–9</dd>
 <dt>Alt+U</dt><dd>next project with unread messages</dd>
-<dt>Alt+N</dt><dd>terminal of the first agent that needs you</dd>
+<dt>Alt+N</dt><dd>the first question for you, else the terminal of an agent that needs you</dd>
+<dt>↑ / ↓, Enter, A–H</dt><dd>in a question's choices: move, pick, or pick by letter</dd>
 <dt>Alt+A</dt><dd>start an agent</dd><dt>Alt+B</dt><dd>switch between chat and board</dd>
 <dt>Ctrl+K</dt><dd>search messages</dd>
 <dt>↑</dt><dd>in an empty message box: your last message again</dd>
@@ -84,6 +86,11 @@
 <div class=row><button id=cdelete class="ghost danger" type=button>Delete card</button><span></span>
 <button id=csave type=button>Save</button></div></dialog>
 
+<dialog id=fileview aria-label=File>
+<div class=top><button id=fileback class=ghost type=button hidden>Back</button><h2 id=filetitle></h2>
+<button id=filecopy class=ghost type=button>Copy path</button><button class=icon type=button value=close aria-label=Close>×</button></div>
+<div id=filebody></div></dialog>
+
 <dialog id=modelspanel aria-label="Local models">
 <div class=top><h2>Local models</h2><button class=icon type=button value=close aria-label=Close>×</button></div>
 <div id=mstatus></div>
@@ -96,5 +103,8 @@
 <button>Pull</button></form><div id=mresults></div></section>
 <section class=mview data-tab=jobs hidden><div id=mjobs></div></section></dialog>
 <script src=page.js></script>
+<script src=marked.js></script>
+<script src=markdown.js></script>
+<script src=answers.js></script>
 <script src=models.js></script>
 <script src=board.js></script>

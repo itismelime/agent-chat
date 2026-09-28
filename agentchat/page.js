@@ -5,7 +5,7 @@ const saved={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 let projects=[],cur=saved.get('cur',null),msgs={},agents=[],seen=saved.get('seen',{}),notified={},drawn='',busy=false,down=false;
 const folds=new Set();  // board-change folds the user opened, by their first message
-let tools={},spawned=[],needed=new Set(),boardData=null,query='',drafts=saved.get('drafts',{});
+let answerCount=0,tools={},spawned=[],needed=new Set(),boardData=null,query='',drafts=saved.get('drafts',{});
 const KIND={claude:'Claude',codex:'Codex',llm:'local model',opencode:'OpenCode',user:'you',board:'board'};
 
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;
@@ -36,25 +36,6 @@ function unread(p){return (msgs[p.id]||[]).filter(m=>m.n>(seen[p.id]||0)&&m.from
 function notify(p,m){if(window.Notification&&Notification.permission==='granted')
   new Notification(m.from+' in '+p.name,{body:m.text.slice(0,300),tag:'agent-chat-'+p.id+'-'+m.n});}
 function say(note,err){$('note').textContent=note||'';$('err').textContent=err||'';}
-
-// message text: ```code blocks```, `inline code`, links and @mentions; the rest stays plain text
-function renderText(text){
-  const frag=document.createDocumentFragment(),re=/```(?:[^\n`]*\n)?([\s\S]*?)```/g;let last=0,m;
-  const words=s=>s.split(/(https?:\/\/[^\s<>"'`]+[^\s<>"'`.,;:!?)\]]|@[\w-]+)/).forEach((part,i)=>{
-    if(!(i%2)){if(part)frag.append(part);return;}
-    if(part[0]==='@'){const name=part.slice(1).toLowerCase();
-      frag.append(name==='user'||name==='you'?el('span','mention me',part):
-        agents.some(a=>a.name===name)?who(el('span','mention',part),name):part);return;}
-    const a=el('a','',part);a.href=part;a.target='_blank';a.rel='noopener noreferrer';frag.append(a);});
-  const inline=s=>s.split(/(`[^`\n]+`)/).forEach((part,i)=>{
-    if(i%2)frag.append(el('code','',part.slice(1,-1)));else words(part);});
-  while((m=re.exec(text))){
-    inline(text.slice(last,m.index).replace(/\n$/,''));last=re.lastIndex+(text[re.lastIndex]==='\n'?1:0);
-    const code=m[1].replace(/\n$/,''),box=el('div','codeblock');
-    const copy=btn('Copy',()=>navigator.clipboard.writeText(code).then(()=>{copy.textContent='Copied';
-      setTimeout(()=>{copy.textContent='Copy';},1200);}),'ghost copy');
-    box.append(el('pre','',code),copy);frag.append(box);}
-  inline(text.slice(last));return frag;}
 
 async function refresh(){
   if(busy)return;busy=true;
@@ -87,7 +68,7 @@ function atEnd(){return log.scrollHeight-log.scrollTop-log.clientHeight<60;}
 
 function select(id){
   if(cur)drafts[cur]=t.value;saved.set('drafts',drafts);
-  cur=id;saved.set('cur',cur);say();query='';$('search').value='';t.value=drafts[cur]||'';grow();
+  cur=id;saved.set('cur',cur);say();replyTo=null;dmTo=null;drawReply();query='';$('search').value='';t.value=drafts[cur]||'';grow();
   document.body.classList.remove('rail');if(typeof bdrawn!=='undefined')bdrawn='';refresh();}
 function render(){
   $('projects').replaceChildren(...projects.map((p,i)=>{
@@ -95,8 +76,8 @@ function render(){
     d.title=p.path+(p.missing?' (folder missing)':'');d.append(el('span','pn',p.name));
     const n=unread(p);if(n)d.append(el('span','badge',String(n)));else if(i<9)d.append(el('kbd','','Alt+'+(i+1)));
     d.onclick=()=>select(p.id);return d;}));
-  drawAnswers();const total=projects.reduce((s,p)=>s+unread(p),0);
-  document.title=(needed.size||answerKey?'● ':'')+(total?`(${total}) `:'')+'agent-chat';
+  if(typeof drawAnswers==='function')drawAnswers();const total=projects.reduce((s,p)=>s+unread(p),0);
+  document.title=(needed.size||answerCount?'● ':'')+(total?`(${total}) `:'')+'agent-chat';
   const p=projects.find(p=>p.id===cur);
   $('name').textContent=p?p.name:'agent-chat';$('path').textContent=p?p.path:'';
   $('boardcount').textContent=boardData?String(boardData.cards.filter(c=>c.column!=='done').length||''):'';
@@ -137,13 +118,28 @@ function drawLog(p){
   log.replaceChildren(...out);}
 function empty(title,text){const d=el('div','empty');d.append(el('h2','',title),el('p','',text));return d;}
 function message(m,time,q){
-  const d=el('div','m'+(q?' hit':''));d.id='m'+m.n;d.append(renderText(m.text),el('span','t',time));
+  const d=el('div','m rich'+(q?' hit':''));d.id='m'+m.n;
+  if(m.dm)d.classList.add('dm');
+  if(m.reply)d.append(quote(m.reply));
+  if(m.dm)d.append(el('span','dmtag','Private: you and '+m.dm));
+  d.append(renderText(m.text),el('span','t',time));
   d.title=new Date(m.time).toLocaleString();
   const acts=el('div','acts');
-  if(m.from!=='user')acts.append(btn('Reply',()=>{t.value='@'+m.from+' '+t.value.replace(/^@[\w-]+\s*/,'');t.focus();grow();hint();}));
+  acts.append(btn('Reply',()=>{replyTo={n:m.n,from:m.from,text:m.text};dmTo=m.dm||null;drawReply();
+    if(m.from!=='user')t.value='@'+m.from+' '+t.value.replace(/^@[\w-]+\s*/,'');t.focus();grow();hint();}));
   acts.append(btn('Copy',()=>navigator.clipboard.writeText(m.text)),
     btn('Add to board',()=>cardFrom(m)));
   d.append(acts);return d;}
+// a reply's quote of the message it answers; a click shows that message
+function quote(r){const q=who(el('button','quote'),r.from);q.type='button';q.title='Show the message this answers';
+  q.append(el('b','',r.from==='user'?'you':r.from),el('span','',' '+r.text.replace(/\s+/g,' ').slice(0,140)));
+  q.onclick=()=>{const o=$('m'+r.n);if(!o){say('That message is not shown; clear the search.');return;}
+    o.scrollIntoView({block:'center'});o.classList.remove('flash');void o.offsetWidth;o.classList.add('flash');};return q;}
+let replyTo=null,dmTo=null;  // the message the composer answers; the agent it writes to privately
+function drawReply(){const bar=$('replybar');bar.hidden=!replyTo&&!dmTo;hint();if(bar.hidden)return;
+  bar.replaceChildren(...(dmTo?[el('span','dmtag','Private to '+dmTo)]:[]),...(replyTo?[el('span','','Replying to '),quote(replyTo)]:[el('span','grow')]),
+    btn('×',()=>{replyTo=null;dmTo=null;drawReply();t.focus();},'icon'));
+  bar.lastChild.setAttribute('aria-label',replyTo?'Cancel the reply':'Write to everyone instead');}
 function boardText(text){  // "#3" in a board notice opens that card
   const f=document.createDocumentFragment();
   text.split(/(#\d+|@[\w-]+)/).forEach((part,i)=>{if(!(i%2)){if(part)f.append(part);return;}
@@ -169,45 +165,6 @@ function drawNeeds(){
     const d=el('div','need'),name=s.name||(KIND[s.tool]||s.tool)+' (starting)';
     const b=el('b','',name),text=el('span');text.append(b,' is waiting for your answer in its terminal.');
     d.append(text,btn('Open terminal',()=>openTerm(s.token,name)));return d;}));}
-
-// needs an answer: agent messages addressed to you (@user or @you up front), in every project, until you
-// post to that agent or to everyone after it, or answer or dismiss them here. Each keeps its own reply box; @ works in it as in the composer.
-let dismissed=saved.get('dismissed',{}),answerKey='',answerCount=0;const answerNodes=new Map();
-const lead=text=>((text.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0].match(/@[\w-]+/g)||[]).map(x=>x.slice(1).toLowerCase());
-function pending(){const out=[];
-  for(const p of projects){const list=msgs[p.id]||[],gone=new Set(dismissed[p.id]||[]),answered=new Set();let all=false;
-    for(let i=list.length-1;i>=0&&!all;i--){const m=list[i];  // newest first: who you have posted to since
-      if(m.from==='user'){const to=lead(m.text);if(!to.length)all=true;
-        for(const x of m.text.matchAll(/@([\w-]+)/g))answered.add(x[1].toLowerCase());continue;}
-      if(m.kind!=='board'&&!answered.has(m.from)&&!gone.has(m.n)&&lead(m.text).some(n=>n==='user'||n==='you'))out.push({p,m});}}
-  return out.reverse();}
-function drawAnswers(){
-  const list=pending(),keys=list.map(x=>x.p.id+':'+x.m.n),key=keys.join();
-  $('answers').hidden=!list.length;$('answercount').textContent='('+list.length+')';
-  if(key===answerKey)return;
-  if(list.length>answerCount)$('answers').classList.remove('min');  // something new: show it
-  answerKey=key;answerCount=list.length;
-  for(const k of answerNodes.keys())if(!keys.includes(k))answerNodes.delete(k);
-  const focus=document.activeElement,a=focus&&focus.selectionStart,b=focus&&focus.selectionEnd;
-  $('answerlist').replaceChildren(...list.map((x,i)=>{
-    if(!answerNodes.has(keys[i]))answerNodes.set(keys[i],answerItem(x.p,x.m));return answerNodes.get(keys[i]);}));
-  if(focus&&focus!==document.activeElement&&focus.isConnected){focus.focus();if(a!=null)focus.setSelectionRange(a,b);}
-  $('answertoggle').setAttribute('aria-expanded',String(!$('answers').classList.contains('min')));}
-function answerItem(p,m){
-  const d=who(el('div','ans'),m.from),h=el('div','gh'),body=el('div','body'),box=el('div','box'),ta=el('textarea');
-  const x=btn('×',()=>dismiss(p.id,m.n),'icon');x.title='Dismiss without answering';x.setAttribute('aria-label','Dismiss');
-  h.append(el('span','n',m.from),el('span','',(projects.length>1?p.name+'  ':'')+m.time.slice(11,16)),x);
-  body.append(renderText(m.text));
-  ta.rows=2;ta.value='@'+m.from+' ';ta.setAttribute('aria-label','Answer '+m.from);mentions(ta);
-  const send=async()=>{const text=ta.value.trim();if(!text||ta.disabled)return;ta.disabled=true;
-    try{await api(`api/projects/${p.id}/messages`,{from:'user',text});dismiss(p.id,m.n);refresh();}
-    catch(e){ta.disabled=false;say('','Not sent: '+e.message);}};
-  ta.oninput=()=>{field=ta;sel=0;showAc();};
-  ta.onkeydown=e=>{if(acKeys(e))return;if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};
-  box.append(ta,btn('Send',send));d.append(h,body,box);return d;}
-function dismiss(pid,n){(dismissed[pid]=dismissed[pid]||[]).push(n);saved.set('dismissed',dismissed);render();}
-$('answertoggle').onclick=()=>{$('answers').classList.toggle('min');
-  $('answertoggle').setAttribute('aria-expanded',String(!$('answers').classList.contains('min')));};
 
 // roster: groups by state, right-click or click for options
 const GROUPS=[['needs_you','Needs you'],['starting','Starting'],['waiting','Available'],
@@ -241,7 +198,8 @@ const path=(token,x)=>`api/projects/${cur}/spawned/${token}/${x}`;
 const agentPath=(a,x)=>`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/${x}`;
 function agentItems(a){
   const items=[];
-  if(!a.starting&&a.status!=='removed')items.push(['Message '+a.name,()=>{t.value='@'+a.name+' ';t.focus();grow();hint();}]);
+  if(!a.starting&&a.status!=='removed')items.push(['Message '+a.name,()=>{t.value='@'+a.name+' ';t.focus();grow();hint();}],
+    ['Message '+a.name+' privately',()=>{dmTo=a.name;replyTo=null;t.value='@'+a.name+' ';drawReply();t.focus();grow();}]);
   if(a.spawn){items.push(['View terminal',()=>openTerm(a.spawn,a.starting?a.name+' (starting)':a.name)]);
     items.push(['Stop',()=>{if(confirm(`Stop ${a.name}? Its tmux session ends.`))return api(path(a.spawn,'stop'),{});}]);}
   if(a.starting)return items;
@@ -283,11 +241,14 @@ addEventListener('click',()=>{menu.hidden=true;});
 addEventListener('keydown',e=>{if(e.key==='Escape'){menu.hidden=true;ac.hidden=true;}});
 
 // composer: who a message goes to, drafts, @ autocomplete
+// the names a message is addressed to: the @names it starts with
+const lead=text=>((text.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0].match(/@[\w-]+/g)||[]).map(x=>x.slice(1).toLowerCase());
 function addressees(){return lead(t.value);}
 function hint(){
   const to=addressees(),live=agents.filter(a=>a.status!=='removed');
   const line=$('to');
   if(t.value.startsWith('/')&&!t.value.startsWith('//'))line.textContent='Command: Enter runs it. Press ? for the list.';
+  else if(dmTo)line.textContent=`Private: only ${dmTo} reads it; the other agents never see it.`;
   else if(to.length){line.replaceChildren('To ');to.forEach((n,i)=>line.append(i?', ':'',who(el('span','',n),n)));
     line.append('. The others read it but do not answer.');}
   else line.textContent=live.length?`To everyone: ${live.map(a=>a.name).join(', ')} may answer.`:'';
@@ -325,6 +286,7 @@ mentions(t);
 t.oninput=()=>{field=t;sel=0;showAc();hint();grow();if(cur){drafts[cur]=t.value;saved.set('drafts',drafts);}};
 t.onkeydown=e=>{
   if(acKeys(e))return;
+  if(e.key==='Escape'&&(replyTo||dmTo)){replyTo=null;dmTo=null;drawReply();return;}
   if(e.key==='ArrowUp'&&!t.value&&lastSent){e.preventDefault();t.value=lastSent;grow();return;}
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('f').requestSubmit();}};
 let lastSent='';
@@ -333,8 +295,9 @@ $('f').onsubmit=async e=>{e.preventDefault();
   if(text.startsWith('/')&&!text.startsWith('//')){
     try{say(await runCommand(text));lastSent=text;}catch(e){t.value=text;say('',e.message);}
     grow();refresh();return;}
-  try{await api(`api/projects/${cur}/messages`,{from:'user',text:text.startsWith('//')?text.slice(1):text});
-    say();lastSent=text;log.scrollTop=log.scrollHeight;}
+  try{await api(`api/projects/${cur}/messages`,{from:'user',text:text.startsWith('//')?text.slice(1):text,
+      ...(replyTo?{reply:replyTo.n}:{}),...(dmTo?{dm:dmTo}:{})});
+    say();lastSent=text;replyTo=null;dmTo=null;drawReply();log.scrollTop=log.scrollHeight;}
   catch(e){t.value=text;say('','Not sent: '+e.message);}
   grow();hint();refresh();};
 
@@ -417,7 +380,8 @@ async function addLocal(model,name){
 const typing=()=>['TEXTAREA','INPUT','SELECT'].includes((document.activeElement||{}).tagName);
 function stepProject(by){const i=projects.findIndex(p=>p.id===cur);
   if(projects.length)select(projects[(i+by+projects.length)%projects.length].id);}
-function needsYou(){  // the first started agent of this project whose terminal asks
+function needsYou(){  // the first question for you, else the first started agent whose terminal asks
+  if(typeof focusAnswer==='function'&&focusAnswer())return;
   const s=spawned.find(s=>s.state==='needs_you');if(s)openTerm(s.token,s.name||(KIND[s.tool]||s.tool)+' (starting)');
   else say('No agent here needs you.');}
 addEventListener('keydown',e=>{
@@ -458,4 +422,5 @@ async function runCommand(text){
   if(cmd==='card'){const title=text.slice(1).trim().slice(4).trim();if(!title)throw new Error('Use /card <title>.');
     await api(`api/projects/${cur}/board/cards`,{by:'user',title,column:'todo'});return 'Added to the board’s To do column.';}
   throw new Error(`Unknown command /${cmd}. Press ? for the list; //text posts text starting with /.`);}
-t.value=drafts[cur]||'';grow();refresh();setInterval(refresh,2000);t.focus();
+// after every script, so the first render has markdown.js and answers.js
+addEventListener('DOMContentLoaded',()=>{t.value=drafts[cur]||'';grow();refresh();setInterval(refresh,2000);t.focus();});
