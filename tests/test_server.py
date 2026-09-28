@@ -290,6 +290,7 @@ class ServerTest(unittest.TestCase):
         (self.dir / "sub" / "notes.md").write_text("# Notes\n")
         (self.dir / "pic.png").write_bytes(b"\x89PNG")
         (self.dir / "blob.bin").write_bytes(b"\xff\xfe\x00")
+        (self.dir / "evil.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"><script>x</script></svg>')
         (self.tmp / "secret.txt").write_text("no")
         (self.dir / "out").symlink_to(self.tmp / "secret.txt")
         get = lambda q: self.raw("GET", "/api/projects/%s/file?%s" % (pid, q), headers=API)
@@ -299,7 +300,7 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(get("path=pic.png&raw=1"), (200, b"\x89PNG"))
         for q, code in [("path=../secret.txt", 403), ("path=" + str(self.tmp / "secret.txt"), 403),
                         ("path=out", 403), ("path=nope.md", 404), ("path=sub", 404),
-                        ("path=blob.bin", 415), ("path=sub/notes.md&raw=1", 415), ("path=", 404)]:
+                        ("path=blob.bin", 415), ("path=sub/notes.md&raw=1", 415), ("path=evil.svg&raw=1", 415), ("path=", 404)]:
             self.assertEqual(get(q)[0], code, q)
         # like every API route, a plain GET from another site is refused
         self.assertEqual(self.raw("GET", "/api/projects/%s/file?path=pic.png&raw=1" % pid)[0], 403)

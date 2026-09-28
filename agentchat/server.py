@@ -30,6 +30,9 @@ ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "te
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 MAX_FILE = 5_000_000
+# raw images for the file viewer; never SVG: the page shows them from blob: URLs of its own origin,
+# so a scripted SVG opened in a tab would run with the page's API access
+RAW_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp"}
 WAIT_SECONDS = 300
 
 
@@ -207,8 +210,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     root, path = project_file(store.project(pid)["path"], query.get("path", ""))
                     if query.get("raw"):  # images a Markdown file shows
                         ctype = mimetypes.guess_type(path.name)[0] or ""
-                        if not ctype.startswith("image/"):
-                            raise StoreError(415, "only images are sent raw")
+                        if ctype not in RAW_TYPES:
+                            raise StoreError(415, "only PNG, JPEG, GIF, WebP, AVIF and BMP images are sent raw")
                         return 200, path.read_bytes(), ctype
                     try:
                         text = path.read_text(encoding="utf-8")
