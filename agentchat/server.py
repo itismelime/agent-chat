@@ -322,7 +322,9 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
             if method != "POST" or what[:1] != ["cards"]:
                 raise StoreError(404, "not found")
             data = self.body()
-            by = self.field(data, "by")
+            by = store.resolve(pid, self.field(data, "by"))  # an agent's old name after a rename
+            if isinstance(data.get("assignee"), str):
+                data["assignee"] = store.resolve(pid, data["assignee"])
             if len(what) == 1:
                 card = board.add(pid, by, data.get("title"), data.get("description", ""),
                                  data.get("column") or "todo", data.get("assignee"))

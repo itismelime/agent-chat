@@ -230,6 +230,9 @@ class ServerTest(unittest.TestCase):
         # a session still using the old name posts, reads and waits as the new one
         m = self.c.call("POST", "/api/projects/%s/messages" % pid, {"from": "alice", "text": "hi"})[1]["message"]
         self.assertEqual(m["from"], "tester")
+        card = self.c.call("POST", "/api/projects/%s/board/cards" % pid,
+                           {"by": "alice", "title": "u", "assignee": "alice"})[1]["card"]
+        self.assertEqual(card["assignee"], "tester")
         self.c.call("POST", "/api/projects/%s/messages" % pid, {"from": "user", "text": "@tester go"})
         got = self.c.call("GET", self.c.agent_path(pid, "alice", "wait"))[1]
         self.assertEqual((got["name"], got["messages"][-1]["text"]), ("tester", "@tester go"))
