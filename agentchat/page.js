@@ -95,8 +95,8 @@ function render(){
     d.title=p.path+(p.missing?' (folder missing)':'');d.append(el('span','pn',p.name));
     const n=unread(p);if(n)d.append(el('span','badge',String(n)));else if(i<9)d.append(el('kbd','','Alt+'+(i+1)));
     d.onclick=()=>select(p.id);return d;}));
-  const total=projects.reduce((s,p)=>s+unread(p),0);
-  document.title=(needed.size?'● ':'')+(total?`(${total}) `:'')+'agent-chat';
+  drawAnswers();const total=projects.reduce((s,p)=>s+unread(p),0);
+  document.title=(needed.size||answerKey?'● ':'')+(total?`(${total}) `:'')+'agent-chat';
   const p=projects.find(p=>p.id===cur);
   $('name').textContent=p?p.name:'agent-chat';$('path').textContent=p?p.path:'';
   $('boardcount').textContent=boardData?String(boardData.cards.filter(c=>c.column!=='done').length||''):'';
@@ -169,6 +169,45 @@ function drawNeeds(){
     const d=el('div','need'),name=s.name||(KIND[s.tool]||s.tool)+' (starting)';
     const b=el('b','',name),text=el('span');text.append(b,' is waiting for your answer in its terminal.');
     d.append(text,btn('Open terminal',()=>openTerm(s.token,name)));return d;}));}
+
+// needs an answer: agent messages addressed to you (@user or @you up front), in every project, until you
+// post to that agent or to everyone after it, or answer or dismiss them here. Each keeps its own reply box; @ works in it as in the composer.
+let dismissed=saved.get('dismissed',{}),answerKey='',answerCount=0;const answerNodes=new Map();
+const lead=text=>((text.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0].match(/@[\w-]+/g)||[]).map(x=>x.slice(1).toLowerCase());
+function pending(){const out=[];
+  for(const p of projects){const list=msgs[p.id]||[],gone=new Set(dismissed[p.id]||[]),answered=new Set();let all=false;
+    for(let i=list.length-1;i>=0&&!all;i--){const m=list[i];  // newest first: who you have posted to since
+      if(m.from==='user'){const to=lead(m.text);if(!to.length)all=true;
+        for(const x of m.text.matchAll(/@([\w-]+)/g))answered.add(x[1].toLowerCase());continue;}
+      if(m.kind!=='board'&&!answered.has(m.from)&&!gone.has(m.n)&&lead(m.text).some(n=>n==='user'||n==='you'))out.push({p,m});}}
+  return out.reverse();}
+function drawAnswers(){
+  const list=pending(),keys=list.map(x=>x.p.id+':'+x.m.n),key=keys.join();
+  $('answers').hidden=!list.length;$('answercount').textContent='('+list.length+')';
+  if(key===answerKey)return;
+  if(list.length>answerCount)$('answers').classList.remove('min');  // something new: show it
+  answerKey=key;answerCount=list.length;
+  for(const k of answerNodes.keys())if(!keys.includes(k))answerNodes.delete(k);
+  const focus=document.activeElement,a=focus&&focus.selectionStart,b=focus&&focus.selectionEnd;
+  $('answerlist').replaceChildren(...list.map((x,i)=>{
+    if(!answerNodes.has(keys[i]))answerNodes.set(keys[i],answerItem(x.p,x.m));return answerNodes.get(keys[i]);}));
+  if(focus&&focus!==document.activeElement&&focus.isConnected){focus.focus();if(a!=null)focus.setSelectionRange(a,b);}
+  $('answertoggle').setAttribute('aria-expanded',String(!$('answers').classList.contains('min')));}
+function answerItem(p,m){
+  const d=who(el('div','ans'),m.from),h=el('div','gh'),body=el('div','body'),box=el('div','box'),ta=el('textarea');
+  const x=btn('×',()=>dismiss(p.id,m.n),'icon');x.title='Dismiss without answering';x.setAttribute('aria-label','Dismiss');
+  h.append(el('span','n',m.from),el('span','',(projects.length>1?p.name+'  ':'')+m.time.slice(11,16)),x);
+  body.append(renderText(m.text));
+  ta.rows=2;ta.value='@'+m.from+' ';ta.setAttribute('aria-label','Answer '+m.from);mentions(ta);
+  const send=async()=>{const text=ta.value.trim();if(!text||ta.disabled)return;ta.disabled=true;
+    try{await api(`api/projects/${p.id}/messages`,{from:'user',text});dismiss(p.id,m.n);refresh();}
+    catch(e){ta.disabled=false;say('','Not sent: '+e.message);}};
+  ta.oninput=()=>{field=ta;sel=0;showAc();};
+  ta.onkeydown=e=>{if(acKeys(e))return;if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};
+  box.append(ta,btn('Send',send));d.append(h,body,box);return d;}
+function dismiss(pid,n){(dismissed[pid]=dismissed[pid]||[]).push(n);saved.set('dismissed',dismissed);render();}
+$('answertoggle').onclick=()=>{$('answers').classList.toggle('min');
+  $('answertoggle').setAttribute('aria-expanded',String(!$('answers').classList.contains('min')));};
 
 // roster: groups by state, right-click or click for options
 const GROUPS=[['needs_you','Needs you'],['starting','Starting'],['waiting','Available'],
@@ -244,8 +283,7 @@ addEventListener('click',()=>{menu.hidden=true;});
 addEventListener('keydown',e=>{if(e.key==='Escape'){menu.hidden=true;ac.hidden=true;}});
 
 // composer: who a message goes to, drafts, @ autocomplete
-function addressees(){const lead=(t.value.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0];
-  return lead.split(/[\s,:@]+/).filter(Boolean).map(x=>x.toLowerCase());}
+function addressees(){return lead(t.value);}
 function hint(){
   const to=addressees(),live=agents.filter(a=>a.status!=='removed');
   const line=$('to');
@@ -258,29 +296,35 @@ function hint(){
     a.status==='removed'?`${a.name} was removed from this chat.`:
     a.status==='needs_you'?`${a.name} is waiting for you in its terminal.`:`${a.name} is offline.`).join(' ');}
 function grow(){t.style.height='auto';t.style.height=t.scrollHeight+'px';}
-let matches=[],sel=0;
-function token(){const m=t.value.slice(0,t.selectionStart).match(/(^|\s)@([\w-]*)$/);return m?m[2]:null;}
+let matches=[],sel=0,field=t;  // field: the box @ autocomplete works in
+function token(){const m=field.value.slice(0,field.selectionStart).match(/(^|\s)@([\w-]*)$/);return m?m[2]:null;}
 function showAc(){
   const q=token();
   matches=q===null?[]:agents.filter(a=>a.status!=='removed'&&a.name.startsWith(q.toLowerCase()));
   if(!matches.length){ac.hidden=true;return;}
   sel=Math.min(sel,matches.length-1);
+  const r=field.closest('.box').getBoundingClientRect();
+  ac.style.left=r.left+'px';ac.style.bottom=(innerHeight-r.top+4)+'px';
   ac.replaceChildren(...matches.map((a,i)=>{const d=who(el('div',i===sel?'sel':''),a.name);
     d.append(el('b','','@'+a.name),el('small','',GROUPS.find(g=>g[0]===a.status)[1]));d.setAttribute('role','option');
     d.onmousedown=e=>{e.preventDefault();pick(i);};return d;}));
   ac.hidden=false;}
 function pick(i){
-  const pos=t.selectionStart,q=token(),start=pos-q.length-1,ins='@'+matches[i].name+' ';
-  t.value=t.value.slice(0,start)+ins+t.value.slice(pos);
-  t.selectionStart=t.selectionEnd=start+ins.length;ac.hidden=true;sel=0;t.focus();hint();}
-t.oninput=()=>{sel=0;showAc();hint();grow();if(cur){drafts[cur]=t.value;saved.set('drafts',drafts);}};
-t.onclick=showAc;t.onblur=()=>{ac.hidden=true;};
+  const pos=field.selectionStart,q=token(),start=pos-q.length-1,ins='@'+matches[i].name+' ';
+  field.value=field.value.slice(0,start)+ins+field.value.slice(pos);
+  field.selectionStart=field.selectionEnd=start+ins.length;ac.hidden=true;sel=0;field.focus();hint();}
+function acKeys(e){  // arrows, Enter, Tab and Esc in an open autocomplete list; true when used
+  if(ac.hidden)return false;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();
+    sel=(sel+(e.key==='ArrowDown'?1:matches.length-1))%matches.length;showAc();return true;}
+  if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();pick(sel);return true;}
+  if(e.key==='Escape'){ac.hidden=true;return true;}
+  return false;}
+function mentions(box){box.onclick=()=>{field=box;showAc();};box.onblur=()=>{ac.hidden=true;};}
+mentions(t);
+t.oninput=()=>{field=t;sel=0;showAc();hint();grow();if(cur){drafts[cur]=t.value;saved.set('drafts',drafts);}};
 t.onkeydown=e=>{
-  if(!ac.hidden){
-    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();
-      sel=(sel+(e.key==='ArrowDown'?1:matches.length-1))%matches.length;showAc();return;}
-    if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();pick(sel);return;}
-    if(e.key==='Escape'){ac.hidden=true;return;}}
+  if(acKeys(e))return;
   if(e.key==='ArrowUp'&&!t.value&&lastSent){e.preventDefault();t.value=lastSent;grow();return;}
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('f').requestSubmit();}};
 let lastSent='';

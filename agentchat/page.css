@@ -52,6 +52,17 @@ h1{font:700 22px/1.2 var(--display);margin:0;white-space:nowrap;letter-spacing:-
 #wrap{flex:1;display:flex;min-height:0}
 #chat{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
 
+/* needs an answer: agents' questions to you, floating over chat and board */
+#answers{position:fixed;top:64px;right:16px;width:min(380px,calc(100vw - 32px));max-height:calc(100dvh - 190px);
+display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--attn);border-radius:12px;
+box-shadow:0 8px 28px #0003;z-index:12}
+#answers[hidden],#answers.min #answerlist{display:none}
+#answers .top{padding:6px 6px 6px 14px;background:var(--attn-bg);border-radius:11px}
+#answers h2{font:700 15px/1.2 var(--display);margin:0;color:var(--attn)}
+#answerlist{overflow:auto;padding:0 12px 12px}
+.ans{padding:10px 0;border-top:1px solid var(--line)}.ans:first-child{border-top:0}
+.ans .gh button{margin-left:auto}.ans .body{margin:2px 0 8px;overflow-wrap:anywhere;max-height:30vh;overflow:auto}
+.ans textarea{flex:1;border:0;background:none;padding:6px 0;resize:none;outline:none;line-height:1.5}
 /* needs-you banner */
 #needs{display:flex;flex-direction:column;gap:1px}
 .need{display:flex;align-items:center;gap:12px;padding:9px 20px;background:var(--attn-bg);color:var(--ink);border-bottom:1px solid var(--line)}
@@ -77,7 +88,7 @@ white-space:pre-wrap;overflow-wrap:anywhere;max-width:84ch}
 .acts button{background:none;color:var(--mute);font-size:12px;padding:2px 8px;font-weight:600}.acts button:hover{color:var(--ink);background:var(--soft)}
 .m.hit{background:color-mix(in srgb,var(--busy) 16%,transparent)}
 .m.flash{animation:flash 1.6s ease-out}@keyframes flash{from{background:color-mix(in srgb,var(--c) 30%,transparent)}}
-.m code{font-size:13px;background:var(--soft);padding:1px 5px;border-radius:4px}
+.m code,.ans code{font-size:13px;background:var(--soft);padding:1px 5px;border-radius:4px}
 .m a{color:inherit;text-decoration-color:var(--mute);text-underline-offset:2px}
 .mention{font-weight:700;color:var(--c)}.mention.me{background:var(--attn-bg);color:var(--attn);border-radius:4px;padding:0 3px}
 .codeblock{position:relative;margin:6px 0;white-space:normal}
@@ -104,8 +115,8 @@ font-size:13px;line-height:1.45;white-space:pre}
 .box{display:flex;gap:8px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 6px 6px 12px}
 .box:focus-within{border-color:var(--mute)}
 #t{flex:1;border:0;background:none;padding:6px 0;resize:none;max-height:40vh;outline:none;line-height:1.5}
-#ac{position:absolute;bottom:calc(100% - 22px);left:20px;min-width:220px;background:var(--panel);border:1px solid var(--line);
-border-radius:9px;padding:4px;box-shadow:0 8px 24px #0003;z-index:5}
+#ac{position:fixed;min-width:220px;background:var(--panel);border:1px solid var(--line);
+border-radius:9px;padding:4px;box-shadow:0 8px 24px #0003;z-index:30}
 #ac div{padding:6px 10px;border-radius:6px;cursor:pointer;display:flex;gap:8px;align-items:center}
 #ac .sel{background:var(--soft)}#ac small{color:var(--mute);margin-left:auto}#ac b{color:var(--c)}
 

@@ -26,7 +26,7 @@
 <div id=log aria-live=polite></div>
 <button id=jump type=button hidden>New messages</button>
 <div id=status><span id=note></span><span id=err role=alert></span><span id=hint></span></div>
-<form id=f><div id=ac role=listbox hidden></div>
+<form id=f>
 <div id=to></div>
 <div class=box><textarea id=t rows=1 placeholder="Message everyone, or start with @name"></textarea>
 <button id=send>Send</button></div></form></div>
@@ -36,6 +36,11 @@
 <div id=members></div></aside></div>
 </main>
 <div id=menu role=menu hidden></div>
+<div id=ac role=listbox hidden></div>
+<section id=answers aria-label="Needs an answer" hidden>
+<div class=top><h2>Needs an answer <span id=answercount></span></h2>
+<button id=answertoggle class=icon type=button aria-label="Hide or show the questions" aria-expanded=true>–</button></div>
+<div id=answerlist></div></section>
 
 <dialog id=help aria-label="Shortcuts and commands">
 <div class=top><h2>Shortcuts and commands</h2><button class=icon type=button value=close aria-label=Close>×</button></div>
