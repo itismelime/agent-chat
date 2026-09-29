@@ -19,8 +19,8 @@ class OpenCodeTest(unittest.TestCase):
     def test_tool_models_default_first(self):
         self.fake.add("small:9b", size=6 * GIB, capabilities=["completion", "tools"])
         self.fake.add("talker:1b", size=GIB, capabilities=["completion"])
-        self.fake.add("qwen3-coder:30b", size=18 * GIB, capabilities=["completion", "tools"])
-        self.assertEqual(opencode.tool_models(self.ollama, 16 * GIB), ["qwen3-coder:30b", "small:9b"])
+        self.fake.add("gpt-oss:20b", size=18 * GIB, capabilities=["completion", "tools"])
+        self.assertEqual(opencode.tool_models(self.ollama, 16 * GIB), ["gpt-oss:20b", "small:9b"])
 
     def test_without_the_default_the_largest_that_fits(self):
         self.fake.add("small:9b", size=6 * GIB, capabilities=["tools"])

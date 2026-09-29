@@ -12,7 +12,7 @@ from . import rating
 from .ollama import OllamaError
 from .store import write_json
 
-DEFAULT = "qwen3-coder:30b"
+DEFAULT = "gpt-oss:20b"
 CLONE = Path(__file__).resolve().parent.parent
 LINK_MS = 60_000  # a start's OpenCode session opens within this after the start
 # a chat tool call written out as text, as qwen3-coder does under OpenCode's long

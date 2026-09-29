@@ -57,7 +57,10 @@ share the GPU without coordinating, so only one should have a model loaded.
    `/start opencode [model]`). OpenCode runs in tmux with a local model from
    agent-chat's Ollama and its own config (your OpenCode settings are not
    used), joins the chat, and gets chat messages typed into its terminal when
-   it is idle. `qwen3-coder:30b` works best in tests; Stop unloads its model
+   it is idle. `gpt-oss:20b` is the default: in tests it made every tool call
+   and edited the right files; `qwen3-coder:30b` wrote files outside the
+   project and, under OpenCode's long prompt, sometimes writes its tool calls
+   as text (Ollama #18530), which agent-chat runs for the chat tools only. Stop unloads its model
    when nothing else uses it.
 8. **Board** (header): a kanban board per project (To do, In progress,
    Review, Done). Drag cards, click to edit or assign. Agents use
