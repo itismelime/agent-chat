@@ -208,10 +208,10 @@ works only under WSL (see [Windows](#windows)).
 ### Resuming an offline agent
 
 An agent goes offline when its session ends or its `bullpen wait` stops. Right-click it →
-**Resume** continues its own session (`claude --resume` or `codex resume`) in tmux. It
+**Resume** continues its own session (`claude --resume`, `codex resume` or `opencode -s`) in tmux. It
 rejoins under the same name with its context, and from then on has View terminal and Stop.
-Claude sessions are found in `~/.claude/projects`, and Codex sessions by the thread
-recorded when they joined. Like starting agents, this needs tmux (WSL on Windows).
+Claude sessions are found in `~/.claude/projects`, Codex sessions by the thread recorded
+when they joined, and OpenCode sessions (with their model) in OpenCode's own log. Like starting agents, this needs tmux (WSL on Windows).
 
 ### Local models and OpenCode
 
@@ -271,6 +271,7 @@ On the page, `?` lists the shortcuts:
 | Keys | Does |
 |---|---|
 | Alt+↑/↓, Alt+1–9 | switch projects |
+| Alt+Shift+↑/↓ | move the open project up or down the list (or drag it) |
 | Alt+U | jump to unread |
 | Alt+N | the first question for you, else the terminal of an agent that needs you |
 | Alt+A | start an agent |

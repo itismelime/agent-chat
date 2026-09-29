@@ -333,6 +333,26 @@ class SpawnerTest(unittest.TestCase):
         self.sp.linked("proj", r2["token"], "alice")  # name clash in tmux: keeps its old name
         self.assertEqual(self.store.spawned("proj")[r2["token"]]["session"], r2["session"])
 
+    def test_resume_an_opencode_agent(self):
+        import json, sqlite3
+        self.opencode_setup()  # kit, an OpenCode start on coder:30b
+        f = self.store.root / "opencode-data" / "opencode" / "opencode.db"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        db = sqlite3.connect(f)
+        db.execute("CREATE TABLE session (id, directory, parent_id, time_created, model)")
+        db.execute("CREATE TABLE part (id, session_id, time_created, data)")
+        db.execute("INSERT INTO session VALUES ('ses_9', '/p', NULL, 1, ?)",
+                   (json.dumps({"id": "coder:30b", "providerID": "ac"}),))
+        db.execute("INSERT INTO part VALUES ('p1', 'ses_9', 2, ?)", (json.dumps(
+            {"type": "tool", "tool": "agent-chat_chat_join", "state": {"input": {"name": "kit"}}}),))
+        db.commit()
+        token = next(iter(self.store.spawned("proj")))
+        self.sp.stop("proj", token)  # its terminal ended: kit is offline
+        r = self.sp.resume("proj", "kit")
+        self.assertIn("-- opencode -s ses_9 -m ac/coder:30b --prompt You are back in the chat", calls(self.d)[-1])
+        self.assertEqual((r["oc_session"], r["model"], r["resume"]), ("ses_9", "coder:30b", "kit"))
+        self.store.join("proj", "kit", "opencode", spawn=r["token"])  # takes its name back
+
     def test_resume_an_offline_agent(self):
         home = Path(tempfile.mkdtemp())
         old, os.environ["HOME"] = os.environ["HOME"], str(home)

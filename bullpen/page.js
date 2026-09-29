@@ -79,6 +79,21 @@ function select(id){
   if(cur)drafts[cur]=t.value;saved.set('drafts',drafts);
   cur=id;saved.set('cur',cur);say();replyTo=null;dmTo=null;drawReply();query='';$('search').value='';t.value=drafts[cur]||'';grow();
   document.body.classList.remove('rail');if(typeof bdrawn!=='undefined')bdrawn='';refresh();}
+// the project list's order is the service's: drag a project, or Alt+Shift+↑/↓ the open one
+async function saveOrder(ids){projects=ids.map(id=>projects.find(p=>p.id===id));render();
+  try{projects=(await api('api/projects/order',{ids})).projects;}catch(e){say('',e.message);}refresh();}
+function moveProject(id,by){const ids=projects.map(p=>p.id),i=ids.indexOf(id),j=i+by;
+  if(i<0||j<0||j>=ids.length)return;ids.splice(j,0,ids.splice(i,1)[0]);saveOrder(ids);}
+let dragging=null;
+$('projects').ondragstart=e=>{const d=e.target.closest('.p');if(!d)return;dragging=d.dataset.id;
+  e.dataTransfer.setData('text/plain',dragging);e.dataTransfer.effectAllowed='move';d.classList.add('dragging');};
+$('projects').ondragover=e=>{const d=e.target.closest('.p');if(!dragging||!d)return;e.preventDefault();
+  for(const x of $('projects').querySelectorAll('.p'))x.classList.remove('dropbefore','dropafter');
+  const r=d.getBoundingClientRect();d.classList.add(e.clientY<r.top+r.height/2?'dropbefore':'dropafter');};
+$('projects').ondragend=()=>{dragging=null;for(const x of $('projects').querySelectorAll('.p'))x.classList.remove('dragging','dropbefore','dropafter');};
+$('projects').ondrop=e=>{e.preventDefault();const d=e.target.closest('.p');if(!dragging||!d||d.dataset.id===dragging)return;
+  const ids=projects.map(p=>p.id).filter(x=>x!==dragging),at=ids.indexOf(d.dataset.id)+(d.classList.contains('dropafter')?1:0);
+  ids.splice(at,0,dragging);saveOrder(ids);};
 function render(){
   $('projects').replaceChildren(...projects.map((p,i)=>{
     const d=el('div','p'+(p.id===cur?' on':'')+(p.missing?' missing':''));
@@ -86,7 +101,7 @@ function render(){
     const n=unread(p),ask=(spawnedBy[p.id]||[]).filter(s=>s.state==='needs_you').length;
     if(ask){const b=el('span','badge need','!');b.title=ask+' agent'+(ask>1?'s':'')+' waiting for you in the terminal';d.append(b);}
     if(n)d.append(el('span','badge',String(n)));else if(i<9&&!ask)d.append(el('kbd','','Alt+'+(i+1)));
-    d.onclick=()=>select(p.id);return d;}));
+    d.onclick=()=>select(p.id);d.draggable=true;d.dataset.id=p.id;return d;}));
   if(typeof drawAnswers==='function')drawAnswers();const total=projects.reduce((s,p)=>s+unread(p),0);
   document.title=(needed.size||answerCount?'● ':'')+(total?`(${total}) `:'')+'bullpen';
   const p=projects.find(p=>p.id===cur);
@@ -217,7 +232,7 @@ function agentItems(a){
     ['Message '+a.name+' privately',()=>{dmTo=a.name;replyTo=null;t.value='@'+a.name+' ';drawReply();t.focus();grow();}]);
   if(a.spawn){items.push(['View terminal',()=>openTerm(a.spawn,a.starting?a.name+' (starting)':a.name)]);
     items.push(['Stop',()=>{if(confirm(`Stop ${a.name}? Its tmux session ends.`))return api(path(a.spawn,'stop'),{});}]);}
-  if(a.status==='offline'&&!a.spawn&&(a.kind==='claude'||a.kind==='codex'))
+  if(a.status==='offline'&&!a.spawn&&(a.kind==='claude'||a.kind==='codex'||a.kind==='opencode'))
     items.push(['Resume',async()=>{await api(agentPath(a,'resume'),{});return `Resuming ${a.name}…`;}]);
   if(a.starting)return items;
   items.push(['Rename',async()=>{const n=await ask({title:'Rename '+a.name,label:'New name',value:a.name,
@@ -409,8 +424,8 @@ addEventListener('keydown',e=>{
   if(document.querySelector('dialog[open]'))return;
   if(e.altKey&&!e.ctrlKey&&!e.metaKey){
     const go=f=>{e.preventDefault();f();};
-    if(e.key==='ArrowUp')return go(()=>stepProject(-1));
-    if(e.key==='ArrowDown')return go(()=>stepProject(1));
+    if(e.key==='ArrowUp')return go(()=>e.shiftKey?moveProject(cur,-1):stepProject(-1));
+    if(e.key==='ArrowDown')return go(()=>e.shiftKey?moveProject(cur,1):stepProject(1));
     const digit=/^Digit([1-9])$/.exec(e.code);
     if(digit)return go(()=>{const p=projects[digit[1]-1];if(p)select(p.id);});
     if(e.code==='KeyU')return go(()=>{const i=projects.findIndex(p=>p.id===cur);

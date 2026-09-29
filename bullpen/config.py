@@ -8,10 +8,22 @@ OWN_OLLAMA = "http://127.0.0.1:%s" % os.environ.get("BULLPEN_OLLAMA_PORT", "1143
 LOCAL_URL = re.compile(r"^http://(?:127\.0\.0\.1|localhost):\d{1,5}$")
 
 
+def moved(old, new):
+    """new, after moving old (the folder from before the rename to bullpen) there once."""
+    if old.is_dir() and not new.exists():
+        old.rename(new)
+    return new
+
+
+def data_dir():
+    base = os.environ.get("XDG_DATA_HOME") or (
+        os.environ.get("LOCALAPPDATA") if os.name == "nt" else None) or os.path.expanduser("~/.local/share")
+    return moved(Path(base) / "agent-chat", Path(base) / "bullpen")
+
+
 def config_path():
     base = os.environ.get("XDG_CONFIG_HOME") or (
         os.environ.get("APPDATA") if os.name == "nt" else None) or os.path.expanduser("~/.config")
-    from .store import moved
     return moved(Path(base) / "agent-chat", Path(base) / "bullpen") / "config.json"
 
 

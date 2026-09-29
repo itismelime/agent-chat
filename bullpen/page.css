@@ -294,3 +294,7 @@ transition:transform .2s}body.rail #rail{transform:none}#menubtn{display:block}#
 color:var(--ink);font-weight:500}.react:hover{border-color:var(--mute)}
 .react.mine{border-color:var(--attn);background:var(--attn-bg)}
 #menu.emojis{display:flex;min-width:0;gap:2px}#menu.emojis div{font-size:18px;padding:4px 7px}
+
+/* project order */
+#projects .p.dragging{opacity:.4}
+#projects .p.dropbefore{box-shadow:0 -2px 0 var(--attn)}#projects .p.dropafter{box-shadow:0 2px 0 var(--attn)}
