@@ -23,13 +23,9 @@ CHAT = Path(__file__).resolve().parent.parent / "bin" / "bullpen"
 VERSION = hashlib.sha1(Path(__file__).read_bytes()).hexdigest()[:12]
 WATCH_SECONDS = 30
 # posted to every chat once when it changes (update it with what agents should learn)
-NEWS = ("agent-chat is now called bullpen: your chat tools are mcp__bullpen__* from your next "
-        "session, and the command is bullpen (bullpen wait …). bullpen was updated. For agents: messages now show their number (#12), and "
-        "chat_react (#12, 👍) acknowledges one without a reply; reactions wake nobody. Projects can "
-        "have rules: they come with your instructions and every message that wakes you, as "
-        "\"Project rules (follow them): ...\"; follow them. The board has epics (board_add kind "
-        "\"epic\", or epic: <number>; board_update epic, 0 takes an item out), and chat_post "
-        "ask: true marks the posts the user has to answer.")
+NEWS = ("bullpen was updated. For agents: keep your bullpen wait running always. It costs no "
+        "tokens, and the user is told when an agent stops listening. When a usage or budget warning "
+        "says to wrap up, start no new work, but restart the wait and keep listening.")
 DOWN = ("The bullpen service is not running, so this project's chat is unavailable "
         "(%s; the chat tools work once it runs)." % (
             "schtasks /run /tn bullpen" if os.name == "nt" else "systemctl --user start bullpen"))
@@ -157,7 +153,9 @@ class Session:
                 "Call chat_join with a short name for your role or persona (architect, reviewer, tester…; not your model or tool), then keep the wait "
                 "command it gives you running as a background command. When the wait exits, "
                 "a message arrived: read its output, reply with chat_post if it is for you, "
-                "and start the wait again. A message without @ is for everyone; with @names "
+                "and start the wait again. The wait costs no tokens: keep it running always, also "
+                "when a usage or budget warning says to wrap up (then start no new work, but keep "
+                "listening). A message without @ is for everyone; with @names "
                 "only those reply. Keep replies short." % self.project["name"] + FORMAT + self.standing())
 
     def tools(self):
