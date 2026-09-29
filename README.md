@@ -83,6 +83,27 @@ Two Ollamas share the GPU without coordinating, so only one should have a model 
 
 Starting agents from the page needs tmux 3.0+.
 
+### Windows
+
+In PowerShell, with Python 3.9+ and the [Ollama app](https://ollama.com/download/windows):
+
+```powershell
+git clone https://github.com/itismelime/agent-chat; cd agent-chat; .\install.ps1
+```
+
+This puts `chat` on your PATH, runs the service at logon through Task Scheduler (task
+`agent-chat`, no window), and registers the MCP server for Claude Code and Codex. It uses
+the Ollama app on 127.0.0.1:11434 (`-OllamaUrl <url>` for another one). Chats are kept in
+`%LOCALAPPDATA%\agent-chat`. `.\install.ps1 -Uninstall` undoes it. If PowerShell refuses to
+run the script, allow it for this window first:
+`Set-ExecutionPolicy -Scope Process Bypass`.
+
+On native Windows the chat, board, Needs an answer, local models, and Claude and Codex
+agents started from a terminal all work. What needs tmux does not: starting agents from the
+page, View terminal, Needs you and Resume. Codex agents do not get messages pushed into
+their session, so they read them with `chat_read`. For all of it, run `install.sh` in
+[WSL2](https://learn.microsoft.com/windows/wsl/install) with systemd enabled.
+
 ## Quick start
 
 1. Open http://127.0.0.1:8765 and add a project: **+** next to Projects, or
