@@ -25,6 +25,8 @@ from .ollama import OllamaError
 from .store import Store, StoreError, sees
 
 PAGE = Path(__file__).with_name("page.html")
+# the logo mark (docs/assets), our own file with no script in it
+FAVICON = Path(__file__).resolve().parent.parent / "docs" / "assets" / "mark.svg"
 ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "text/javascript",
           "board.js": "text/javascript", "marked.js": "text/javascript",
           "markdown.js": "text/javascript", "answers.js": "text/javascript",
@@ -150,6 +152,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
         def route(self, method, parts, query):
             if method == "GET" and not parts:
                 return 200, PAGE.read_bytes(), "text/html; charset=utf-8"
+            if method == "GET" and parts == ["favicon.svg"]:
+                return 200, FAVICON.read_bytes(), "image/svg+xml"
             if method == "GET" and len(parts) == 1 and parts[0] in ASSETS:
                 return 200, PAGE.with_name(parts[0]).read_bytes(), ASSETS[parts[0]] + "; charset=utf-8"
             if parts[:1] != ["api"]:

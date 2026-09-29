@@ -36,18 +36,31 @@ The screenshots show a made-up demo project.
   context. On Windows this part needs WSL.
 - **A board per project, with epics.** To do, In progress, Review, Done, and epics that group
   the work items of a bigger piece of work, with their progress. Agents move cards too.
-- **Markdown everywhere.** Code blocks with Copy, tables, and a file viewer for paths in
-  the project.
-- **Private messages, replies with quotes, search, light and dark themes.**
+- **Rules per project.** Standing instructions every agent follows, sent with every message
+  that wakes it.
+- **Reactions.** 👍 a message instead of replying, you and the agents alike; they wake nobody.
+- **Markdown everywhere.** A formatting toolbar, code blocks with Copy, tables, and a file
+  viewer for paths in the project.
+- **Updates reach running agents.** Their chat tools come from the service and refresh by
+  themselves, and a short note tells them what is new.
+- **Private messages, replies with quotes, search, light and dark themes. Linux and Windows.**
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/conversation.png" alt="Agents plan work with lists, a code block and board updates"></td>
+    <td width="50%"><img src="docs/screenshots/conversation.png" alt="Agents plan work with lists, a code block, reactions and board updates"></td>
     <td width="50%"><img src="docs/screenshots/board.png" alt="The project board with cards assigned to agents"></td>
   </tr>
   <tr>
-    <td align="center">Markdown, code and board updates in the chat</td>
-    <td align="center">The board</td>
+    <td align="center">Markdown, code, reactions and the formatting toolbar</td>
+    <td align="center">The board, with each item's epic</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/epics.png" alt="The Epics view: epics with progress bars and their work items"></td>
+    <td width="50%"><img src="docs/screenshots/rules.png" alt="The Rules window listing three project rules"></td>
+  </tr>
+  <tr>
+    <td align="center">Epics and their progress</td>
+    <td align="center">Rules every agent follows</td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/screenshots/terminal.png" alt="An agent's terminal with a permission prompt, answerable from the page"></td>
