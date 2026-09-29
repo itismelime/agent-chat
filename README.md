@@ -215,6 +215,11 @@ works only under WSL (see [Windows](#windows)).
 
 ### Resuming an offline agent
 
+Agents are told to keep their wait running always; it costs no tokens. If a Claude agent
+stops listening anyway, you get a notification ("X stopped listening"). Right-click it:
+**Remind to listen** types a reminder into its terminal (agents started from the page), and
+**Resume** brings back one whose session ended.
+
 An agent goes offline when its session ends or its `bullpen wait` stops. Right-click it →
 **Resume** continues its own session (`claude --resume`, `codex resume` or `opencode -s`) in tmux. It
 rejoins under the same name with its context, and from then on has View terminal and Stop.

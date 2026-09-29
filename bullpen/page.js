@@ -5,7 +5,7 @@ const saved={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 let projects=[],cur=saved.get('cur',null),msgs={},agents=[],seen=saved.get('seen',{}),notified={},drawn='',busy=false,down=false;
 const folds=new Set();  // board-change folds the user opened, by their first message
-let answerCount=0,tools={},spawned=[],spawnedBy={},needed=new Set(),boardData=null,query='',drafts=saved.get('drafts',{});
+let lastStatus={},answerCount=0,tools={},spawned=[],spawnedBy={},needed=new Set(),boardData=null,query='',drafts=saved.get('drafts',{});
 const KIND={claude:'Claude',codex:'Codex',llm:'local model',opencode:'OpenCode',user:'you',board:'board'};
 
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;
@@ -57,6 +57,11 @@ async function refresh(){
     const p=projects.find(p=>p.id===cur);
     const lists=await Promise.all(projects.map(p=>api(`api/projects/${p.id}/agents`)));  // every project's, for colors
     agentsBy={};renamesBy={};projects.forEach((p,i)=>{agentsBy[p.id]=lists[i].agents;renamesBy[p.id]=lists[i].renames||{};});
+    for(const q of projects)for(const a of agentsBy[q.id]){  // a Claude agent that was listening and no longer is
+      const k=q.id+'/'+a.name,was=lastStatus[k];lastStatus[k]=a.status;
+      if(a.kind==='claude'&&a.status==='offline'&&(was==='waiting'||was==='busy')){
+        notify(q,{from:a.name,text:'stopped listening to the chat. Right-click it: Remind or Resume.',n:'off-'+k+Date.now()});
+        if(q.id===cur)say(a.name+' stopped listening to the chat. Right-click it: Remind or Resume.');}}
     agents=agentsBy[cur]||[];
     // every project's starts: an agent stuck on a question in another project must reach you too
     const [starts,board]=await Promise.all([Promise.all(projects.map(p=>api(`api/projects/${p.id}/spawned`).then(x=>x.spawned))),
@@ -231,6 +236,8 @@ function agentItems(a){
   const items=[];
   if(!a.starting&&a.status!=='removed')items.push(['Message '+a.name,()=>{t.value='@'+a.name+' ';t.focus();grow();hint();}],
     ['Message '+a.name+' privately',()=>{dmTo=a.name;replyTo=null;t.value='@'+a.name+' ';drawReply();t.focus();grow();}]);
+  if(a.spawn&&a.status==='offline'&&a.kind==='claude')  // its terminal is there, its wait is not
+    items.push(['Remind to listen',async()=>{await api(path(a.spawn,'keys'),{text:'Your bullpen wait stopped. Restart it in the background now (the command from your join), and keep it running.'});return `Reminded ${a.name}.`;}]);
   if(a.spawn){items.push(['View terminal',()=>openTerm(a.spawn,a.starting?a.name+' (starting)':a.name)]);
     items.push(['Stop',()=>{if(confirm(`Stop ${a.name}? Its tmux session ends.`))return api(path(a.spawn,'stop'),{});}]);}
   if(a.status==='offline'&&!a.spawn&&(a.kind==='claude'||a.kind==='codex'||a.kind==='opencode'))
