@@ -182,6 +182,7 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(peer_uid(0xD432, 0x223D, table), -1)
         self.assertIsNone(peer_uid(1, 2, self.tmp / "missing"))
 
+    @unittest.skipIf(os.name == "nt", "no Unix users on Windows")
     def test_other_users_are_refused(self):
         _, server, port, _ = start()
         self.addCleanup(stop, server)

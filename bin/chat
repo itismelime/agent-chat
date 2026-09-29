@@ -83,6 +83,10 @@ def wait(client, pid, name):
 
 
 def main():
+    # UTF-8 both ways (Windows consoles and pipes default to a code page); None under pythonw
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        if stream is not None:
+            stream.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(prog="chat", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd")

@@ -15,6 +15,7 @@ exit 0
 """
 
 
+@unittest.skipIf(os.name == "nt", "Linux only: /proc, shell stubs, install.sh")
 class InstallTest(unittest.TestCase):
     def setUp(self):
         tmp = Path(tempfile.mkdtemp())

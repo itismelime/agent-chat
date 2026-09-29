@@ -218,7 +218,7 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         text = path.read_text(encoding="utf-8")
                     except UnicodeDecodeError:
                         raise StoreError(415, "not a text file") from None
-                    return 200, {"path": str(path.relative_to(root)), "text": text}
+                    return 200, {"path": path.relative_to(root).as_posix(), "text": text}
                 if what[:1] == ["board"]:
                     return self.board_route(method, pid, what[1:])
                 if what == ["spawned"] and method == "GET":
@@ -368,7 +368,9 @@ def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=
         talker.start()
     server.RequestHandlerClass = make_handler(store, server.server_address[1],
                                               wait_seconds, spawner,
-                                              os.getuid() if owner is None else owner, models)
+                                              # no uids on Windows: peer_uid finds no table there either
+                                              getattr(os, "getuid", lambda: None)() if owner is None
+                                              else owner, models)
     return server
 
 

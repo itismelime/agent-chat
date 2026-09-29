@@ -4,6 +4,7 @@ messages into it (an idle Codex session does not resume when a background
 import os
 import queue
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -54,7 +55,8 @@ def deliver(store, pid, name, thread, m):
     if personality:
         text = "Your personality: %s\n%s" % (personality, text)
     try:
-        r = subprocess.run(["codex", "queue", "--thread", thread, "--message", text],
+        # shutil.which finds codex.cmd on Windows, which subprocess alone does not
+        r = subprocess.run([shutil.which("codex") or "codex", "queue", "--thread", thread, "--message", text],
                            capture_output=True, text=True, timeout=60)
         ok, err = r.returncode == 0, r.stderr.strip()
     except (OSError, subprocess.TimeoutExpired) as e:

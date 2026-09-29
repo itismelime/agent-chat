@@ -28,7 +28,8 @@ class StoreError(Exception):
 
 
 def data_dir():
-    base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+    base = os.environ.get("XDG_DATA_HOME") or (
+        os.environ.get("LOCALAPPDATA") if os.name == "nt" else None) or os.path.expanduser("~/.local/share")
     return Path(base) / "agent-chat"
 
 

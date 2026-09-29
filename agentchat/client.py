@@ -7,7 +7,8 @@ from urllib.request import Request, urlopen
 
 from .store import addressed
 
-DOWN = "agent-chat service not running (systemctl --user start agent-chat)"
+DOWN = ("agent-chat service not running (%s)" % (
+    "schtasks /run /tn agent-chat" if os.name == "nt" else "systemctl --user start agent-chat"))
 
 
 class ServiceDown(Exception):

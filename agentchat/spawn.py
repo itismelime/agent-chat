@@ -39,7 +39,10 @@ WORKING = re.compile(r"esc interrupt", re.I)
 
 
 def tmux(*args):
-    return subprocess.run(["tmux", *args], capture_output=True, text=True, timeout=10)
+    try:
+        return subprocess.run(["tmux", *args], capture_output=True, text=True, timeout=10)
+    except OSError as e:  # no tmux (e.g. Windows): the call fails like one tmux refused
+        return subprocess.CompletedProcess(["tmux", *args], 1, "", str(e))
 
 
 # tmux treats a target it cannot find as a prefix ("x" would hit "x2"); "="
