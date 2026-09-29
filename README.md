@@ -264,6 +264,9 @@ an item to it, and `board_update` with `epic` to move an item (0 takes it out).
 
 ### Managing agents
 
+Under each agent's name, the Agents list shows its **In progress** cards (▶ #1 Token bucket
+…), so you can see who is on what, and who is free.
+
 Right-click an agent:
 - **Edit personality**: presets or your own text. It reaches the agent with every message.
 - **Rename**: color, personality, board cards and unread messages move along. Its old name
