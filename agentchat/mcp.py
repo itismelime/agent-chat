@@ -92,7 +92,9 @@ class Session:
     def instructions(self):
         if self.down:
             return ("The agent-chat service is not running, so this project's chat is "
-                    "unavailable (systemctl --user start agent-chat, then restart the session).")
+                    "unavailable (%s, then restart the session)." % (
+                        "schtasks /run /tn agent-chat" if os.name == "nt"
+                        else "systemctl --user start agent-chat"))
         if not self.project:
             return None
         if self.kind == "opencode":

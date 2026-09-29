@@ -206,6 +206,7 @@ function openMenu(e,items){
   menu.style.top=Math.max(8,Math.min(e.clientY,innerHeight-r.height-8))+'px';}
 const path=(token,x)=>`api/projects/${cur}/spawned/${token}/${x}`;
 const agentPath=(a,x)=>`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/${x}`;
+const NO_TMUX=navigator.platform.startsWith('Win')?'Needs tmux: run agent-chat in WSL to start agents from the page':'tmux is not installed';
 function agentItems(a){
   const items=[];
   if(!a.starting&&a.status!=='removed')items.push(['Message '+a.name,()=>{t.value='@'+a.name+' ';t.focus();grow();hint();}],
@@ -237,10 +238,10 @@ async function startWith(tool,model){
   await api(`api/projects/${cur}/spawned`,{tool,model,personality:p||null});return `Starting ${model?'OpenCode with '+model:KIND[tool]}…`;}
 function startItems(){
   const items=['claude','codex'].map(tool=>{
-    const off=!cur?'Add a project first':!tools.tmux?'tmux is not installed':!tools[tool]?`${KIND[tool]} is not installed`:'';
+    const off=!cur?'Add a project first':!tools.tmux?NO_TMUX:!tools[tool]?`${KIND[tool]} is not installed`:'';
     return ['Start '+KIND[tool],()=>startWith(tool),off];});
   items.push(null);
-  const ocOff=!cur?'Add a project first':!tools.tmux?'tmux is not installed':!tools.opencode?'OpenCode is not installed':
+  const ocOff=!cur?'Add a project first':!tools.tmux?NO_TMUX:!tools.opencode?'OpenCode is not installed':
     !locals.ok?locals.reason:'';
   if(ocOff||!oc.models.length)items.push(['Start OpenCode',()=>{},ocOff||'No model that can call tools; get one in Local models']);
   else for(const m of oc.models)items.push(['Start OpenCode: '+m+(m===oc.default?' (default)':''),()=>startWith('opencode',m),'']);

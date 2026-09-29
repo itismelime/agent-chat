@@ -368,7 +368,9 @@ def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=
         talker.start()
     server.RequestHandlerClass = make_handler(store, server.server_address[1],
                                               wait_seconds, spawner,
-                                              os.getuid() if owner is None else owner, models)
+                                              # no uids on Windows: peer_uid finds no table there either
+                                              getattr(os, "getuid", lambda: None)() if owner is None
+                                              else owner, models)
     return server
 
 

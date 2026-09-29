@@ -26,6 +26,8 @@ exit 0
 
 def stub_tools(test, names=("tmux", "claude", "codex")):
     """Put stub tmux/claude/codex first on PATH for the test; returns the stub dir."""
+    if os.name == "nt":
+        raise unittest.SkipTest("the stubs are shell scripts; tmux is not on Windows")
     d = Path(tempfile.mkdtemp())
     for name in names:
         f = d / name

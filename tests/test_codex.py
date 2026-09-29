@@ -15,6 +15,7 @@ exit {code}
 """
 
 
+@unittest.skipIf(os.name == "nt", "Linux only: /proc, shell stubs, install.sh")
 class FindThreadTest(unittest.TestCase):
     def setUp(self):
         self.proc = Path(tempfile.mkdtemp())
@@ -36,6 +37,7 @@ class FindThreadTest(unittest.TestCase):
         self.assertIsNone(find_thread(999, started, self.proc))
 
 
+@unittest.skipIf(os.name == "nt", "Linux only: /proc, shell stubs, install.sh")
 class DeliverTest(unittest.TestCase):
     def setUp(self):
         tmp = Path(tempfile.mkdtemp())
