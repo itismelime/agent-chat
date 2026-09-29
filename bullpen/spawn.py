@@ -18,6 +18,7 @@ from .store import StoreError, wakes
 
 TOOLS = ("claude", "codex", "opencode")
 PROMPT = "join the chat"
+BACK = "You are back in the chat: call chat_join with the name %s, then carry on as before."
 KEYS = {"1": "1", "2": "2", "3": "3", "up": "Up", "down": "Down",
         "enter": "Enter", "esc": "Escape"}
 MAX_TEXT = 2000
@@ -103,12 +104,11 @@ def start(tool, path, session, token, model=None, config_home=None, data_home=No
         # config from a tmux server's environment
         env += ["-e", "OPENCODE_DISABLE_CLAUDE_CODE=1", "-e", "OPENCODE_CONFIG=",
                 "-e", "OPENCODE_CONFIG_DIR=", "-e", "OPENCODE_CONFIG_CONTENT="]
-        command = ["opencode", "-m", "ac/" + model, "--prompt", PROMPT]
+        command = (["opencode", "-s", resume, "-m", "ac/" + model, "--prompt", BACK % name] if resume
+                   else ["opencode", "-m", "ac/" + model, "--prompt", PROMPT])
     elif resume:
-        prompt = ("You are back in the chat: call chat_join with the name %s, then carry on "
-                  "as before." % name)
-        command = (["claude", "--resume", resume, prompt] if tool == "claude"
-                   else ["codex", "resume", resume, "%s (start %s)" % (prompt, token)])
+        command = (["claude", "--resume", resume, BACK % name] if tool == "claude"
+                   else ["codex", "resume", resume, "%s (start %s)" % (BACK % name, token)])
     else:
         # Codex's MCP servers are started by its app-server daemon and do not see
         # BULLPEN_SPAWN, so Codex gets the token in its prompt for chat_join.
@@ -204,16 +204,7 @@ class Spawner:
         project = self.store.project(pid)
         token = secrets.token_hex(16)
         session = "bullpen-%s-%s" % (pid, token[:6])
-        home = None
-        if tool == "opencode":
-            from . import opencode
-            usable = opencode.tool_models(self.models.ollama, self.models.gpu_total())
-            if model not in usable:
-                raise StoreError(400, "%s cannot call tools or is not installed; choose one of: %s"
-                                 % (model, ", ".join(usable) or "none"))
-            opencode.write_config(self.store.root, self.models.ollama.url, usable, self.port)
-            home = str(opencode.config_home(self.store.root))
-        data = str(opencode.data_home(self.store.root)) if tool == "opencode" else None
+        home, data = self._opencode(model) if tool == "opencode" else (None, None)
         start(tool, project["path"], session, token, model=model, config_home=home, data_home=data,
               personality=personality)
         record = self.store.add_spawned(pid, token, tool, session, personality)
@@ -221,9 +212,19 @@ class Spawner:
             record = self.store.update_spawned(pid, token, model=model)
         return record
 
+    def _opencode(self, model):
+        """Check OpenCode can use model and write its config; its (config, data) homes."""
+        from . import opencode
+        usable = opencode.tool_models(self.models.ollama, self.models.gpu_total())
+        if model not in usable:
+            raise StoreError(400, "%s cannot call tools or is not installed; choose one of: %s"
+                             % (model, ", ".join(usable) or "none"))
+        opencode.write_config(self.store.root, self.models.ollama.url, usable, self.port)
+        return str(opencode.config_home(self.store.root)), str(opencode.data_home(self.store.root))
+
     def resume(self, pid, name):
-        """Continue an offline Claude or Codex agent's own session in tmux; it
-        rejoins under its name, so it then has View terminal and Stop."""
+        """Continue an offline Claude, Codex or OpenCode agent's own session in tmux;
+        it rejoins under its name, so it then has View terminal and Stop."""
         project, agent = self.store.project(pid), self.store._agent(pid, name)
         if any(name in (r["name"], r.get("resume")) for r in self.store.spawned(pid).values()):
             raise StoreError(409, "%s already has a terminal here; use View terminal" % name)
@@ -233,15 +234,26 @@ class Spawner:
             sid = claude_session(project["path"], name)
         elif agent["kind"] == "codex":
             sid = agent.get("thread")
+        elif agent["kind"] == "opencode":
+            from . import opencode
+            sid, model = opencode.named_session(self.store.root, name) or (None, None)
         else:
-            raise StoreError(400, "only Claude and Codex agents can be resumed")
+            raise StoreError(400, "only Claude, Codex and OpenCode agents can be resumed")
         if not sid:
             raise StoreError(404, "no session of %s found to resume" % name)
         token = secrets.token_hex(16)
         session = "bullpen-%s-%s" % (pid, token[:6])
-        start(agent["kind"], project["path"], session, token, resume=sid, name=name)
+        extra = {}
+        if agent["kind"] == "opencode":
+            home, data = self._opencode(model)
+            start("opencode", project["path"], session, token, model=model, config_home=home,
+                  data_home=data, resume=sid, name=name)
+            # its session is known; only calls written from now on are rescued
+            extra = dict(model=model, oc_session=sid, oc_seen=int(time.time() * 1000))
+        else:
+            start(agent["kind"], project["path"], session, token, resume=sid, name=name)
         self.store.add_spawned(pid, token, agent["kind"], session)
-        return self.store.update_spawned(pid, token, resume=name)
+        return self.store.update_spawned(pid, token, resume=name, **extra)
 
     def record(self, pid, token):
         records = self.store.spawned(pid)

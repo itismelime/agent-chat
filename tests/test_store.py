@@ -6,7 +6,8 @@ import time
 import unittest
 from pathlib import Path
 
-from bullpen.store import Store, StoreError, addressed, moved, slug, wakes
+from bullpen.config import moved
+from bullpen.store import Store, StoreError, addressed, slug, wakes
 
 
 class StoreTest(unittest.TestCase):
@@ -27,6 +28,17 @@ class StoreTest(unittest.TestCase):
         (old / "x").mkdir(parents=True)  # both there: nothing moves again
         moved(old, new)
         self.assertTrue(old.exists())
+
+    def test_reorder_projects(self):
+        (self.tmp / "B").mkdir()
+        (self.tmp / "C").mkdir()
+        self.store.add_project(str(self.tmp / "B"))
+        self.store.add_project(str(self.tmp / "C"))
+        self.assertEqual([p["id"] for p in self.store.reorder(["c", "openvibes", "b"])], ["c", "openvibes", "b"])
+        self.assertEqual([p["id"] for p in self.store.projects()], ["c", "openvibes", "b"])
+        for bad in (["c", "b"], ["c", "b", "b"], ["c", "b", "x"], "c,b,openvibes"):
+            with self.assertRaises(StoreError, msg=bad):
+                self.store.reorder(bad)
 
     def test_add_project_new_existing_and_child(self):
         self.assertEqual(self.p["id"], "openvibes")

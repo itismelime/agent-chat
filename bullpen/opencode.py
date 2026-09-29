@@ -109,3 +109,30 @@ def written_calls(root, session, after_ms):
             for m in CALL.finditer(part.get("text") or ""):
                 out.append((t, m[1], dict(PARAM.findall(m[2]))))
     return out
+
+
+def named_session(root, name):
+    """(session id, model) of the newest OpenCode session whose chat_join or
+    chat_rename took this name, or None. The MCP server was agent-chat before
+    the rename to bullpen."""
+    db = _db(root)
+    if db is None:
+        return None
+    try:
+        rows = db.execute("SELECT p.session_id, p.data, s.model FROM part p JOIN session s ON s.id = p.session_id "
+                          "WHERE p.data LIKE '%chat_join%' OR p.data LIKE '%chat_rename%' "
+                          "ORDER BY p.time_created DESC").fetchall()
+    except sqlite3.Error:
+        return None
+    finally:
+        db.close()
+    for sid, data, model in rows:
+        try:
+            part, model = json.loads(data), json.loads(model or "{}").get("id")
+        except (ValueError, AttributeError):
+            continue
+        tool = part.get("tool") or ""
+        if (part.get("type") == "tool" and tool.split("_chat_")[0] in ("bullpen", "agent-chat")
+                and ((part.get("state") or {}).get("input") or {}).get("name") == name and model):
+            return sid, model
+    return None

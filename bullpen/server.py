@@ -163,6 +163,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
             if rest == ["projects"] and method == "GET":
                 return 200, {"projects": [dict(p, missing=not Path(p["path"]).is_dir())
                                           for p in store.projects()]}
+            if rest == ["projects", "order"] and method == "POST":
+                return 200, {"projects": store.reorder(self.body().get("ids"))}
             if rest == ["projects"] and method == "POST":
                 project, existing = store.add_project(self.field(self.body(), "path"))
                 return (200 if existing else 201), {"project": project, "existing": existing}

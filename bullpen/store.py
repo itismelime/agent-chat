@@ -12,6 +12,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from .config import data_dir, moved  # noqa: F401 (moved: for callers of the store)
+
 NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 RESERVED = {"user", "all", "board"}
 KINDS = {"claude", "codex", "llm", "opencode"}
@@ -25,19 +27,6 @@ class StoreError(Exception):
     def __init__(self, code, message):
         super().__init__(message)
         self.code = code
-
-
-def data_dir():
-    base = os.environ.get("XDG_DATA_HOME") or (
-        os.environ.get("LOCALAPPDATA") if os.name == "nt" else None) or os.path.expanduser("~/.local/share")
-    return moved(Path(base) / "agent-chat", Path(base) / "bullpen")
-
-
-def moved(old, new):
-    """new, after moving old (the folder from before the rename to bullpen) there once."""
-    if old.is_dir() and not new.exists():
-        old.rename(new)
-    return new
 
 
 def now():
@@ -110,6 +99,15 @@ class Store:
             if str(d) in by_path:
                 return by_path[str(d)]
         return None
+
+    def reorder(self, ids):
+        """Put the projects in the order of ids (the page's drag and drop)."""
+        with self.changed:
+            by = {p["id"]: p for p in self.projects()}
+            if not isinstance(ids, list) or sorted(map(str, ids)) != sorted(by):
+                raise StoreError(400, "ids must name every project once")
+            write_json(self.root / "projects.json", {"projects": [by[i] for i in ids]})
+        return [by[i] for i in ids]
 
     def add_project(self, path):
         """Register a folder. Returns (project, existing)."""
