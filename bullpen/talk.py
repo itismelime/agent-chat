@@ -111,7 +111,7 @@ class Talker:
             from . import rules
             r = ollama.chat(agent["model"], build_messages(name, project, others, agent.get("role"),
                                                            history, num_ctx,
-                                                           rules.summary(rules.get(self.store, pid))),
+                                                           rules.standing(self.store, pid)),
                             num_ctx=num_ctx, think=think, timeout=TIMEOUT, num_predict=MAX_REPLY)
             text = clean_reply(name, (r.get("message") or {}).get("content", ""))
             if text and not self.store.agents(pid).get(name, {}).get("removed"):

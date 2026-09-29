@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import mcp, reactions, rules, spawn, talk
+from . import mcp, pins, reactions, rules, spawn, talk
 from .board import Board
 from .client import Client
 from .codex import Deliverer
@@ -32,7 +32,7 @@ ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "te
           "markdown.js": "text/javascript", "answers.js": "text/javascript",
           "format.js": "text/javascript", "rules.js": "text/javascript",
           "reactions.js": "text/javascript", "emoji-data.js": "text/javascript",
-          "emoji.js": "text/javascript"}
+          "emoji.js": "text/javascript", "pins.js": "text/javascript"}
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 MAX_FILE = 5_000_000
@@ -197,7 +197,11 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     except ValueError:
                         raise StoreError(400, "after must be a number") from None
                     return 200, {"messages": store.messages(pid, after),
-                                 "reactions": reactions.get(store, pid)}
+                                 "reactions": reactions.get(store, pid), "pins": pins.get(store, pid)}
+                if len(what) == 3 and what[0] == "messages" and what[2] == "pin" and method == "POST":
+                    if not re.fullmatch(r"[0-9]+", what[1]):
+                        raise StoreError(404, "no message %s" % what[1])
+                    return 200, {"pins": pins.toggle(store, pid, int(what[1]))}
                 if len(what) == 3 and what[0] == "messages" and what[2] == "react" and method == "POST":
                     if not re.fullmatch(r"[0-9]+", what[1]):
                         raise StoreError(404, "no message %s" % what[1])
@@ -246,7 +250,7 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     return self.board_route(method, pid, what[1:])
                 if what[:1] == ["rules"]:  # changed from the page only; agents read them
                     if what == ["rules"] and method == "GET":
-                        return 200, {"rules": rules.get(store, pid)}
+                        return 200, {"rules": rules.get(store, pid), "standing": rules.standing(store, pid)}
                     if method == "POST" and what == ["rules"]:
                         return 201, {"rule": rules.add(store, pid, self.body().get("text"))}
                     if method == "POST" and len(what) >= 2 and re.fullmatch(r"[0-9]+", what[1]):
@@ -290,7 +294,7 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                             return 204, None
                         role = store.agents(pid).get(what[1], {}).get("role")
                         return 200, dict(result, personality=role, name=what[1],
-                                         rules=rules.summary(rules.get(store, pid)))
+                                         rules=rules.standing(store, pid))
                 if len(what) == 3 and what[0] == "agents" and method == "POST" and what[2] == "resume":
                     return 201, {"spawned": spawner.resume(pid, what[1])}
                 if len(what) == 3 and what[0] == "agents" and method == "POST" \

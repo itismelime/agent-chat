@@ -55,7 +55,7 @@ def deliver(store, pid, name, thread, m):
     personality = store.agents(pid).get(name, {}).get("role")
     if personality:
         text = "Your personality: %s\n%s" % (personality, text)
-    standing = rules.summary(rules.get(store, pid))
+    standing = rules.standing(store, pid)
     if standing:
         text = "%s\n%s" % (standing, text)
     try:

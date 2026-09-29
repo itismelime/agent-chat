@@ -85,3 +85,9 @@ def summary(rules):
         return ""
     return "Project rules (follow them): " + " ".join(
         "%d. %s" % (i + 1, r["text"]) for i, r in enumerate(rules))
+
+
+def standing(store, pid):
+    """What agents get with every wake: the rules, then the pinned messages."""
+    from . import pins
+    return " ".join(x for x in (summary(get(store, pid)), pins.summary(store, pid)) if x)

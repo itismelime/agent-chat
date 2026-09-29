@@ -47,7 +47,7 @@ async function refresh(){
     for(const p of projects){
       const list=msgs[p.id]||(msgs[p.id]=[]);
       const got=await api(`api/projects/${p.id}/messages?after=${lastN(p.id)}`),fresh=got.messages;
-      reactsBy[p.id]=got.reactions||{};
+      reactsBy[p.id]=got.reactions||{};pinsBy[p.id]=got.pins||[];
       list.push(...fresh);
       if(notified[p.id]===undefined){  // first load: history is not new
         notified[p.id]=lastN(p.id);if(seen[p.id]===undefined)seen[p.id]=lastN(p.id);continue;}
@@ -110,7 +110,7 @@ function render(){
   $('boardcount').textContent=String(open.filter(c=>c.kind!=='epic').length||'');
   $('epiccount').textContent=String(open.filter(c=>c.kind==='epic').length||'');
   drawNeeds();drawRoster();hint();
-  const key=cur+':'+lastN(cur)+':'+query+':'+agents.map(a=>a.name).join()+JSON.stringify(reactsBy[cur]||{});if(key===drawn)return;
+  const key=cur+':'+lastN(cur)+':'+query+':'+agents.map(a=>a.name).join()+JSON.stringify(reactsBy[cur]||{})+(pinsBy[cur]||[]);if(key===drawn)return;
   const switched=!drawn.startsWith(cur+':'),end=atEnd(),before=drawn;drawn=key;
   drawLog(p);
   if(end||switched||!before)log.scrollTop=log.scrollHeight;else $('jump').hidden=false;
@@ -118,6 +118,7 @@ function render(){
 
 // transcript: messages grouped by speaker, board notices as one line, a rule per day
 function drawLog(p){
+  drawPins();
   if(!p){log.replaceChildren(empty('Add a project to start',
     'Choose + next to Projects and give a folder, or run bullpen add <folder> in a terminal.'));return;}
   const q=query.toLowerCase(),all=msgs[p.id]||[];
@@ -156,7 +157,7 @@ function message(m,time,q){
   const acts=el('div','acts');
   acts.append(btn('Reply',()=>{const from=current(m.from);replyTo={n:m.n,from,text:m.text};dmTo=m.dm?current(m.dm):null;drawReply();
     if(from!=='user')t.value='@'+from+' '+t.value.replace(/^@[\w-]+\s*/,'');t.focus();grow();hint();}));
-  acts.append(btn('React',ev=>{ev.stopPropagation();pickReaction(ev,m);}),
+  acts.append(btn('React',ev=>{ev.stopPropagation();pickReaction(ev,m);}),btn(isPinned(m.n)?'Unpin':'Pin',()=>togglePin(m.n)),
     btn('Copy',()=>navigator.clipboard.writeText(m.text)),btn('Add to board',()=>cardFrom(m)));
   d.append(reactRow(m),acts);return d;}
 // a reply's quote of the message it answers; a click shows that message

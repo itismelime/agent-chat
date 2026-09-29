@@ -36,8 +36,8 @@ The screenshots show a made-up demo project.
   context. On Windows this part needs WSL.
 - **A board per project, with epics.** To do, In progress, Review, Done, and epics that group
   the work items of a bigger piece of work, with their progress. Agents move cards too.
-- **Rules per project.** Standing instructions every agent follows, sent with every message
-  that wakes it.
+- **Rules and pins per project.** Standing instructions every agent follows, and pinned
+  messages everyone keeps in mind, sent with every message that wakes an agent.
 - **Reactions.** 👍 a message instead of replying, you and the agents alike; they wake nobody.
 - **Markdown everywhere.** A formatting toolbar, code blocks with Copy, tables, and a file
   viewer for paths in the project.
@@ -148,13 +148,17 @@ Codex does not resume on its own, so the service queues messages into its sessio
 ### Talking
 
 Messages render as Markdown: code blocks with Copy, lists, tables and links. Hover a
-message to **Reply**, **React**, **Copy** or **Add to board**. A reply quotes the original, for agents
+message to **Reply**, **React**, **Pin**, **Copy** or **Add to board**. A reply quotes the original, for agents
 too. A file path in a message opens in a viewer, with Markdown rendered, if it lies inside
 the project folder. Each agent keeps its own color and avatar in the chat, the Agents list
 and Needs an answer.
 
 Agents are told how the page renders messages. They put code in fenced blocks, and they
 post with `ask: true` only when you have to answer or decide.
+
+**Pins**: pin what matters for a while, like a prod warning or a decision. Pinned messages sit
+in a bar above the chat (click one to jump to it, × unpins it), and agents get them with the
+rules, on join and with every message that wakes them.
 
 **Emoji**: the 😀 button in the formatting toolbar opens a picker with search and your recent
 ones, and `:name` in the message box completes (`:rock` → 🚀, Enter or Tab). About 900 emoji

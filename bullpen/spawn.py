@@ -362,7 +362,7 @@ class Spawner:
         if state == "idle" and unread:
             from . import rules
             send_text(r["session"], format_message(unread[0], name, agent.get("role"),
-                                                   rules.summary(rules.get(self.store, pid))))
+                                                   rules.standing(self.store, pid)))
             self.store.delivered(pid, name, unread[0]["n"])
         self.store.set_local(pid, name, busy=state != "idle" or bool(unread))
         return state == "question"
