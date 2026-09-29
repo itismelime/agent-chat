@@ -330,7 +330,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 data["assignee"] = store.resolve(pid, data["assignee"])
             if len(what) == 1:
                 card = board.add(pid, by, data.get("title"), data.get("description", ""),
-                                 data.get("column") or "todo", data.get("assignee"))
+                                 data.get("column") or "todo", data.get("assignee"),
+                                 data.get("kind"), data.get("epic"))
                 return 201, {"card": card}
             if not re.fullmatch(r"[0-9]+", what[1]):
                 raise StoreError(404, "no card %s" % what[1])
@@ -339,7 +340,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 board.delete(pid, n, by)
                 return 200, {}
             if len(what) == 2:
-                fields = {k: data[k] for k in ("title", "description", "column", "assignee") if k in data}
+                fields = {k: data[k] for k in ("title", "description", "column", "assignee", "epic")
+                          if k in data}
                 return 200, {"card": board.update(pid, n, by, **fields)}
             raise StoreError(404, "not found")
 

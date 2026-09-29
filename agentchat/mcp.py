@@ -41,22 +41,28 @@ TOOLS = [
      "description": "Chat messages you have not seen yet.",
      "inputSchema": {"type": "object", "properties": {}}},
     {"name": "board_list",
-     "description": "The project's kanban board: cards by column (To do, In progress, Review, Done).",
+     "description": "The project's kanban board: epics with their progress, then the work items by "
+                    "column (To do, In progress, Review, Done).",
      "inputSchema": {"type": "object", "properties": {}}},
     {"name": "board_add",
-     "description": "Add a card to the board (in To do). assignee: an agent's name, user, or leave out.",
+     "description": "Add a card to the board (in To do). assignee: an agent's name, user, or leave out. "
+                    "kind: epic for a big piece of work that groups items (default: item). "
+                    "epic: the number of the epic this item belongs to.",
      "inputSchema": {"type": "object", "required": ["title"],
                      "properties": {"title": {"type": "string"}, "description": {"type": "string"},
-                                    "assignee": {"type": "string"}}}},
+                                    "assignee": {"type": "string"},
+                                    "kind": {"type": "string", "enum": ["item", "epic"]},
+                                    "epic": {"type": "integer"}}}},
     {"name": "board_update",
-     "description": "Change a card: move it (column todo, doing, review or done), assign it, or "
-                    "edit its title or description.",
+     "description": "Change a card: move it (column todo, doing, review or done), assign it, "
+                    "edit its title or description, or put an item in an epic (epic: its number, "
+                    "or 0 to take it out).",
      "inputSchema": {"type": "object", "required": ["id"],
                      "properties": {"id": {"type": "integer"},
                                     "column": {"type": "string",
                                                "enum": ["todo", "doing", "review", "done"]},
                                     "assignee": {"type": "string"}, "title": {"type": "string"},
-                                    "description": {"type": "string"}}}},
+                                    "description": {"type": "string"}, "epic": {"type": "integer"}}}},
 ]
 BOARD_TOOLS = ("board_list", "board_add", "board_update")
 # what the page does with a message, so agents write for it
@@ -131,13 +137,24 @@ class Session:
         base = "/api/projects/%s/board" % pid
         if tool == "board_list":
             b = self.client.call("GET", base)[1]
-            lines = []
+            lines, cols = [], dict(b["columns"])
+            epics = [c for c in b["cards"] if c.get("kind") == "epic"]
+            items = [c for c in b["cards"] if c.get("kind") != "epic"]
+            if epics:
+                lines.append("Epics:")
+                for e in epics:
+                    mine = [c for c in items if c.get("epic") == e["id"]]
+                    lines.append('  epic #%d "%s" (%s, %d/%d items done)%s' % (
+                        e["id"], e["title"], cols[e["column"]],
+                        sum(c["column"] == "done" for c in mine), len(mine),
+                        " (%s)" % e["assignee"] if e["assignee"] else ""))
             for key, label in b["columns"]:
-                cards = [c for c in b["cards"] if c["column"] == key]
+                cards = [c for c in items if c["column"] == key]
                 lines.append("%s:%s" % (label, "" if cards else " (empty)"))
                 for c in cards:
-                    lines.append('  #%d "%s"%s' % (c["id"], c["title"],
-                                                  " (%s)" % c["assignee"] if c["assignee"] else ""))
+                    lines.append('  #%d "%s"%s%s' % (c["id"], c["title"],
+                                                    " (%s)" % c["assignee"] if c["assignee"] else "",
+                                                    " [epic #%d]" % c["epic"] if c.get("epic") else ""))
                     if c.get("description"):
                         d = " ".join(c["description"].split())
                         lines.append("      " + (d[:300] + "…" if len(d) > 300 else d))
@@ -146,12 +163,15 @@ class Session:
             card = self.client.call("POST", base + "/cards", {
                 "by": self.name, "title": str(args.get("title", "")),
                 "description": str(args.get("description") or ""),
-                "assignee": args.get("assignee")})[1]["card"]
-            return 'added #%d "%s"' % (card["id"], card["title"])
+                "assignee": args.get("assignee"), "kind": args.get("kind"),
+                "epic": args.get("epic")})[1]["card"]
+            return 'added %s#%d "%s"' % ("epic " if card["kind"] == "epic" else "", card["id"], card["title"])
         n = args.get("id")
         if not isinstance(n, int) or isinstance(n, bool):
             raise ApiError(400, "id must be a card number")
-        data = {k: args[k] for k in ("column", "assignee", "title", "description") if k in args}
+        data = {k: args[k] for k in ("column", "assignee", "title", "description", "epic") if k in args}
+        if data.get("epic") == 0:
+            data["epic"] = None  # out of its epic
         card = self.client.call("POST", "%s/cards/%d" % (base, n), dict(data, by=self.name))[1]["card"]
         return '#%d "%s" is now in %s%s' % (card["id"], card["title"], card["column"],
                                              ", assigned to %s" % card["assignee"] if card["assignee"] else "")

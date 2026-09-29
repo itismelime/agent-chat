@@ -240,6 +240,28 @@ overflow-wrap:anywhere;display:flex;flex-direction:column;gap:5px}
 .card .cf{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mute)}.card .cf span{flex:1}
 .card .av{width:22px;height:22px;font-size:11px;border-radius:6px;position:static}
 .addcard input{width:100%;padding:7px 10px}
+#boardview{flex-direction:column;align-items:stretch}.cols{display:flex;gap:12px;align-items:flex-start}
+.bfilter{display:flex;gap:8px}
+.bfilter:empty{display:none}.bfilter select{max-width:320px}
+.chip{flex:0 1 auto!important;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+font-size:11px;font-weight:600;color:var(--ec);border:1px solid var(--ec);border-radius:5px;padding:0 6px;line-height:18px}
+#epicview{flex:1;overflow:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+#epicview>.addcard{max-width:260px}
+.epic{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ec,var(--line));border-radius:10px}
+.ehead{display:flex;align-items:center;gap:6px 8px;padding:10px 12px;flex-wrap:wrap}
+.etog{background:none;color:var(--mute);padding:2px 6px;min-width:26px}
+.ename{font:700 15px var(--display);background:none;color:var(--ink);padding:0;text-align:left;cursor:pointer}
+span.ename{cursor:default;color:var(--mute)}.ename:hover{text-decoration:underline}span.ename:hover{text-decoration:none}
+.epic .num{color:var(--mute);font-size:12px}.estate{font-size:12px;font-weight:600;white-space:nowrap}
+.epic .av,.eitem .av{width:22px;height:22px;font-size:11px;border-radius:6px;position:static;flex:none}
+.eprog{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute);white-space:nowrap}
+.ebar{width:120px;height:6px;border-radius:3px;background:var(--soft);overflow:hidden}
+.ebar span{display:block;height:100%;background:var(--ok)}
+.ebody{border-top:1px solid var(--line);padding:6px 8px 8px}
+.eitem{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:7px;cursor:pointer}
+.eitem:hover,.eitem:focus-visible{background:var(--soft)}.eitem .ct{flex:1}.eitem .num{color:var(--mute);font-size:12px}
+.eitem .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.eempty{color:var(--mute);font-size:13px;padding:6px 8px;margin:0}
 .addcard button{width:100%;background:none;color:var(--mute);text-align:left;font-weight:500}
 .addcard button:hover{background:var(--soft);color:var(--ink)}
 

@@ -1,5 +1,8 @@
 """A kanban board per project. Every change is announced in the chat by the
-sender "board", which (like an agent) wakes only the names it addresses."""
+sender "board", which (like an agent) wakes only the names it addresses.
+
+A card is a work item or an epic (kind "epic"); an item may belong to one
+epic (its "epic" is the epic's card number). Epics do not nest."""
 import json
 
 from .store import StoreError, now, write_json
@@ -28,7 +31,9 @@ class Board:
 
     def get(self, pid):
         b = self._load(pid)
-        cards = [dict(c, id=int(n)) for n, c in b["cards"].items()]
+        # cards from before epics are items without one
+        cards = [dict(c, id=int(n), kind=c.get("kind", "item"), epic=c.get("epic"))
+                 for n, c in b["cards"].items()]
         return {"columns": [[k, v] for k, v in COLUMNS.items()],
                 "cards": sorted(cards, key=lambda c: c["id"])}
 
@@ -62,6 +67,31 @@ class Board:
         return value
 
     @staticmethod
+    def _kind(kind):
+        if kind not in (None, "item", "epic"):
+            raise StoreError(400, "kind must be item or epic")
+        return kind or "item"
+
+    @staticmethod
+    def _epic(b, epic, kind="item"):
+        """The epic an item joins: None, or the number of an epic card."""
+        if epic in (None, ""):
+            return None
+        if kind == "epic":
+            raise StoreError(400, "an epic cannot belong to another epic")
+        if isinstance(epic, bool) or not isinstance(epic, int):
+            raise StoreError(400, "epic must be a card number")
+        if b["cards"].get(str(epic), {}).get("kind") != "epic":
+            raise StoreError(400, "#%s is not an epic" % epic)
+        return epic
+
+    @staticmethod
+    def _in(b, card):
+        """' in epic #2 "Title"' for an item in an epic, else ''."""
+        e = card.get("epic") and b["cards"].get(str(card["epic"]))
+        return ' in epic #%s "%s"' % (card["epic"], e["title"]) if e else ""
+
+    @staticmethod
     def _column(column):
         if not isinstance(column, str) or column not in COLUMNS:
             raise StoreError(400, "column must be one of: " + ", ".join(COLUMNS))
@@ -69,26 +99,30 @@ class Board:
 
     # changes
 
-    def add(self, pid, by, title, description="", column="todo", assignee=None):
+    def add(self, pid, by, title, description="", column="todo", assignee=None, kind=None, epic=None):
         self._by(pid, by)
-        card = {"title": self._text(title, "title", MAX_TITLE, True),
+        kind = self._kind(kind)
+        card = {"kind": kind, "title": self._text(title, "title", MAX_TITLE, True),
                 "description": self._text(description, "description", MAX_DESCRIPTION),
                 "column": self._column(column or "todo"),
                 "assignee": self._assignee(pid, assignee), "created_by": by, "updated": now()}
         with self.store.changed:
             b = self._load(pid)
+            card["epic"] = self._epic(b, epic, kind)
             n = b["next"]
             b["cards"][str(n)], b["next"] = card, n + 1
             write_json(self._path(pid), b)
-            self.store.notice(pid, '#%d "%s" added by %s (%s)' % (n, card["title"], by,
-                                                                  COLUMNS[card["column"]]))
+            self.store.notice(pid, '%s#%d "%s" added by %s (%s)%s' % (
+                "Epic " if kind == "epic" else "", n, card["title"], by, COLUMNS[card["column"]],
+                self._in(b, card)))
             if card["assignee"] and card["assignee"] not in ("user", by):
                 self.store.notice(pid, '@%s you were assigned #%d "%s" by %s'
                                   % (card["assignee"], n, card["title"], by))
         return dict(card, id=n)
 
-    def update(self, pid, n, by, title=None, description=None, column=None, assignee=False):
-        """assignee=False leaves it; None clears it."""
+    def update(self, pid, n, by, title=None, description=None, column=None, assignee=False,
+               epic=False):
+        """assignee and epic: False leaves them; None clears them."""
         self._by(pid, by)
         with self.store.changed:
             b = self._load(pid)
@@ -104,6 +138,8 @@ class Board:
                 card["column"] = self._column(column)
             if assignee is not False:
                 card["assignee"] = self._assignee(pid, assignee)
+            if epic is not False:
+                card["epic"] = self._epic(b, epic, card.get("kind", "item"))
             if card == old:
                 return dict(card, id=int(n))
             card["updated"] = now()
@@ -115,6 +151,9 @@ class Board:
             if card["column"] != old["column"]:
                 self.store.notice(pid, '%s%s moved #%s "%s" to %s'
                                   % (at, by, n, old["title"], COLUMNS[card["column"]]))
+            if card.get("epic") != old.get("epic"):
+                self.store.notice(pid, '%s%s moved #%s "%s" %s' % (
+                    at, by, n, card["title"], self._in(b, card).strip() or "out of its epic"))
             if (card["title"], card["description"]) != (old["title"], old["description"]):
                 self.store.notice(pid, '%s%s edited #%s "%s"' % (at, by, n, card["title"]))
         return dict(card, id=int(n))
@@ -149,6 +188,9 @@ class Board:
             card = b["cards"].pop(str(n), None)
             if card is None:
                 raise StoreError(404, "no card #%s" % n)
+            for c in b["cards"].values():  # an epic's items stay, without it
+                if c.get("epic") == n:
+                    c["epic"], c["updated"] = None, now()
             write_json(self._path(pid), b)
             to = card["assignee"]
             at = "@%s " % to if to and to not in ("user", by) else ""

@@ -68,6 +68,7 @@ async function refresh(){
     if(cur&&!away()&&atEnd())seen[cur]=lastN(cur);
     saved.set('seen',seen);if(down){say();down=false;}render();
     if(typeof drawBoard==='function'&&!$('boardview').hidden&&boardData)drawBoard(boardData);
+    if(typeof drawEpics==='function'&&!$('epicview').hidden&&boardData)drawEpics(boardData);
   }catch(e){down=true;say('','Cannot reach the agent-chat service: '+e.message+'. Is it running? systemctl --user status agent-chat');}
   finally{busy=false;}
 }
@@ -89,7 +90,9 @@ function render(){
   document.title=(needed.size||answerCount?'● ':'')+(total?`(${total}) `:'')+'agent-chat';
   const p=projects.find(p=>p.id===cur);
   $('name').textContent=p?p.name:'agent-chat';$('path').textContent=p?p.path:'';
-  $('boardcount').textContent=boardData?String(boardData.cards.filter(c=>c.column!=='done').length||''):'';
+  const open=boardData?boardData.cards.filter(c=>c.column!=='done'):[];
+  $('boardcount').textContent=String(open.filter(c=>c.kind!=='epic').length||'');
+  $('epiccount').textContent=String(open.filter(c=>c.kind==='epic').length||'');
   drawNeeds();drawRoster();hint();
   const key=cur+':'+lastN(cur)+':'+query+':'+agents.map(a=>a.name).join();if(key===drawn)return;
   const switched=!drawn.startsWith(cur+':'),end=atEnd(),before=drawn;drawn=key;
