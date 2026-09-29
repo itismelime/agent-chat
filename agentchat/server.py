@@ -186,7 +186,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     data = self.body()
                     sender = store.resolve(pid, self.field(data, "from"))
                     dm = data.get("dm") if sender == "user" else sender if data.get("private") is True else None
-                    m = store.post(pid, sender, self.field(data, "text"), reply=data.get("reply"), dm=dm)
+                    m = store.post(pid, sender, self.field(data, "text"), reply=data.get("reply"), dm=dm,
+                                   ask=data.get("ask") is True)
                     return 201, {"message": m}
                 if what == ["agents"] and method == "GET":
                     return 200, {"agents": store.status(pid), "renames": store.renames(pid)}
@@ -254,6 +255,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                             return 204, None
                         role = store.agents(pid).get(what[1], {}).get("role")
                         return 200, dict(result, personality=role, name=what[1])
+                if len(what) == 3 and what[0] == "agents" and method == "POST" and what[2] == "resume":
+                    return 201, {"spawned": spawner.resume(pid, what[1])}
                 if len(what) == 3 and what[0] == "agents" and method == "POST" \
                         and what[2] in ("remove", "readd", "role", "personality", "forget", "rename"):
                     data = self.body()

@@ -151,10 +151,11 @@ class Store:
         msgs = self.messages(pid)
         return msgs[-1]["n"] if msgs else 0
 
-    def post(self, pid, sender, text, _board=False, reply=None, dm=None):
+    def post(self, pid, sender, text, _board=False, reply=None, dm=None, ask=False):
         """reply: the n of the message this answers; the new message keeps a
         short quote of it, so agents see what is being answered. dm: the agent
-        of a private message, the sender itself or, from the user, its reader."""
+        of a private message, the sender itself or, from the user, its reader.
+        ask: an agent needs the user to answer (shown under Needs an answer)."""
         text = text.strip()
         if not text:
             raise StoreError(400, "empty message")
@@ -176,6 +177,8 @@ class Store:
                  "kind": kind, "text": text}
             if dm is not None:
                 m["dm"] = dm
+            if ask is True and kind not in ("user", "board"):
+                m["ask"] = True
             if reply is not None:
                 q = next((x for x in self.messages(pid, reply - 1) if x["n"] == reply), None)
                 if q is None:
@@ -239,11 +242,18 @@ class Store:
             raise StoreError(400, "thread must be a session id")
         with self.changed:
             agents = self.agents(pid)
-            if name in agents or name in self.renames(pid):
+            # a resumed session (Spawner.resume) takes its own name back
+            back = (name in agents and isinstance(spawn, str)
+                    and self.spawned(pid).get(spawn, {}).get("resume") == name)
+            if back:
+                agents[name].update(gone=False, last_seen=now(),
+                                    thread=thread or agents[name].get("thread"))
+            elif name in agents or name in self.renames(pid):
                 raise StoreError(409, "the name %s is taken in this project; pick another" % name)
-            agents[name] = {"kind": kind, "joined": now(), "last_seen": now(),
-                            "cursor": self._last_n(pid), "removed": False, "notice": None,
-                            "thread": thread}
+            else:
+                agents[name] = {"kind": kind, "joined": now(), "last_seen": now(),
+                                "cursor": self._last_n(pid), "removed": False, "notice": None,
+                                "thread": thread}
             write_json(self._dir(pid) / "agents.json", agents)
             return dict(agents[name], name=name, spawn=self._link(pid, name, kind, spawn))
 

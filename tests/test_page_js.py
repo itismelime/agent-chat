@@ -19,6 +19,14 @@ assert.strictEqual(keys('1. Signing key\n2. Compat'),'');  // a numbered list is
 assert.strictEqual(keys('Plan A is fine'),'');
 assert.strictEqual(keys('A) only one'),'');
 assert.strictEqual(keys('```\nA) in code\nB) too\n```'),'');
+// pending(): only messages that ask something reach Needs an answer
+eval(src.match(/function pending[\s\S]*?\n  return out.sort[^\n]*\n/)[0]+';globalThis.pending=pending');
+globalThis.projects=[{id:'p'}];globalThis.dismissed={};globalThis.current=n=>n;
+globalThis.lead=t=>((t.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0].match(/@[\w-]+/g)||[]).map(x=>x.slice(1).toLowerCase());
+const m=(n,from,text,x)=>Object.assign({n,from,text,time:'t'+n,kind:'claude'},x);
+globalThis.msgs={p:[m(1,'a','@user FYI: done'),m(2,'b','@user Merge? (A) yes (B) no'),
+  m(3,'c','Should I push?',{ask:true}),m(4,'d','private note',{dm:'d'})]};
+assert.deepStrictEqual(pending().map(x=>x.m.n),[2,3]);
 """
 
 

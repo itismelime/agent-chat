@@ -208,6 +208,8 @@ function agentItems(a){
     ['Message '+a.name+' privately',()=>{dmTo=a.name;replyTo=null;t.value='@'+a.name+' ';drawReply();t.focus();grow();}]);
   if(a.spawn){items.push(['View terminal',()=>openTerm(a.spawn,a.starting?a.name+' (starting)':a.name)]);
     items.push(['Stop',()=>{if(confirm(`Stop ${a.name}? Its tmux session ends.`))return api(path(a.spawn,'stop'),{});}]);}
+  if(a.status==='offline'&&!a.spawn&&(a.kind==='claude'||a.kind==='codex'))
+    items.push(['Resume',async()=>{await api(agentPath(a,'resume'),{});return `Resuming ${a.name}…`;}]);
   if(a.starting)return items;
   items.push(['Rename',async()=>{const n=await ask({title:'Rename '+a.name,label:'New name',value:a.name,
     help:"a-z, 0-9 and '-'. Its color, personality and board cards move along, and its running session keeps working."});

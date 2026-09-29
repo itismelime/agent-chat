@@ -16,7 +16,8 @@ CHAT = Path(__file__).resolve().parent.parent / "bin" / "chat"
 TOOLS = [
     {"name": "chat_join",
      "description": "Join this project's chat under a short name you choose "
-                    "(a-z, 0-9, '-'). Once per session.",
+                    "(a-z, 0-9, '-') that says your role or persona, like architect, reviewer "
+                    "or tester, not your model or tool. Once per session.",
      "inputSchema": {"type": "object", "required": ["name"],
                      "properties": {"name": {"type": "string"},
                                     "spawn": {"type": "string",
@@ -25,9 +26,12 @@ TOOLS = [
     {"name": "chat_post",
      "description": "Post to the project chat. Start with @name to address someone. private: true "
                     "sends it to the user alone (a direct message the other agents never see); use it "
-                    "for questions or reports meant only for the user, and to answer their private messages.",
+                    "for questions or reports meant only for the user, and to answer their private messages. "
+                    "ask: true when the user has to answer or decide something before you can go on; "
+                    "leave it out for reports and updates, which the user reads without replying.",
      "inputSchema": {"type": "object", "required": ["text"],
-                     "properties": {"text": {"type": "string"}, "private": {"type": "boolean"}}}},
+                     "properties": {"text": {"type": "string"}, "private": {"type": "boolean"},
+                                    "ask": {"type": "boolean"}}}},
     {"name": "chat_rename",
      "description": "Change your name in the chat. Your color, personality, board cards and unread "
                     "messages move with you; messages you already posted keep the old name.",
@@ -55,6 +59,13 @@ TOOLS = [
                                     "description": {"type": "string"}}}},
 ]
 BOARD_TOOLS = ("board_list", "board_add", "board_update")
+# what the page does with a message, so agents write for it
+FORMAT = (" The page renders messages as Markdown: put code, commands and logs in fenced code "
+          "blocks (```lang), and use lists and tables where they help. A file path in the project "
+          "opens in a viewer when clicked. Lines like \"A) …\" \"B) …\" (or \"Option 1: …\") "
+          "become answer buttons for the user. Post with ask: true only when the user has to answer "
+          "or decide; reports and updates go without it. Use private: true for things only the user "
+          "should see.")
 
 
 def kind_of(client_name):
@@ -86,23 +97,23 @@ class Session:
             return None
         if self.kind == "opencode":
             return ("This project (%s) has a shared chat with the user and other agents. "
-                    "Call chat_join with a short name you pick for yourself; chat messages "
+                    "Call chat_join with a short name for your role or persona (architect, reviewer, tester…; not your model or tool); chat messages "
                     "for you are then typed into this session as they arrive. Reply with "
                     "chat_post if a message is for you. A message without @ is for everyone; "
-                    "with @names only those reply. Keep replies short." % self.project["name"])
+                    "with @names only those reply. Keep replies short." % self.project["name"] + FORMAT)
         if self.kind == "codex":
             return ("This project (%s) has a shared chat with the user and other agents. "
-                    "Call chat_join with a short name you pick for yourself (and, if your first "
+                    "Call chat_join with a short name for your role or persona (architect, reviewer, tester…; not your model or tool) (and, if your first "
                     "prompt said \"(start <code>)\", that code as spawn); chat messages "
                     "for you are then delivered into this session as they arrive. Reply with "
                     "chat_post if a message is for you. A message without @ is for everyone; "
-                    "with @names only those reply. Keep replies short." % self.project["name"])
+                    "with @names only those reply. Keep replies short." % self.project["name"] + FORMAT)
         return ("This project (%s) has a shared chat with the user and other agents. "
-                "Call chat_join with a short name you pick for yourself, then keep the wait "
+                "Call chat_join with a short name for your role or persona (architect, reviewer, tester…; not your model or tool), then keep the wait "
                 "command it gives you running as a background command. When the wait exits, "
                 "a message arrived: read its output, reply with chat_post if it is for you, "
                 "and start the wait again. A message without @ is for everyone; with @names "
-                "only those reply. Keep replies short." % self.project["name"])
+                "only those reply. Keep replies short." % self.project["name"] + FORMAT)
 
     def tools(self):
         if not self.project:
@@ -179,7 +190,7 @@ class Session:
                 elif self.kind != "codex":
                     how = ("Run this as a background command now, and again each time it "
                            "exits:\n%s" % self.wait_command())
-                elif join["thread"]:
+                elif body["agent"].get("thread"):
                     how = ("Chat messages for you are delivered into this session as they "
                            "arrive; reply with chat_post.")
                 else:
@@ -207,7 +218,8 @@ class Session:
             if tool == "chat_post":
                 m = self.client.call("POST", "/api/projects/%s/messages" % pid,
                                      {"from": self.name, "text": str(args.get("text", "")),
-                                      "private": args.get("private") is True})[1]
+                                      "private": args.get("private") is True,
+                                      "ask": args.get("ask") is True})[1]
                 return "posted #%d%s" % (m["message"]["n"], self.reminder()), False
             msgs = self.client.call("GET", self.client.agent_path(pid, self.name, "read"))[1]
             text = "\n".join("%s  (%s)" % (fmt(m), label(m, self.name))

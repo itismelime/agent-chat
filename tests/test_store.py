@@ -78,6 +78,12 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(len(raw.splitlines()), 1)
         self.assertEqual(self.store.messages(self.pid)[0]["text"], "line one\nline två ✓")
 
+    def test_ask_marks_only_agent_messages(self):
+        self.store.join(self.pid, "alice", "claude")
+        self.assertTrue(self.store.post(self.pid, "alice", "@user A or B?", ask=True)["ask"])
+        self.assertNotIn("ask", self.store.post(self.pid, "alice", "@user done"))
+        self.assertNotIn("ask", self.store.post(self.pid, "user", "hi", ask=True))
+
     def test_concurrent_posts_get_unique_numbers(self):
         threads = [threading.Thread(target=self.store.post, args=(self.pid, "user", str(i))) for i in range(20)]
         for t in threads:

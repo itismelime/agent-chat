@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 import time
 import unittest
@@ -284,6 +285,51 @@ class SpawnerTest(unittest.TestCase):
         (self.d / "norename").touch()
         self.sp.linked("proj", r2["token"], "alice")  # name clash in tmux: keeps its old name
         self.assertEqual(self.store.spawned("proj")[r2["token"]]["session"], r2["session"])
+
+    def test_resume_an_offline_agent(self):
+        home = Path(tempfile.mkdtemp())
+        old, os.environ["HOME"] = os.environ["HOME"], str(home)
+        self.addCleanup(os.environ.__setitem__, "HOME", old)
+        path = self.store.project("proj")["path"]
+        logs = home / ".claude" / "projects" / re.sub(r"[^A-Za-z0-9]", "-", path)
+        logs.mkdir(parents=True)
+        (logs / "s-alice.jsonl").write_text('{"name":"mcp__agent-chat__chat_join","input":{"name":"alice"}}\n')
+        (logs / "s-bob.jsonl").write_text('{"name":"mcp__agent-chat__chat_join","input":{"name":"bob"}}\n')
+        self.store.join("proj", "alice", "claude")
+        with self.assertRaises(StoreError) as e:  # just joined: not offline
+            self.sp.resume("proj", "alice")
+        self.assertEqual(e.exception.code, 409)
+        self.store._update("proj", "alice", gone=True)
+        r = self.sp.resume("proj", "alice")
+        self.assertIn("-- claude --resume s-alice You are back in the chat: call chat_join with "
+                      "the name alice", calls(self.d)[-1])
+        with self.assertRaises(StoreError) as e:  # its resumed terminal is there
+            self.sp.resume("proj", "alice")
+        self.assertEqual(e.exception.code, 409)
+        with self.assertRaises(StoreError) as e:  # only its own start takes the name back
+            self.store.join("proj", "alice", "claude")
+        self.assertEqual(e.exception.code, 409)
+        a = self.store.join("proj", "alice", "claude", spawn=r["token"])
+        self.assertEqual(a["spawn"], r["token"])
+        self.assertEqual([(x["name"], x["status"]) for x in self.store.status("proj")],
+                         [("alice", "busy")])
+        # Codex resumes its recorded thread and keeps it
+        self.store.join("proj", "cody", "codex", thread="t-1")
+        self.store._update("proj", "cody", gone=True)
+        r = self.sp.resume("proj", "cody")
+        self.assertIn("-- codex resume t-1 You are back", calls(self.d)[-1])
+        self.assertIn("(start %s)" % r["token"], calls(self.d)[-1])
+        self.assertEqual(self.store.join("proj", "cody", "codex", spawn=r["token"])["thread"], "t-1")
+        self.store.join("proj", "dora", "claude")  # no session log names her
+        self.store._update("proj", "dora", gone=True)
+        with self.assertRaises(StoreError) as e:
+            self.sp.resume("proj", "dora")
+        self.assertEqual(e.exception.code, 404)
+
+    def test_a_personality_asks_for_a_fitting_name(self):
+        self.sp.start("proj", "claude", personality="finds bugs")
+        self.assertTrue(calls(self.d)[-1].endswith(
+            "-- claude join the chat with a name that fits your personality: finds bugs"))
 
     def test_stop_even_when_already_gone(self):
         r = self.sp.start("proj", "claude")

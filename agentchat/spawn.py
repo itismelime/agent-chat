@@ -3,6 +3,7 @@
 tmux is always called with an argument list, never through a shell, so a
 project path or typed text cannot run anything.
 """
+import json
 import re
 import secrets
 import shutil
@@ -11,6 +12,7 @@ import sys
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 
 from .store import StoreError, wakes
 
@@ -54,8 +56,33 @@ def available():
     return {t: shutil.which(t) is not None for t in ("tmux",) + TOOLS}
 
 
-def start(tool, path, session, token, model=None, config_home=None, data_home=None):
-    """Start the tool with the prompt "join the chat" in a detached tmux session."""
+def claude_session(path, name, home=None):
+    """The id of the Claude Code session in this project that took the chat
+    name: the newest session log under ~/.claude/projects whose chat_join or
+    chat_rename set it. None if there is none."""
+    # ponytail: a name set with `chat rename` from a shell is not found; the
+    # MCP tools are what agents use.
+    root = Path(home or Path.home()) / ".claude" / "projects"
+    slug = re.sub(r"[^A-Za-z0-9]", "-", str(path))
+    needles = ['"name":"mcp__agent-chat__chat_%s","input":{"name":%s' % (tool, json.dumps(name))
+               for tool in ("join", "rename")]
+    best = None
+    for d in root.glob(slug + "*"):  # the folder and its subfolders
+        for f in d.glob("*.jsonl"):
+            try:
+                mtime = f.stat().st_mtime
+                if (best is None or mtime > best[0]) and any(n in f.read_text(errors="replace")
+                                                              for n in needles):
+                    best = (mtime, f.stem)
+            except OSError:
+                continue
+    return best[1] if best else None
+
+
+def start(tool, path, session, token, model=None, config_home=None, data_home=None,
+          resume=None, name=None, personality=None):
+    """Start the tool with the prompt "join the chat" in a detached tmux session;
+    with resume (a session id), continue that session and rejoin as name."""
     if tool not in TOOLS:
         raise StoreError(400, "tool must be one of: " + ", ".join(TOOLS))
     if tool == "opencode" and not model:
@@ -72,10 +99,17 @@ def start(tool, path, session, token, model=None, config_home=None, data_home=No
         env += ["-e", "OPENCODE_DISABLE_CLAUDE_CODE=1", "-e", "OPENCODE_CONFIG=",
                 "-e", "OPENCODE_CONFIG_DIR=", "-e", "OPENCODE_CONFIG_CONTENT="]
         command = ["opencode", "-m", "ac/" + model, "--prompt", PROMPT]
+    elif resume:
+        prompt = ("You are back in the chat: call chat_join with the name %s, then carry on "
+                  "as before." % name)
+        command = (["claude", "--resume", resume, prompt] if tool == "claude"
+                   else ["codex", "resume", resume, "%s (start %s)" % (prompt, token)])
     else:
         # Codex's MCP servers are started by its app-server daemon and do not see
         # AGENT_CHAT_SPAWN, so Codex gets the token in its prompt for chat_join.
-        command = [tool, PROMPT if tool == "claude" else "%s (start %s)" % (PROMPT, token)]
+        prompt = PROMPT + (" with a name that fits your personality: %s" % personality
+                           if personality else "")
+        command = [tool, prompt if tool == "claude" else "%s (start %s)" % (prompt, token)]
     r = tmux("new-session", "-d", "-s", session, "-c", path, *env, "--", *command)
     if r.returncode:
         raise StoreError(503, "tmux could not start it: %s" % r.stderr.strip())
@@ -174,11 +208,34 @@ class Spawner:
             opencode.write_config(self.store.root, self.models.ollama.url, usable, self.port)
             home = str(opencode.config_home(self.store.root))
         data = str(opencode.data_home(self.store.root)) if tool == "opencode" else None
-        start(tool, project["path"], session, token, model=model, config_home=home, data_home=data)
+        start(tool, project["path"], session, token, model=model, config_home=home, data_home=data,
+              personality=personality)
         record = self.store.add_spawned(pid, token, tool, session, personality)
         if model:
             record = self.store.update_spawned(pid, token, model=model)
         return record
+
+    def resume(self, pid, name):
+        """Continue an offline Claude or Codex agent's own session in tmux; it
+        rejoins under its name, so it then has View terminal and Stop."""
+        project, agent = self.store.project(pid), self.store._agent(pid, name)
+        if any(name in (r["name"], r.get("resume")) for r in self.store.spawned(pid).values()):
+            raise StoreError(409, "%s already has a terminal here; use View terminal" % name)
+        if any(a["name"] == name and a["status"] != "offline" for a in self.store.status(pid)):
+            raise StoreError(409, "%s is not offline" % name)
+        if agent["kind"] == "claude":
+            sid = claude_session(project["path"], name)
+        elif agent["kind"] == "codex":
+            sid = agent.get("thread")
+        else:
+            raise StoreError(400, "only Claude and Codex agents can be resumed")
+        if not sid:
+            raise StoreError(404, "no session of %s found to resume" % name)
+        token = secrets.token_hex(16)
+        session = "agent-chat-%s-%s" % (pid, token[:6])
+        start(agent["kind"], project["path"], session, token, resume=sid, name=name)
+        self.store.add_spawned(pid, token, agent["kind"], session)
+        return self.store.update_spawned(pid, token, resume=name)
 
     def record(self, pid, token):
         records = self.store.spawned(pid)
