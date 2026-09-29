@@ -420,7 +420,9 @@ class ModelRoutesTest(unittest.TestCase):
                                     ("format.js", b"function wrap", "text/javascript"),
                                     ("rules.js", b"function loadRules", "text/javascript"),
                                     ("reactions.js", b"function reactRow", "text/javascript"),
-                                    ("favicon.svg", b"<svg", "image/svg+xml")]:
+                                    ("favicon.svg", b"<svg", "image/svg+xml"),
+                                    ("emoji.js", b"function openPicker", "text/javascript"),
+                                    ("emoji-data.js", "🚀".encode(), "text/javascript")]:
             conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
             conn.request("GET", "/" + name)
             r = conn.getresponse()

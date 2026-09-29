@@ -31,7 +31,8 @@ ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "te
           "board.js": "text/javascript", "marked.js": "text/javascript",
           "markdown.js": "text/javascript", "answers.js": "text/javascript",
           "format.js": "text/javascript", "rules.js": "text/javascript",
-          "reactions.js": "text/javascript"}
+          "reactions.js": "text/javascript", "emoji-data.js": "text/javascript",
+          "emoji.js": "text/javascript"}
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 MAX_FILE = 5_000_000

@@ -11,4 +11,5 @@ function reactRow(m){  // chips under a message: emoji and count; yours are mark
     b.title=who.map(w=>w==='user'?'you':current(w)).join(', ');b.setAttribute('aria-pressed',String(who.includes('user')));
     row.append(b);}
   return row;}
-function pickReaction(ev,m){openMenu(ev,REACTIONS.map(e=>[e,()=>react(m,e)]));menu.classList.add('emojis');}
+function pickReaction(ev,m){const at=ev.target;
+  openMenu(ev,[...REACTIONS.map(e=>[e,()=>react(m,e)]),['…',()=>openPicker(at,e=>react(m,e))]]);menu.classList.add('emojis');}
