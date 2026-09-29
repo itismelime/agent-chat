@@ -411,7 +411,8 @@ class ModelRoutesTest(unittest.TestCase):
                                     ("marked.js", b"marked", "text/javascript"),
                                     ("markdown.js", b"function renderText", "text/javascript"),
                                     ("answers.js", b"function drawAnswers", "text/javascript"),
-                                    ("format.js", b"function wrap", "text/javascript")]:
+                                    ("format.js", b"function wrap", "text/javascript"),
+                                    ("rules.js", b"function loadRules", "text/javascript")]:
             conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
             conn.request("GET", "/" + name)
             r = conn.getresponse()

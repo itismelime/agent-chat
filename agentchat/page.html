@@ -19,7 +19,8 @@
 <button id=viewepics type=button role=tab>Epics <span id=epiccount></span></button></div>
 <input id=search type=search placeholder="Search messages" aria-label="Search messages">
 <button id=answerchip class=ghost type=button hidden title="Show the questions (Alt+N)"></button>
-<button id=bell class=ghost type=button hidden>Enable notifications</button>
+<button id=rulesbtn class=ghost type=button title="Rules every agent in this project follows">Rules <span id=rulecount></span></button>
+<button id=bell class=ghost type=button hidden title="Enable notifications">Notifications</button>
 <button id=rosterbtn class=ghost type=button>Agents</button>
 <button id=keys class=icon type=button title="Shortcuts and commands (?)" aria-label="Shortcuts and commands">?</button>
 </header>
@@ -80,6 +81,15 @@
 <div class=row><span></span><button type=button value=close class=ghost>Cancel</button><button id=askok value=ok>OK</button></div>
 </form></dialog>
 
+<dialog id=rulespanel aria-label=Rules>
+<div class=top><h2>Rules for <span id=rulesproj></span></h2><button class=icon type=button value=close aria-label=Close>×</button></div>
+<p class=rhelp>Every agent in this project gets these when it joins and with every message that wakes it. Changes show in the chat.</p>
+<p id=rulenone class=rhelp>No rules yet.</p>
+<ol id=rulelist></ol>
+<form id=ruleadd><textarea id=ruletext rows=2 maxlength=500 aria-label="New rule"
+placeholder="A new rule, e.g. When you mention a PR by number, link to it"></textarea>
+<div class=row><span></span><button type=submit>Add rule</button></div></form></dialog>
+
 <dialog id=cardpanel aria-label=Card>
 <div class=top><h2 id=cardtitle></h2><button class=icon type=button value=close aria-label=Close>×</button></div>
 <input id=ctitle maxlength=200 placeholder=Title aria-label=Title>
@@ -113,3 +123,4 @@
 <script src=models.js></script>
 <script src=board.js></script>
 <script src=format.js></script>
+<script src=rules.js></script>

@@ -172,12 +172,13 @@ def working(text):
     return bool(WORKING.search("\n".join(text.rstrip().splitlines()[-SCREEN_LINES:])))
 
 
-def format_message(m, name, personality=None):
+def format_message(m, name, personality=None, rules=""):
     """One line to type into an OpenCode agent's terminal."""
     from .client import label
     who = (" Your personality: %s." % re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", personality).rstrip(".")
            if personality else "")
-    tail = " (%s)%s Reply with chat_post." % (label(m, name), who)
+    tail = " (%s)%s%s Reply with chat_post." % (
+        label(m, name), who, " " + re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", rules) if rules else "")
     # typed as keystrokes into a coding agent: no control characters, which
     # could erase the "[chat]" prefix, interrupt it, or start a "!" shell line
     text = re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", m["text"].replace("\r", "").replace("\n", " / "))
@@ -345,7 +346,9 @@ class Spawner:
             return state == "question"
         unread = [m for m in self.store.messages(pid, agent["cursor"]) if wakes(m, name)]
         if state == "idle" and unread:
-            send_text(r["session"], format_message(unread[0], name, agent.get("role")))
+            from . import rules
+            send_text(r["session"], format_message(unread[0], name, agent.get("role"),
+                                                   rules.summary(rules.get(self.store, pid))))
             self.store.delivered(pid, name, unread[0]["n"])
         self.store.set_local(pid, name, busy=state != "idle" or bool(unread))
         return state == "question"

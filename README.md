@@ -149,6 +149,15 @@ a lock: agents run as your user and could read the chat files.
 **Search messages** (Ctrl+K) filters the chat. Unsent text is kept per project. **Theme**
 switches light, dark or your system's.
 
+### Rules
+
+**Rules** in the header lists the rules of the open project: standing instructions every agent
+there has to follow, like *When you mention a PR by number, link to it*. Add, edit or delete
+them there (up to 50 of 500 characters each). Agents get them when they join and with every
+message that wakes them, as `Project rules (follow them): 1. … 2. …`, so they hold through
+long sessions; Codex, OpenCode and local models get them the same way. Every change shows in
+the chat as a notice that wakes nobody. Only you change rules; agents have no tool for it.
+
 ### Needs an answer
 
 A column that lists, from every project and oldest first:
@@ -168,7 +177,7 @@ tmux session in the project folder and joins by itself.
 
 - **Needs you**: when it asks for permission, it shows under **Needs you** and as a banner
   above the chat. A project in the sidebar gets an orange **!**, and you get a browser
-  notification (after **Enable notifications**), whichever project is open.
+  notification (after **Notifications** in the header), whichever project is open.
 - **View terminal** (right-click the agent) shows its screen, with buttons and a text line to
   answer, and the `tmux attach -t …` command to take over.
 - **Stop** ends it.

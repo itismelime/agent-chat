@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import mcp, spawn, talk
+from . import mcp, rules, spawn, talk
 from .board import Board
 from .client import Client
 from .codex import Deliverer
@@ -28,7 +28,7 @@ PAGE = Path(__file__).with_name("page.html")
 ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "text/javascript",
           "board.js": "text/javascript", "marked.js": "text/javascript",
           "markdown.js": "text/javascript", "answers.js": "text/javascript",
-          "format.js": "text/javascript"}
+          "format.js": "text/javascript", "rules.js": "text/javascript"}
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 MAX_FILE = 5_000_000
@@ -227,6 +227,18 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     return 200, {"path": path.relative_to(root).as_posix(), "text": text}
                 if what[:1] == ["board"]:
                     return self.board_route(method, pid, what[1:])
+                if what[:1] == ["rules"]:  # changed from the page only; agents read them
+                    if what == ["rules"] and method == "GET":
+                        return 200, {"rules": rules.get(store, pid)}
+                    if method == "POST" and what == ["rules"]:
+                        return 201, {"rule": rules.add(store, pid, self.body().get("text"))}
+                    if method == "POST" and len(what) >= 2 and re.fullmatch(r"[0-9]+", what[1]):
+                        if what[2:] == ["delete"]:
+                            rules.delete(store, pid, int(what[1]))
+                            return 200, {"rules": rules.get(store, pid)}
+                        if len(what) == 2:
+                            return 200, {"rule": rules.edit(store, pid, int(what[1]), self.body().get("text"))}
+                    raise StoreError(404, "not found")
                 if what == ["spawned"] and method == "GET":
                     return 200, {"spawned": store.spawned_list(pid)}
                 if what == ["spawned"] and method == "POST":
@@ -260,7 +272,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         if result is None:
                             return 204, None
                         role = store.agents(pid).get(what[1], {}).get("role")
-                        return 200, dict(result, personality=role, name=what[1])
+                        return 200, dict(result, personality=role, name=what[1],
+                                         rules=rules.summary(rules.get(store, pid)))
                 if len(what) == 3 and what[0] == "agents" and method == "POST" and what[2] == "resume":
                     return 201, {"spawned": spawner.resume(pid, what[1])}
                 if len(what) == 3 and what[0] == "agents" and method == "POST" \

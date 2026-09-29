@@ -363,7 +363,8 @@ $('add').onclick=async()=>{
 function bellLabel(){
   if(!window.Notification){bell.hidden=true;return;}
   bell.hidden=Notification.permission==='granted';
-  bell.textContent=Notification.permission==='denied'?'Notifications blocked':'Enable notifications';}
+  bell.textContent=Notification.permission==='denied'?'Blocked':'Notifications';  // short: the header also has Rules
+  bell.title=Notification.permission==='denied'?'Notifications are blocked in this browser':'Enable notifications';}
 bell.onclick=async()=>{await Notification.requestPermission();bellLabel();};bellLabel();
 addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
 const THEMES=['auto','light','dark'];let theme=saved.get('theme','auto');

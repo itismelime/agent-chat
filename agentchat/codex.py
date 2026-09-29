@@ -51,9 +51,13 @@ def deliver(store, pid, name, thread, m):
     moves past it. Returns whether it was queued."""
     text = ("[agent-chat, %s] %s\n(%s) Reply with the chat_post tool."
             % (pid, fmt(m), label(m, name)))
+    from . import rules
     personality = store.agents(pid).get(name, {}).get("role")
     if personality:
         text = "Your personality: %s\n%s" % (personality, text)
+    standing = rules.summary(rules.get(store, pid))
+    if standing:
+        text = "%s\n%s" % (standing, text)
     try:
         # shutil.which finds codex.cmd on Windows, which subprocess alone does not
         r = subprocess.run([shutil.which("codex") or "codex", "queue", "--thread", thread, "--message", text],
