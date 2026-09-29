@@ -2,16 +2,36 @@
 
 Outside a registered project it offers no tools and no instructions, so the
 agent never notices it. Messages are newline-delimited JSON-RPC.
+
+The process an agent runs is a Relay: the tools, instructions and tool logic
+(Session) run in the service, so an updated service reaches sessions that are
+already running; the relay announces it with tools/list_changed.
 """
+import hashlib
 import json
 import os
 import sys
+import threading
+import time
 from pathlib import Path
 
 from .client import ApiError, Client, ServiceDown, fmt, label
 from .codex import find_thread
 
 CHAT = Path(__file__).resolve().parent.parent / "bin" / "chat"
+# changes with this file: running relays then tell their agent to fetch the tools again
+VERSION = hashlib.sha1(Path(__file__).read_bytes()).hexdigest()[:12]
+WATCH_SECONDS = 30
+# posted to every chat once when it changes (update it with what agents should learn)
+NEWS = ("agent-chat was updated. For agents: the board has epics (board_add with kind \"epic\", "
+        "or epic: <number> to put an item in one; board_update epic moves an item, 0 takes it out; "
+        "board_list shows each epic's progress). Post with ask: true only when the user has to "
+        "answer or decide; only those reach the user's Needs an answer. The page renders Markdown: "
+        "code goes in fenced blocks, and lines like A) B) become answer buttons. Your chat tools "
+        "refresh by themselves; a session from before this update gets them when it restarts.")
+DOWN = ("The agent-chat service is not running, so this project's chat is unavailable "
+        "(%s; the chat tools work once it runs)." % (
+            "schtasks /run /tn agent-chat" if os.name == "nt" else "systemctl --user start agent-chat"))
 
 TOOLS = [
     {"name": "chat_join",
@@ -97,10 +117,7 @@ class Session:
 
     def instructions(self):
         if self.down:
-            return ("The agent-chat service is not running, so this project's chat is "
-                    "unavailable (%s, then restart the session)." % (
-                        "schtasks /run /tn agent-chat" if os.name == "nt"
-                        else "systemctl --user start agent-chat"))
+            return DOWN
         if not self.project:
             return None
         if self.kind == "opencode":
@@ -261,10 +278,11 @@ def handle(session, req):
         if session.kind == "opencode" and not session.spawn_token:
             session.kind = "llm"  # started by hand, not by the page: nothing types into it
         result = {"protocolVersion": params.get("protocolVersion", "2025-06-18"),
-                  "capabilities": {"tools": {}},
+                  "capabilities": {"tools": {"listChanged": True}},
                   "serverInfo": {"name": "agent-chat", "version": "1"}}
-        if session.instructions():
-            result["instructions"] = session.instructions()
+        instructions = session.instructions()
+        if instructions:
+            result["instructions"] = instructions
     elif method == "tools/list":
         result = {"tools": session.tools()}
     elif method == "tools/call":
@@ -280,8 +298,101 @@ def handle(session, req):
     return {"jsonrpc": "2.0", "id": rid, "result": result}
 
 
+def serve_request(client, data):
+    """The service's side of a Relay: one op of one agent session, rebuilt from
+    what the relay keeps (so a service restart loses nothing)."""
+    from .store import StoreError
+    if not isinstance(data.get("cwd"), str):
+        raise StoreError(400, "cwd must be a path")
+    spawn = data.get("spawn") if isinstance(data.get("spawn"), str) else None
+    thread = data.get("thread") if isinstance(data.get("thread"), str) else None
+    s = Session(client, data["cwd"], find_thread=lambda: thread, spawn_token=spawn)
+    s.kind = data.get("kind") if data.get("kind") in ("claude", "codex", "opencode", "llm") else "llm"
+    s.name = data.get("name") if isinstance(data.get("name"), str) else None
+    op = data.get("op")
+    if op == "init":
+        return {"instructions": s.instructions(), "version": VERSION}
+    if op == "tools":
+        return {"tools": s.tools(), "version": VERSION}
+    if op == "call":
+        text, err = s.call(data.get("tool"), data.get("args", {}))
+        return {"text": text, "isError": err, "name": s.name, "version": VERSION}
+    raise StoreError(400, "op must be init, tools or call")
+
+
+class Relay:
+    """The session in the agent's MCP process: it keeps the agent's name (and a
+    Codex thread) and asks the service (serve_request) for everything else."""
+
+    def __init__(self, client, cwd, find_thread=find_thread, spawn_token=None):
+        self.client, self.cwd, self.find_thread = client, cwd, find_thread
+        self.spawn_token, self.kind, self.name, self.thread = spawn_token, "llm", None, None
+        self.version = None  # of the tools the agent last listed; "" when that failed
+
+    def _ask(self, op, **data):
+        return self.client.call("POST", "/api/mcp", dict(
+            data, op=op, cwd=self.cwd, kind=self.kind, name=self.name,
+            spawn=self.spawn_token, thread=self.thread))[1]
+
+    def instructions(self):
+        try:
+            return self._ask("init")["instructions"]
+        except ServiceDown:
+            return DOWN
+        except ApiError:
+            return None
+
+    def tools(self):
+        try:
+            body = self._ask("tools")
+        except (ApiError, ServiceDown):
+            self.version = ""  # listed nothing: announce the tools once the service answers
+            return []
+        self.version = body["version"]
+        return body["tools"]
+
+    def call(self, tool, args):
+        if tool == "chat_join" and self.kind == "codex" and not self.thread:
+            self.thread = self.find_thread()  # this process's parent, so found here
+        try:
+            body = self._ask("call", tool=tool, args=args if isinstance(args, dict) else None)
+        except (ApiError, ServiceDown) as e:
+            return str(e), True
+        self.name = body["name"]
+        return body["text"], body["isError"]
+
+    def changed(self):
+        """Whether the service's tools differ from those the agent last listed.
+        After a True, stays False until the agent lists them again."""
+        if self.version is None:
+            return False
+        try:
+            now = self.client.call("GET", "/api/mcp/version", timeout=5)[1]["version"]
+        except (ApiError, ServiceDown, KeyError, TypeError):
+            return False
+        if now == self.version:
+            return False
+        self.version = None
+        return True
+
+
+def watch(session, write, every=WATCH_SECONDS):
+    while True:
+        time.sleep(every)
+        if session.changed():
+            write({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"})
+
+
 def main():
-    session = Session(Client(), os.getcwd(), spawn_token=os.environ.get("AGENT_CHAT_SPAWN"))
+    session = Relay(Client(), os.getcwd(), spawn_token=os.environ.get("AGENT_CHAT_SPAWN"))
+    lock = threading.Lock()
+
+    def write(msg):
+        with lock:
+            sys.stdout.write(json.dumps(msg) + "\n")
+            sys.stdout.flush()
+
+    threading.Thread(target=watch, args=(session, write), daemon=True).start()
     for raw in sys.stdin:
         if not raw.strip():
             continue
@@ -292,5 +403,4 @@ def main():
             print("agent-chat mcp: %s" % e, file=sys.stderr)
             continue
         if reply:
-            sys.stdout.write(json.dumps(reply) + "\n")
-            sys.stdout.flush()
+            write(reply)

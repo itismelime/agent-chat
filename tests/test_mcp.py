@@ -1,7 +1,10 @@
 import unittest
 
 from agentchat.client import Client
-from agentchat.mcp import Session, handle, kind_of
+from agentchat import mcp
+from agentchat.client import ApiError
+from agentchat.mcp import Relay, Session, handle, kind_of
+from agentchat.server import announce_update
 from tests.helpers import start, stop
 
 
@@ -193,3 +196,70 @@ class McpTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RelayTest(unittest.TestCase):
+    """The agent's MCP process relays to the service, which runs the Session."""
+
+    def setUp(self):
+        self.store, self.server, self.port, self.tmp = start(wait_seconds=1)
+        self.addCleanup(stop, self.server)
+        self.dir = self.tmp / "proj"
+        self.dir.mkdir()
+        self.store.add_project(str(self.dir))
+        self.r = Relay(Client(self.port), str(self.dir))
+        self.init = rpc(self.r, "initialize", {"clientInfo": {"name": "claude-code"}})["result"]
+
+    def test_everything_comes_from_the_service(self):
+        self.assertEqual(self.init["capabilities"], {"tools": {"listChanged": True}})
+        self.assertIn("This project (proj) has a shared chat", self.init["instructions"])
+        names = [t["name"] for t in rpc(self.r, "tools/list")["result"]["tools"]]
+        self.assertEqual(names[:2], ["chat_join", "chat_post"])
+        self.assertEqual(tool(self.r, "chat_post", {"text": "x"}), ("call chat_join first", True))
+        text, err = tool(self.r, "chat_join", {"name": "alice"})
+        self.assertFalse(err, text)
+        self.assertEqual(self.r.name, "alice")  # kept here, sent with every call
+        self.assertFalse(tool(self.r, "chat_post", {"text": "hi"})[1])
+        self.assertEqual(self.store.messages("proj")[-1]["from"], "alice")
+        self.assertIn("added epic #1", tool(self.r, "board_add", {"title": "E", "kind": "epic"})[0])
+
+    def test_announces_new_tools_once(self):
+        self.assertFalse(self.r.changed())  # nothing listed yet
+        rpc(self.r, "tools/list")
+        self.assertFalse(self.r.changed())
+        old, mcp.VERSION = mcp.VERSION, "newer"
+        self.addCleanup(setattr, mcp, "VERSION", old)
+        self.assertTrue(self.r.changed())
+        self.assertFalse(self.r.changed())  # until the agent lists them again
+        rpc(self.r, "tools/list")
+        self.assertEqual(self.r.version, "newer")
+
+    def test_service_down(self):
+        r = Relay(Client(1), str(self.dir))
+        self.assertEqual(r.instructions(), mcp.DOWN)
+        self.assertEqual(r.tools(), [])
+        self.assertEqual(r.version, "")  # so the tools are announced once it runs
+        self.assertTrue(tool(r, "chat_join", {"name": "a"})[1])
+
+    def test_codex_thread_is_found_by_the_relay(self):
+        r = Relay(Client(self.port), str(self.dir), find_thread=lambda: "t-42")
+        rpc(r, "initialize", {"clientInfo": {"name": "codex-mcp-client"}})
+        self.assertFalse(tool(r, "chat_join", {"name": "cody"})[1])
+        self.assertEqual(self.store.agents("proj")["cody"]["thread"], "t-42")
+
+    def test_bad_requests(self):
+        c = Client(self.port)
+        for body in ({"op": "init"}, {"op": "x", "cwd": str(self.dir)}):
+            with self.assertRaises(ApiError) as e:
+                c.call("POST", "/api/mcp", body)
+            self.assertEqual(e.exception.code, 400)
+
+    def test_update_note_once_per_news(self):
+        announce_update(self.store)
+        announce_update(self.store)
+        notes = [m["text"] for m in self.store.messages("proj") if m["from"] == "board"]
+        self.assertEqual(notes, [mcp.NEWS])
+        old, mcp.NEWS = mcp.NEWS, "agent-chat was updated: something else."
+        self.addCleanup(setattr, mcp, "NEWS", old)
+        announce_update(self.store)
+        self.assertEqual(len([m for m in self.store.messages("proj") if m["from"] == "board"]), 2)
