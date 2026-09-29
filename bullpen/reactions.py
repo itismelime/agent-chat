@@ -5,7 +5,13 @@ import json
 
 from .store import StoreError, write_json
 
-REACTIONS = ("👍", "✅", "👀", "❤️", "🎉", "🙏", "😄", "👎")
+REACTIONS = ("👍", "✅", "👀", "❤️", "🎉", "🙏", "😄", "👎")  # the quick row; any emoji works
+
+
+def is_emoji(text):
+    """One emoji, possibly joined (👩‍💻) or with a variation selector: nothing below
+    U+200D (so no letters, digits or spaces) and at most 16 code points."""
+    return isinstance(text, str) and 0 < len(text) <= 16 and all(ord(c) >= 0x200D for c in text)
 
 
 def _path(store, pid):
@@ -23,8 +29,8 @@ def get(store, pid):
 
 def toggle(store, pid, n, who, emoji):
     """Add who's emoji to message n, or take it off again. Returns n's reactions."""
-    if emoji not in REACTIONS:
-        raise StoreError(400, "emoji must be one of: " + " ".join(REACTIONS))
+    if not is_emoji(emoji):
+        raise StoreError(400, "emoji must be a single emoji")
     if who != "user":
         agent = store.agents(pid).get(who)
         if not agent or agent.get("removed"):

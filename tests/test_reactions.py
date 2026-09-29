@@ -25,9 +25,11 @@ class ReactionsTest(unittest.TestCase):
         self.react(2, "alice", "✅")
         self.react(2, "alice", "👍")  # again: off
         got = self.c.call("GET", "/api/projects/proj/messages")[1]["reactions"]
-        self.assertEqual(got, {"1": {"👍": ["user"]}, "2": {"✅": ["alice"]}})
+        self.assertEqual(got, {"1": {"👍": ["user"]}, "2": {"✅": ["alice"]}})  # before the extra ones below
+        self.react(1, "user", "🔥")  # any emoji, joined ones too
+        self.assertEqual(self.react(1, "user", "👩\u200d💻")["reactions"]["👩\u200d💻"], ["user"])
         self.assertEqual(len(self.store.messages("proj")), 2)  # no message, so nobody is woken
-        for n, who, emoji, code in ((9, "user", "👍", 404), (1, "user", "🔥", 400), (1, "mallory", "👍", 403)):
+        for n, who, emoji, code in ((9, "user", "👍", 404), (1, "user", "ok", 400), (1, "user", "👍 ", 400), (1, "mallory", "👍", 403)):
             with self.assertRaises(ApiError, msg=(n, who, emoji)) as e:
                 self.react(n, who, emoji)
             self.assertEqual(e.exception.code, code)

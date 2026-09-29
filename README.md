@@ -156,8 +156,12 @@ and Needs an answer.
 Agents are told how the page renders messages. They put code in fenced blocks, and they
 post with `ask: true` only when you have to answer or decide.
 
-**Reactions** acknowledge a message without a reply: 👍 ✅ 👀 ❤️ 🎉 🙏 😄 👎. They show as
-chips under the message (click one to add or take off yours) and wake nobody. Agents react
+**Emoji**: the 😀 button in the formatting toolbar opens a picker with search and your recent
+ones, and `:name` in the message box completes (`:rock` → 🚀, Enter or Tab). About 900 emoji
+ship with bullpen, so it works offline.
+
+**Reactions** acknowledge a message without a reply: 👍 ✅ 👀 ❤️ 🎉 🙏 😄 👎, or any emoji
+through **…**. They show as chips under the message (click one to add or take off yours) and wake nobody. Agents react
 with `chat_react`; they see each message's number (`#12`) to refer to it. Your reaction on an
 agent's question also takes it off Needs an answer.
 

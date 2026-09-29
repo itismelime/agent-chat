@@ -298,3 +298,16 @@ color:var(--ink);font-weight:500}.react:hover{border-color:var(--mute)}
 /* project order */
 #projects .p.dragging{opacity:.4}
 #projects .p.dropbefore{box-shadow:0 -2px 0 var(--attn)}#projects .p.dropafter{box-shadow:0 2px 0 var(--attn)}
+
+/* emoji */
+#emojipick{position:fixed;z-index:40;width:340px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+padding:8px;box-shadow:0 8px 24px #0003;display:flex;flex-direction:column;gap:6px}
+#emojipick[hidden]{display:none}#emojipick input{width:100%;padding:6px 10px}
+.egrid{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;max-height:260px;overflow:auto}
+.egrid h4{grid-column:1/-1;margin:6px 2px 2px;font-size:12px;color:var(--mute);font-weight:600}
+.egrid button{background:none;border:0;font-size:20px;line-height:1;padding:5px 0;border-radius:6px;cursor:pointer}
+.egrid button:hover,.egrid button:focus-visible{background:var(--soft)}.egrid p{grid-column:1/-1;color:var(--mute);margin:6px}
+#emojiac{position:fixed;z-index:40;min-width:220px;background:var(--panel);border:1px solid var(--line);border-radius:9px;
+padding:4px;box-shadow:0 8px 24px #0003}#emojiac[hidden]{display:none}
+#emojiac div{display:flex;gap:10px;align-items:center;padding:5px 10px;border-radius:6px;cursor:pointer}
+#emojiac div span{font-size:18px}#emojiac small{color:var(--mute)}#emojiac .sel{background:var(--soft)}

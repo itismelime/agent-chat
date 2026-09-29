@@ -54,6 +54,28 @@ set('https://x.io',0,12);link();assert.strictEqual(t.value,'[text](https://x.io)
 """
 
 
+EMOJI_DATA = Path(__file__).parent.parent / "bullpen" / "emoji-data.js"
+EMOJI_CHECK = r"""
+// emojiFind from emoji.js over the shipped list
+const fs=require('fs'),assert=require('assert');eval(fs.readFileSync(process.argv[1],'utf8').replace('const EMOJI=','globalThis.EMOJI='));
+const src=fs.readFileSync(process.argv[2],'utf8');
+eval('globalThis.EMOJI_ALL=EMOJI.flatMap(([,items])=>items);'+src.match(/function emojiFind[\s\S]*?return hit\.slice\(0,n\);\}/)[0]+';globalThis.emojiFind=emojiFind');
+assert.strictEqual(emojiFind('thu',3)[0][0],'👍');
+assert.strictEqual(emojiFind('rocket',3)[0][0],'🚀');
+assert.strictEqual(emojiFind('party',9).some(x=>x[0]==='🎉'),true);
+assert.strictEqual(emojiFind('zzqx',3).length,0);
+assert.ok(EMOJI_ALL.length>500);
+"""
+
+
+@unittest.skipUnless(shutil.which("node"), "node is not installed")
+class EmojiTest(unittest.TestCase):
+    def test_find(self):
+        r = subprocess.run(["node", "-e", EMOJI_CHECK, str(EMOJI_DATA),
+                            str(EMOJI_DATA.with_name("emoji.js"))], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+
 @unittest.skipUnless(shutil.which("node"), "node is not installed")
 class FormatTest(unittest.TestCase):
     def test_buttons(self):
