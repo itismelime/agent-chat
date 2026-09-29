@@ -41,7 +41,17 @@ def stub_tools(test, names=("tmux", "claude", "codex")):
 
 def calls(d):
     f = d / "calls"
-    return f.read_text().splitlines() if f.exists() else []
+    return f.read_text(encoding="utf-8").splitlines() if f.exists() else []
+
+
+class NoTmuxTest(unittest.TestCase):
+    def test_a_missing_tmux_is_a_failed_call(self):
+        old = os.environ["PATH"]
+        os.environ["PATH"] = str(Path(tempfile.mkdtemp()))
+        self.addCleanup(os.environ.__setitem__, "PATH", old)
+        self.assertEqual(spawn.tmux("has-session", "-t", "=x").returncode, 1)
+        self.assertFalse(spawn.alive("x"))
+        self.assertFalse(spawn.rename("x", "y"))
 
 
 class TmuxTest(unittest.TestCase):
@@ -160,14 +170,14 @@ class TmuxTest(unittest.TestCase):
 
 class OpenCodeStateTest(unittest.TestCase):
     def test_states_from_the_footer(self):
-        read = lambda n: (SCREENS / n).read_text()
+        read = lambda n: (SCREENS / n).read_text(encoding="utf-8")
         self.assertEqual(spawn.opencode_state(read("idle-opencode-idle.txt")), "idle")
         self.assertEqual(spawn.opencode_state(read("working-opencode-working.txt")), "working")
         self.assertEqual(spawn.opencode_state(read("question-opencode-permission.txt")), "question")
         self.assertEqual(spawn.opencode_state("some dialog\nwith no footer\n"), "unknown")
 
     def test_words_in_the_transcript_do_not_count(self):
-        idle = (SCREENS / "idle-opencode-idle.txt").read_text().splitlines()
+        idle = (SCREENS / "idle-opencode-idle.txt").read_text(encoding="utf-8").splitlines()
         noisy = idle[:-4] + ["  [chat] user: Do you want to see esc interrupt? enter confirm"] + idle[-4:]
         self.assertEqual(spawn.opencode_state("\n".join(noisy)), "idle")
 
@@ -177,11 +187,11 @@ class NeedsYouTest(unittest.TestCase):
         files = sorted(SCREENS.glob("*.txt"))
         self.assertEqual(len(files), 9)
         for f in files:
-            self.assertEqual(spawn.needs_you(f.read_text()), f.name.startswith("question-"), f.name)
-            self.assertEqual(spawn.working(f.read_text()), f.name.startswith("working-"), f.name)
+            self.assertEqual(spawn.needs_you(f.read_text(encoding="utf-8")), f.name.startswith("question-"), f.name)
+            self.assertEqual(spawn.working(f.read_text(encoding="utf-8")), f.name.startswith("working-"), f.name)
 
     def test_only_the_bottom_of_the_screen_counts(self):
-        old_question = (SCREENS / "question-codex-approval.txt").read_text()
+        old_question = (SCREENS / "question-codex-approval.txt").read_text(encoding="utf-8")
         self.assertFalse(spawn.needs_you(old_question + "\n" * 30 + "› Ask Codex to do anything\n"))
 
 
@@ -214,22 +224,22 @@ class SpawnerTest(unittest.TestCase):
         r = self.opencode_setup()
         self.assertEqual(r["model"], "coder:30b")
         cfg = self.store.root / "opencode-config" / "opencode" / "opencode.json"
-        self.assertIn("coder:30b", cfg.read_text())
+        self.assertIn("coder:30b", cfg.read_text(encoding="utf-8"))
         self.assertIn("XDG_CONFIG_HOME=%s" % (self.store.root / "opencode-config"),
                       [c for c in calls(self.d) if c.startswith("new-session")][0])
 
     def test_types_pending_messages_only_when_idle(self):
         self.opencode_setup()
-        (self.d / "screen").write_text((SCREENS / "working-opencode-working.txt").read_text())
+        (self.d / "screen").write_text((SCREENS / "working-opencode-working.txt").read_text(encoding="utf-8"))
         self.store.post("proj", "user", "first")
         self.store.post("proj", "user", "second")
         self.sp.poll()
         self.assertEqual(self.typed(), [])
         self.assertEqual(next(a for a in self.store.status("proj") if a["name"] == "kit")["status"], "busy")
-        (self.d / "screen").write_text((SCREENS / "question-opencode-permission.txt").read_text())
+        (self.d / "screen").write_text((SCREENS / "question-opencode-permission.txt").read_text(encoding="utf-8"))
         self.sp.poll()
         self.assertEqual(self.typed(), [])
-        (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text())
+        (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text(encoding="utf-8"))
         self.sp.poll()
         self.sp.poll()
         self.sp.poll()
@@ -242,7 +252,7 @@ class SpawnerTest(unittest.TestCase):
 
     def test_read_messages_are_not_typed_and_restart_loses_nothing(self):
         self.opencode_setup()
-        (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text())
+        (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text(encoding="utf-8"))
         self.store.post("proj", "user", "one")
         self.store.read("proj", "kit")                 # the agent read it itself
         self.store.post("proj", "user", "two")
@@ -272,10 +282,10 @@ class SpawnerTest(unittest.TestCase):
         db.execute("INSERT INTO part VALUES ('p1', 'ses_1', ?, ?)",
                    (started + 900, call("chat_join", "name", "coder")))
         db.commit()
-        (self.d / "screen").write_text((SCREENS / "working-opencode-working.txt").read_text())
+        (self.d / "screen").write_text((SCREENS / "working-opencode-working.txt").read_text(encoding="utf-8"))
         self.sp.poll()
         self.assertNotIn("coder", self.store.agents("proj"))  # busy: nothing run yet
-        (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text())
+        (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text(encoding="utf-8"))
         self.sp.poll()
         self.assertEqual(self.store.spawned("proj")[r["token"]]["name"], "coder")
         self.assertIn("You joined the chat as coder.", self.typed()[-1])
@@ -290,7 +300,7 @@ class SpawnerTest(unittest.TestCase):
 
     def test_nothing_is_typed_to_a_removed_agent(self):
         self.opencode_setup()
-        (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text())
+        (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text(encoding="utf-8"))
         self.store.post("proj", "user", "hello")
         self.store.remove("proj", "kit")
         self.sp.poll()
@@ -380,10 +390,10 @@ class SpawnerTest(unittest.TestCase):
     def test_poll_marks_questions_and_drops_ended_sessions(self):
         r = self.sp.start("proj", "codex")
         self.store.join("proj", "cody", "codex", thread="t-1", spawn=r["token"])  # always "waiting"
-        (self.d / "screen").write_text((SCREENS / "question-codex-approval.txt").read_text())
+        (self.d / "screen").write_text((SCREENS / "question-codex-approval.txt").read_text(encoding="utf-8"))
         self.sp.poll()
         self.assertEqual(self.store.status("proj")[0]["status"], "needs_you")
-        (self.d / "screen").write_text((SCREENS / "idle-codex-idle.txt").read_text())
+        (self.d / "screen").write_text((SCREENS / "idle-codex-idle.txt").read_text(encoding="utf-8"))
         self.sp.poll()
         self.assertEqual(self.store.status("proj")[0]["status"], "waiting")
         (self.d / "dead").touch()
@@ -416,7 +426,7 @@ class SpawnerTest(unittest.TestCase):
     def test_poll_skips_an_agent_with_an_open_wait(self):
         r = self.sp.start("proj", "claude")
         self.store.join("proj", "alice", "claude", spawn=r["token"])
-        (self.d / "screen").write_text((SCREENS / "question-claude-trust.txt").read_text())
+        (self.d / "screen").write_text((SCREENS / "question-claude-trust.txt").read_text(encoding="utf-8"))
         self.store.waiting[("proj", "alice")] = 1
         self.sp.poll()
         self.assertEqual(self.store.status("proj")[0]["status"], "waiting")

@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -40,7 +41,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_cli(self):
         env = dict(os.environ, XDG_CONFIG_HOME=self.tmp)
-        run = lambda *a: subprocess.run([CHAT, "config", "ollama-url", *a], env=env,
+        run = lambda *a: subprocess.run([sys.executable, CHAT, "config", "ollama-url", *a], env=env,
                                         capture_output=True, text=True)
         self.assertEqual(run("http://127.0.0.1:11434").returncode, 0)
         self.assertEqual(run().stdout.strip(), "http://127.0.0.1:11434")

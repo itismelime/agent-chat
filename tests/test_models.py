@@ -50,6 +50,7 @@ class ClientTest(OllamaSetup):
 
 
 class GpuTest(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "the nvidia-smi stub is a shell script")
     def test_nvidia_smi(self):
         d = Path(tempfile.mkdtemp())
         (d / "nvidia-smi").write_text(NVIDIA)
@@ -285,7 +286,8 @@ class ImportTest(OllamaSetup):
         done = wait_done(jobs, v["id"])
         self.assertEqual(done["state"], "failed")
         self.assertIn("not reachable", done["message"])
-        self.assertLess(time.monotonic() - start, 0.9)  # the 1.3 MB file at 20 chunks/s was not fetched
+        # the 1.3 MB file at 20 chunks/s was not fetched (Windows retries a refused connect for ~2 s)
+        self.assertLess(time.monotonic() - start, 3.5 if os.name == "nt" else 0.9)
 
     def test_check_import(self):
         ok = ("https://huggingface.co/a/b-GGUF/resolve/main/b-Q4_K_M.gguf", "b-Q4_K_M.gguf", "b:q4_k_m")

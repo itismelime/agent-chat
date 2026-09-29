@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import threading
 import unittest
 from pathlib import Path
@@ -19,7 +20,7 @@ class CliTest(unittest.TestCase):
         self.env = dict(os.environ, AGENT_CHAT_PORT=str(self.port))
 
     def chat(self, *args, cwd=None):
-        return subprocess.run([CHAT, *args], cwd=cwd or self.dir, env=self.env,
+        return subprocess.run([sys.executable, CHAT, *args], cwd=cwd or self.dir, env=self.env,
                               capture_output=True, text=True, timeout=20)
 
     def test_add_twice(self):

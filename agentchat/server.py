@@ -218,7 +218,7 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         text = path.read_text(encoding="utf-8")
                     except UnicodeDecodeError:
                         raise StoreError(415, "not a text file") from None
-                    return 200, {"path": str(path.relative_to(root)), "text": text}
+                    return 200, {"path": path.relative_to(root).as_posix(), "text": text}
                 if what[:1] == ["board"]:
                     return self.board_route(method, pid, what[1:])
                 if what == ["spawned"] and method == "GET":
