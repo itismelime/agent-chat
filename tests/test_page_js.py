@@ -30,6 +30,34 @@ assert.deepStrictEqual(pending().map(x=>x.m.n),[2,3]);
 """
 
 
+FORMAT = Path(__file__).parent.parent / "agentchat" / "format.js"
+FORMAT_CHECK = r"""
+// format.js against a stand-in textarea (no DOM; insertText falls back to setRangeText)
+const src=require('fs').readFileSync(process.argv[1],'utf8'),assert=require('assert');
+globalThis.document={execCommand:()=>false};globalThis.Event=class{};
+globalThis.t={value:'',selectionStart:0,selectionEnd:0,focus(){},dispatchEvent(){},
+  setSelectionRange(s,e){this.selectionStart=s;this.selectionEnd=e;},
+  setRangeText(x,s,e){this.value=this.value.slice(0,s)+x+this.value.slice(e);this.selectionStart=this.selectionEnd=s+x.length;}};
+eval(src.split('\n$(\'fmt\')')[0]+';globalThis.wrap=wrap;globalThis.codeBlock=codeBlock;globalThis.prefixLines=prefixLines;globalThis.link=link');
+const set=(v,s,e=s)=>{t.value=v;t.setSelectionRange(s,e);},sel=()=>t.value.slice(t.selectionStart,t.selectionEnd);
+set('say hi now',4,6);wrap('**','**','bold text');assert.strictEqual(t.value,'say **hi** now');assert.strictEqual(sel(),'hi');
+wrap('**','**','bold text');assert.strictEqual(t.value,'say hi now');assert.strictEqual(sel(),'hi');  // off again
+set('',0);wrap('`','`','code');assert.strictEqual(t.value,'`code`');assert.strictEqual(sel(),'code');
+set('look: x=1',6,9);codeBlock();assert.strictEqual(t.value,'look: \n```\nx=1\n```');assert.strictEqual(sel(),'x=1');
+set('a\nb',0,3);prefixLines(i=>(i+1)+'. ',/^\d+\. /);assert.strictEqual(t.value,'1. a\n2. b');
+prefixLines(i=>(i+1)+'. ',/^\d+\. /);assert.strictEqual(t.value,'a\nb');
+set('see docs',4,8);link();assert.strictEqual(t.value,'see [docs](https://)');assert.strictEqual(sel(),'https://');
+set('https://x.io',0,12);link();assert.strictEqual(t.value,'[text](https://x.io)');assert.strictEqual(sel(),'text');
+"""
+
+
+@unittest.skipUnless(shutil.which("node"), "node is not installed")
+class FormatTest(unittest.TestCase):
+    def test_buttons(self):
+        r = subprocess.run(["node", "-e", FORMAT_CHECK, str(FORMAT)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+
 @unittest.skipUnless(shutil.which("node"), "node is not installed")
 class OptionsTest(unittest.TestCase):
     def test_options(self):

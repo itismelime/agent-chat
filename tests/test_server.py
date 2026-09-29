@@ -410,7 +410,8 @@ class ModelRoutesTest(unittest.TestCase):
                                     ("page.css", b"--paper", "text/css"),
                                     ("marked.js", b"marked", "text/javascript"),
                                     ("markdown.js", b"function renderText", "text/javascript"),
-                                    ("answers.js", b"function drawAnswers", "text/javascript")]:
+                                    ("answers.js", b"function drawAnswers", "text/javascript"),
+                                    ("format.js", b"function wrap", "text/javascript")]:
             conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
             conn.request("GET", "/" + name)
             r = conn.getresponse()

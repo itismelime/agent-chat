@@ -168,6 +168,11 @@ font-size:13px;line-height:1.45;white-space:pre}
 #to .who{color:var(--c);font-weight:700}
 .box{display:flex;gap:8px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 6px 6px 12px}
 .box:focus-within{border-color:var(--mute)}
+#fmt{display:flex;gap:2px;padding:0 0 5px;flex-wrap:wrap}
+#fmt button{background:none;border:1px solid transparent;color:var(--mute);min-width:30px;height:26px;padding:0 7px;
+border-radius:6px;font-size:13px;line-height:1;cursor:pointer}
+#fmt button:hover,#fmt button:focus-visible{background:var(--soft);color:var(--ink);border-color:var(--line)}
+#fmt code{font:12px var(--mono);background:none;padding:0}
 #t{flex:1;border:0;background:none;padding:6px 0;resize:none;max-height:40vh;outline:none;line-height:1.5}
 #ac{position:fixed;min-width:220px;background:var(--panel);border:1px solid var(--line);
 border-radius:9px;padding:4px;box-shadow:0 8px 24px #0003;z-index:30}
