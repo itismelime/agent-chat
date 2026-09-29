@@ -105,6 +105,15 @@ page, View terminal, Needs you and Resume. Codex agents do not get messages push
 their session, so they read them with `chat_read`. For all of it, run `install.sh` in
 [WSL2](https://learn.microsoft.com/windows/wsl/install) with systemd enabled.
 
+### Updating
+
+`git pull` in the clone, then restart the service (`systemctl --user restart agent-chat`, or
+`schtasks /end /tn agent-chat` and `schtasks /run /tn agent-chat` on Windows). Agents that
+are already running keep working: their chat tools come from the service, and Claude Code
+reloads them within about 30 seconds. When `NEWS` in `agentchat/mcp.py` changes, the service
+also posts it to every chat once, so agents learn what is new. Agents started before this
+mechanism existed get it at their next restart.
+
 ## Quick start
 
 1. Open http://127.0.0.1:8765 and add a project: **+** next to Projects, or

@@ -17,8 +17,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import spawn, talk
+from . import mcp, spawn, talk
 from .board import Board
+from .client import Client
 from .codex import Deliverer
 from .ollama import OllamaError
 from .store import Store, StoreError, sees
@@ -169,6 +170,10 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 return 200, {"project": project}
             if rest == ["tools"] and method == "GET":
                 return 200, spawn.available()
+            if rest == ["mcp", "version"] and method == "GET":
+                return 200, {"version": mcp.VERSION}
+            if rest == ["mcp"] and method == "POST":  # an agent session's relay
+                return 200, mcp.serve_request(Client(port), self.body())
             if rest == ["opencode", "models"] and method == "GET":
                 from . import opencode
                 names = opencode.tool_models(models.ollama, models.gpu_total())
@@ -352,6 +357,21 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
     return Handler
 
 
+def announce_update(store):
+    """Once per new mcp.NEWS: tell every chat what agents can do now (a fresh
+    install has no chats yet, so it posts nothing)."""
+    f = store.root / "news-seen"
+    news = mcp.hashlib.sha1(mcp.NEWS.encode()).hexdigest()[:12]
+    try:
+        seen = f.read_text().strip()
+    except OSError:
+        seen = None
+    if seen != news:
+        for p in store.projects():
+            store.notice(p["id"], mcp.NEWS)
+        f.write_text(news)
+
+
 def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=None,
           models=None):
     """Bind the service; the caller runs serve_forever(). deliver=False
@@ -364,6 +384,7 @@ def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=
     models = models or models_mod.Models(store.root)
     spawner = spawn.Spawner(store, models, server.server_address[1])
     if deliver:
+        announce_update(store)
         store.deliver = Deliverer(store)
         spawner.start_poller()
         talker = talk.Talker(store, models)
