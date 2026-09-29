@@ -5,7 +5,7 @@ const saved={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 let projects=[],cur=saved.get('cur',null),msgs={},agents=[],seen=saved.get('seen',{}),notified={},drawn='',busy=false,down=false;
 const folds=new Set();  // board-change folds the user opened, by their first message
-let lastStatus={},answerCount=0,tools={},spawned=[],spawnedBy={},needed=new Set(),boardData=null,query='',drafts=saved.get('drafts',{});
+let usageBy={},usageAt=0,lastStatus={},answerCount=0,tools={},spawned=[],spawnedBy={},needed=new Set(),boardData=null,query='',drafts=saved.get('drafts',{});
 const KIND={claude:'Claude',codex:'Codex',llm:'local model',opencode:'OpenCode',user:'you',board:'board'};
 
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;
@@ -68,6 +68,8 @@ async function refresh(){
       cur?api(`api/projects/${cur}/board`):null]);
     spawnedBy={};projects.forEach((p,i)=>{spawnedBy[p.id]=starts[i];});spawned=spawnedBy[cur]||[];boardData=board;
     assignHues();
+    if(cur&&Date.now()-usageAt>30e3){usageAt=Date.now();  // tokens and memory: every 30 s is plenty
+      api(`api/projects/${cur}/usage`).then(r=>{usageBy[cur]=r.usage;drawRoster();}).catch(()=>{});}
     for(const q of projects)for(const s of spawnedBy[q.id])if(s.state==='needs_you'&&!needed.has(s.token))
       notify(q,{from:s.name||('new '+(KIND[s.tool]||s.tool)),text:'needs you',n:'need-'+s.token});
     needed=new Set(projects.flatMap(q=>spawnedBy[q.id]).filter(s=>s.state==='needs_you').map(s=>s.token));
@@ -204,6 +206,14 @@ function drawNeeds(){
 // roster: groups by state, right-click or click for options
 const GROUPS=[['needs_you','Needs you'],['starting','Starting'],['waiting','Available'],
   ['busy','Working'],['offline','Offline'],['removed','Removed']];
+const kfmt=n=>n==null?'?':n>=1e6?(n/1e6).toFixed(n>=1e7?0:1)+'M':n>=1e3?Math.round(n/1e3)+'k':String(n);
+function usageLine(u){  // Claude: context and tokens out; Codex: context of its window and plan limits; local: memory
+  let text,title;
+  if(u.out!=null){text=`ctx ${kfmt(u.ctx)} · ${kfmt(u.out)} out`;title=`${u.model||'Claude'}: ${u.ctx} tokens of context in use, ${u.out} tokens written this session`;}
+  else if(u.window!=null){const l=u.limits||{};text=`ctx ${kfmt(u.ctx)}/${kfmt(u.window)}`+(l.primary!=null?` · 5h ${Math.round(l.primary)}%`:'')+(l.secondary!=null?` · wk ${Math.round(l.secondary)}%`:'');
+    title=`Codex: ${u.ctx} of ${u.window} context tokens; ${u.total} tokens this session; plan limits used: 5 hours ${l.primary}%, week ${l.secondary}%`;}
+  else{text=u.loaded?`ctx ${kfmt(u.ctx)} · ${(u.vram/2**30).toFixed(1)} GB`:'not loaded';title=`${u.model}: `+(u.loaded?`context ${u.ctx} tokens, ${u.vram} bytes of video memory`:'not in memory now');}
+  const s=el('span','usage',text);s.title=title;return s;}
 function drawRoster(){
   const starting=spawned.filter(s=>!s.name).map(s=>({name:KIND[s.tool]||s.tool,kind:s.tool,starting:true,
     spawn:s.token,status:s.state==='needs_you'?'needs_you':'starting'}));
@@ -221,6 +231,7 @@ function drawRoster(){
       const doing=(boardData?boardData.cards:[]).filter(c=>c.assignee===a.name&&c.column==='doing'&&c.kind!=='epic');
       if(doing.length){const w=el('span','doing','▶ '+doing.map(c=>'#'+c.id+' '+c.title).join(', '));  // its In progress cards
         w.title='In progress: '+doing.map(c=>'#'+c.id+' '+c.title).join('; ');d.append(w);}
+      const u=(usageBy[cur]||{})[a.name];if(u&&!a.starting)d.append(usageLine(u));
       d.onclick=d.oncontextmenu=e=>{e.stopPropagation();openMenu(e,agentItems(a));};return d;})];}));}
 const menu=$('menu');
 function openMenu(e,items){

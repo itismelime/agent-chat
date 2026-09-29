@@ -321,3 +321,4 @@ color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;curso
 
 /* what an agent is doing: its In progress cards */
 .a .doing{grid-column:2;font-size:12px;color:var(--busy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a .usage{grid-column:2;font-size:11px;color:var(--mute);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
