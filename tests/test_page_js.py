@@ -26,7 +26,10 @@ globalThis.lead=t=>((t.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0].match(/@[\w-]+/
 const m=(n,from,text,x)=>Object.assign({n,from,text,time:'t'+n,kind:'claude'},x);
 globalThis.msgs={p:[m(1,'a','@user FYI: done'),m(2,'b','@user Merge? (A) yes (B) no'),
   m(3,'c','Should I push?',{ask:true}),m(4,'d','private note',{dm:'d'})]};
+globalThis.reactsBy={};
 assert.deepStrictEqual(pending().map(x=>x.m.n),[2,3]);
+reactsBy.p={3:{'👍':['user']},2:{'👀':['b']}};  // your reaction acknowledges #3; an agent's does not
+assert.deepStrictEqual(pending().map(x=>x.m.n),[2]);
 """
 
 

@@ -46,7 +46,8 @@ async function refresh(){
     if(!projects.some(p=>p.id===cur))cur=projects.length?projects[0].id:null;
     for(const p of projects){
       const list=msgs[p.id]||(msgs[p.id]=[]);
-      const fresh=(await api(`api/projects/${p.id}/messages?after=${lastN(p.id)}`)).messages;
+      const got=await api(`api/projects/${p.id}/messages?after=${lastN(p.id)}`),fresh=got.messages;
+      reactsBy[p.id]=got.reactions||{};
       list.push(...fresh);
       if(notified[p.id]===undefined){  // first load: history is not new
         notified[p.id]=lastN(p.id);if(seen[p.id]===undefined)seen[p.id]=lastN(p.id);continue;}
@@ -94,7 +95,7 @@ function render(){
   $('boardcount').textContent=String(open.filter(c=>c.kind!=='epic').length||'');
   $('epiccount').textContent=String(open.filter(c=>c.kind==='epic').length||'');
   drawNeeds();drawRoster();hint();
-  const key=cur+':'+lastN(cur)+':'+query+':'+agents.map(a=>a.name).join();if(key===drawn)return;
+  const key=cur+':'+lastN(cur)+':'+query+':'+agents.map(a=>a.name).join()+JSON.stringify(reactsBy[cur]||{});if(key===drawn)return;
   const switched=!drawn.startsWith(cur+':'),end=atEnd(),before=drawn;drawn=key;
   drawLog(p);
   if(end||switched||!before)log.scrollTop=log.scrollHeight;else $('jump').hidden=false;
@@ -140,9 +141,9 @@ function message(m,time,q){
   const acts=el('div','acts');
   acts.append(btn('Reply',()=>{const from=current(m.from);replyTo={n:m.n,from,text:m.text};dmTo=m.dm?current(m.dm):null;drawReply();
     if(from!=='user')t.value='@'+from+' '+t.value.replace(/^@[\w-]+\s*/,'');t.focus();grow();hint();}));
-  acts.append(btn('Copy',()=>navigator.clipboard.writeText(m.text)),
-    btn('Add to board',()=>cardFrom(m)));
-  d.append(acts);return d;}
+  acts.append(btn('React',ev=>{ev.stopPropagation();pickReaction(ev,m);}),
+    btn('Copy',()=>navigator.clipboard.writeText(m.text)),btn('Add to board',()=>cardFrom(m)));
+  d.append(reactRow(m),acts);return d;}
 // a reply's quote of the message it answers; a click shows that message
 function quote(r){const q=who(el('button','quote'),r.from);q.type='button';q.title='Show the message this answers';
   q.append(el('b','',r.from==='user'?'you':current(r.from)),el('span','',' '+r.text.replace(/\s+/g,' ').slice(0,140)));
@@ -199,7 +200,7 @@ function drawRoster(){
       d.onclick=d.oncontextmenu=e=>{e.stopPropagation();openMenu(e,agentItems(a));};return d;})];}));}
 const menu=$('menu');
 function openMenu(e,items){
-  e.preventDefault();
+  e.preventDefault();menu.classList.remove('emojis');
   menu.replaceChildren(...items.map(it=>{if(!it)return el('hr');const [text,fn,off]=it,item=el('div',off?'off':'',text);
     item.setAttribute('role','menuitem');if(off)item.title=off;
     item.onclick=async ev=>{ev.stopPropagation();if(off)return;menu.hidden=true;

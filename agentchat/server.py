@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import mcp, rules, spawn, talk
+from . import mcp, reactions, rules, spawn, talk
 from .board import Board
 from .client import Client
 from .codex import Deliverer
@@ -28,7 +28,8 @@ PAGE = Path(__file__).with_name("page.html")
 ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "text/javascript",
           "board.js": "text/javascript", "marked.js": "text/javascript",
           "markdown.js": "text/javascript", "answers.js": "text/javascript",
-          "format.js": "text/javascript", "rules.js": "text/javascript"}
+          "format.js": "text/javascript", "rules.js": "text/javascript",
+          "reactions.js": "text/javascript"}
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 MAX_FILE = 5_000_000
@@ -187,7 +188,15 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         after = int(query.get("after", "0"))
                     except ValueError:
                         raise StoreError(400, "after must be a number") from None
-                    return 200, {"messages": store.messages(pid, after)}
+                    return 200, {"messages": store.messages(pid, after),
+                                 "reactions": reactions.get(store, pid)}
+                if len(what) == 3 and what[0] == "messages" and what[2] == "react" and method == "POST":
+                    if not re.fullmatch(r"[0-9]+", what[1]):
+                        raise StoreError(404, "no message %s" % what[1])
+                    data = self.body()
+                    return 200, {"reactions": reactions.toggle(
+                        store, pid, int(what[1]), store.resolve(pid, self.field(data, "from")),
+                        data.get("emoji"))}
                 if what == ["messages"] and method == "POST":
                     data = self.body()
                     sender = store.resolve(pid, self.field(data, "from"))

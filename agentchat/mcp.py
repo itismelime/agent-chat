@@ -23,11 +23,12 @@ CHAT = Path(__file__).resolve().parent.parent / "bin" / "chat"
 VERSION = hashlib.sha1(Path(__file__).read_bytes()).hexdigest()[:12]
 WATCH_SECONDS = 30
 # posted to every chat once when it changes (update it with what agents should learn)
-NEWS = ("agent-chat was updated. For agents: projects can have rules now. They come with your "
-        "instructions and with every message that wakes you, as \"Project rules (follow them): ...\"; "
-        "follow them. Also: the board has epics (board_add kind \"epic\", or epic: <number>; "
-        "board_update epic moves an item, 0 takes it out), and chat_post ask: true marks the "
-        "posts the user has to answer.")
+NEWS = ("agent-chat was updated. For agents: messages now show their number (#12), and "
+        "chat_react (#12, 👍) acknowledges one without a reply; reactions wake nobody. Projects can "
+        "have rules: they come with your instructions and every message that wakes you, as "
+        "\"Project rules (follow them): ...\"; follow them. The board has epics (board_add kind "
+        "\"epic\", or epic: <number>; board_update epic, 0 takes an item out), and chat_post "
+        "ask: true marks the posts the user has to answer.")
 DOWN = ("The agent-chat service is not running, so this project's chat is unavailable "
         "(%s; the chat tools work once it runs)." % (
             "schtasks /run /tn agent-chat" if os.name == "nt" else "systemctl --user start agent-chat"))
@@ -56,6 +57,14 @@ TOOLS = [
                     "messages move with you; messages you already posted keep the old name.",
      "inputSchema": {"type": "object", "required": ["name"],
                      "properties": {"name": {"type": "string"}}}},
+    {"name": "chat_react",
+     "description": "React to message #n (the number shown before its sender) instead of replying, "
+                    "when it only needs acknowledging: 👍 ✅ 👀 ❤️ 🎉 🙏 😄 👎. The same emoji again "
+                    "takes it off. Reactions wake nobody.",
+     "inputSchema": {"type": "object", "required": ["n", "emoji"],
+                     "properties": {"n": {"type": "integer"},
+                                    "emoji": {"type": "string",
+                                              "enum": ["👍", "✅", "👀", "❤️", "🎉", "🙏", "😄", "👎"]}}}},
     {"name": "chat_read",
      "description": "Chat messages you have not seen yet.",
      "inputSchema": {"type": "object", "properties": {}}},
@@ -88,7 +97,8 @@ BOARD_TOOLS = ("board_list", "board_add", "board_update")
 FORMAT = (" The page renders messages as Markdown: put code, commands and logs in fenced code "
           "blocks (```lang), and use lists and tables where they help. A file path in the project "
           "opens in a viewer when clicked. Lines like \"A) …\" \"B) …\" (or \"Option 1: …\") "
-          "become answer buttons for the user. Post with ask: true only when the user has to answer "
+          "become answer buttons for the user. To acknowledge a message that needs no reply, react "
+          "with chat_react (e.g. 👍) instead of posting. Post with ask: true only when the user has to answer "
           "or decide; reports and updates go without it. Use private: true for things only the user "
           "should see.")
 
@@ -250,7 +260,7 @@ class Session:
                 if body["agent"].get("personality"):
                     joined += "Your personality: %s. " % body["agent"]["personality"].rstrip(".")
                 return "%s%s\n\nRecent messages:\n%s" % (joined, how, recent), False
-            if tool not in ("chat_post", "chat_read", "chat_rename") + BOARD_TOOLS:
+            if tool not in ("chat_post", "chat_read", "chat_rename", "chat_react") + BOARD_TOOLS:
                 return "unknown tool: %s" % tool, True
             if not self.name:
                 return "call chat_join first", True
@@ -265,6 +275,13 @@ class Session:
                     text += (" A chat wait still running as %s keeps working; start the next one "
                              "as:\n%s" % (old, self.wait_command()))
                 return text, False
+            if tool == "chat_react":
+                n = args.get("n")
+                if not isinstance(n, int) or isinstance(n, bool):
+                    return "n must be a message number", True
+                self.client.call("POST", "/api/projects/%s/messages/%d/react" % (pid, n),
+                                 {"from": self.name, "emoji": args.get("emoji")})
+                return "reacted %s to #%d" % (args.get("emoji"), n), False
             if tool == "chat_post":
                 m = self.client.call("POST", "/api/projects/%s/messages" % pid,
                                      {"from": self.name, "text": str(args.get("text", "")),

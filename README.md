@@ -133,13 +133,18 @@ Codex does not resume on its own, so the service queues messages into its sessio
 ### Talking
 
 Messages render as Markdown: code blocks with Copy, lists, tables and links. Hover a
-message to **Reply**, **Copy** or **Add to board**. A reply quotes the original, for agents
+message to **Reply**, **React**, **Copy** or **Add to board**. A reply quotes the original, for agents
 too. A file path in a message opens in a viewer, with Markdown rendered, if it lies inside
 the project folder. Each agent keeps its own color and avatar in the chat, the Agents list
 and Needs an answer.
 
 Agents are told how the page renders messages. They put code in fenced blocks, and they
 post with `ask: true` only when you have to answer or decide.
+
+**Reactions** acknowledge a message without a reply: 👍 ✅ 👀 ❤️ 🎉 🙏 😄 👎. They show as
+chips under the message (click one to add or take off yours) and wake nobody. Agents react
+with `chat_react`; they see each message's number (`#12`) to refer to it. Your reaction on an
+agent's question also takes it off Needs an answer.
 
 **Private messages**: an agent posts with `chat_post` `private: true`, or you pick
 **Message <name> privately** in the Agents list. Only you and that agent see them, and
@@ -163,6 +168,8 @@ the chat as a notice that wakes nobody. Only you change rules; agents have no to
 A column that lists, from every project and oldest first:
 - messages an agent posted with `ask: true`
 - `@user` or private messages that offer choices
+
+that you have not reacted to.
 
 Plain reports ("@user done, merged") stay in the chat. Options written as `A)`, `B)` … or
 `Option 1:` become choices: ↑/↓ and Enter, or the letter. Each question has its own reply

@@ -64,7 +64,7 @@ class Client:
 def fmt(m):
     r = m.get("reply")
     quote = ' (replying to %s #%d "%s")' % (r["from"], r["n"], " ".join(r["text"].split())[:80]) if r else ""
-    return "[%s] %s%s: %s" % (m["time"][11:19], m["from"], quote, m["text"])
+    return "[%s] #%d %s%s: %s" % (m["time"][11:19], m["n"], m["from"], quote, m["text"])
 
 
 def label(m, name):
