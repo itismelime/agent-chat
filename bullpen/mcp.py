@@ -129,10 +129,11 @@ class Session:
         """The project's rules for agents ("" when none or unreadable)."""
         from .rules import summary
         try:
-            rules = self.client.call("GET", "/api/projects/%s/rules" % self.project["id"])[1]["rules"]
+            body = self.client.call("GET", "/api/projects/%s/rules" % self.project["id"])[1]
         except (ApiError, ServiceDown):
             return ""
-        return lead + summary(rules) if rules else ""
+        standing = body.get("standing", summary(body["rules"]))  # rules, then pins
+        return lead + standing if standing else ""
 
     def instructions(self):
         if self.down:
