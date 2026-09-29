@@ -5,7 +5,7 @@ const saved={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 let projects=[],cur=saved.get('cur',null),msgs={},agents=[],seen=saved.get('seen',{}),notified={},drawn='',busy=false,down=false;
 const folds=new Set();  // board-change folds the user opened, by their first message
-let answerCount=0,tools={},spawned=[],needed=new Set(),boardData=null,query='',drafts=saved.get('drafts',{});
+let answerCount=0,tools={},spawned=[],spawnedBy={},needed=new Set(),boardData=null,query='',drafts=saved.get('drafts',{});
 const KIND={claude:'Claude',codex:'Codex',llm:'local model',opencode:'OpenCode',user:'you',board:'board'};
 
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;
@@ -57,12 +57,14 @@ async function refresh(){
     const lists=await Promise.all(projects.map(p=>api(`api/projects/${p.id}/agents`)));  // every project's, for colors
     agentsBy={};renamesBy={};projects.forEach((p,i)=>{agentsBy[p.id]=lists[i].agents;renamesBy[p.id]=lists[i].renames||{};});
     agents=agentsBy[cur]||[];
-    [spawned,boardData]=cur?await Promise.all([api(`api/projects/${cur}/spawned`).then(x=>x.spawned),
-      api(`api/projects/${cur}/board`)]):[[],null];
+    // every project's starts: an agent stuck on a question in another project must reach you too
+    const [starts,board]=await Promise.all([Promise.all(projects.map(p=>api(`api/projects/${p.id}/spawned`).then(x=>x.spawned))),
+      cur?api(`api/projects/${cur}/board`):null]);
+    spawnedBy={};projects.forEach((p,i)=>{spawnedBy[p.id]=starts[i];});spawned=spawnedBy[cur]||[];boardData=board;
     assignHues();
-    for(const s of spawned)if(s.state==='needs_you'&&!needed.has(s.token)&&p)
-      notify(p,{from:s.name||('new '+(KIND[s.tool]||s.tool)),text:'needs you',n:'need-'+s.token});
-    needed=new Set(spawned.filter(s=>s.state==='needs_you').map(s=>s.token));
+    for(const q of projects)for(const s of spawnedBy[q.id])if(s.state==='needs_you'&&!needed.has(s.token))
+      notify(q,{from:s.name||('new '+(KIND[s.tool]||s.tool)),text:'needs you',n:'need-'+s.token});
+    needed=new Set(projects.flatMap(q=>spawnedBy[q.id]).filter(s=>s.state==='needs_you').map(s=>s.token));
     if(cur&&!away()&&atEnd())seen[cur]=lastN(cur);
     saved.set('seen',seen);if(down){say();down=false;}render();
     if(typeof drawBoard==='function'&&!$('boardview').hidden&&boardData)drawBoard(boardData);
@@ -79,7 +81,9 @@ function render(){
   $('projects').replaceChildren(...projects.map((p,i)=>{
     const d=el('div','p'+(p.id===cur?' on':'')+(p.missing?' missing':''));
     d.title=p.path+(p.missing?' (folder missing)':'');d.append(el('span','pn',p.name));
-    const n=unread(p);if(n)d.append(el('span','badge',String(n)));else if(i<9)d.append(el('kbd','','Alt+'+(i+1)));
+    const n=unread(p),ask=(spawnedBy[p.id]||[]).filter(s=>s.state==='needs_you').length;
+    if(ask){const b=el('span','badge need','!');b.title=ask+' agent'+(ask>1?'s':'')+' waiting for you in the terminal';d.append(b);}
+    if(n)d.append(el('span','badge',String(n)));else if(i<9&&!ask)d.append(el('kbd','','Alt+'+(i+1)));
     d.onclick=()=>select(p.id);return d;}));
   if(typeof drawAnswers==='function')drawAnswers();const total=projects.reduce((s,p)=>s+unread(p),0);
   document.title=(needed.size||answerCount?'● ':'')+(total?`(${total}) `:'')+'agent-chat';
