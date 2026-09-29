@@ -251,6 +251,41 @@ class SpawnerTest(unittest.TestCase):
         self.assertEqual(len(typed), 1)
         self.assertIn("[chat] user: two", typed[0])
 
+    def test_chat_calls_written_as_text_are_run(self):
+        import json, sqlite3
+        self.opencode_setup()
+        r = self.sp.start("proj", "opencode", model="coder:30b")  # not joined yet
+        started = int(time.time() * 1000)
+        f = self.store.root / "opencode-data" / "opencode" / "opencode.db"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        db = sqlite3.connect(f)
+        db.execute("CREATE TABLE session (id, directory, parent_id, time_created)")
+        db.execute("CREATE TABLE part (id, session_id, time_created, data)")
+        for sid, t in (("ses_0", started + 100), ("ses_1", started + 500)):  # kit's, then ours
+            db.execute("INSERT INTO session VALUES (?, ?, NULL, ?)",
+                       (sid, self.store.project("proj")["path"], t))
+        call = lambda tool, param, value: json.dumps({"type": "text", "text": (
+            "<function=agent-chat_%s>\n<parameter=%s>\n%s\n</parameter>\n</function>\n</tool_call>"
+            % (tool, param, value))})
+        db.execute("INSERT INTO part VALUES ('p1', 'ses_1', ?, ?)",
+                   (started + 900, call("chat_join", "name", "coder")))
+        db.commit()
+        (self.d / "screen").write_text((SCREENS / "working-opencode-working.txt").read_text())
+        self.sp.poll()
+        self.assertNotIn("coder", self.store.agents("proj"))  # busy: nothing run yet
+        (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text())
+        self.sp.poll()
+        self.assertEqual(self.store.spawned("proj")[r["token"]]["name"], "coder")
+        self.assertIn("You joined the chat as coder.", self.typed()[-1])
+        db.execute("INSERT INTO part VALUES ('p2', 'ses_1', ?, ?)",
+                   (started + 2000, call("chat_post", "text", "@user hi\nthere")))
+        db.commit()
+        self.sp.poll()
+        self.sp.poll()  # each call runs once
+        self.assertEqual([m["text"] for m in self.store.messages("proj") if m["from"] == "coder"],
+                         ["@user hi\nthere"])
+        self.assertEqual(sum("came out as text" in c for c in self.typed()), 2)
+
     def test_nothing_is_typed_to_a_removed_agent(self):
         self.opencode_setup()
         (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text())

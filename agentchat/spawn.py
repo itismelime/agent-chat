@@ -289,12 +289,47 @@ class Spawner:
                     except StoreError:
                         continue
                     need = needs_you(text)
+                    if r["tool"] == "opencode" and opencode_state(text) == "idle":
+                        seen, r = r.get("oc_seen"), self._rescue(pid, token, r)
+                        if r.get("oc_seen") != seen:
+                            continue  # it was just typed to: look again next poll
                     if not r["name"]:
                         age = time.time() - datetime.fromisoformat(r["started"]).timestamp()
                         need = need or age > JOIN_GRACE
                     elif r["tool"] == "opencode":
                         need = self._type_unread(pid, r, text)
                 self.store.set_needs(pid, token, need)
+
+    def _rescue(self, pid, token, r):
+        """Run the chat calls an idle OpenCode model wrote out as text instead of
+        making them, and tell it so. Returns the start's fresh record."""
+        from . import opencode
+        root = self.store.root
+        sid = r.get("oc_session") or opencode.find_session(
+            root, self.store.project(pid)["path"],
+            int(datetime.fromisoformat(r["started"]).timestamp() * 1000),
+            {x.get("oc_session") for x in self.store.spawned(pid).values()})
+        if not sid:
+            return r
+        fields = {"oc_session": sid}
+        for t, tool, args in opencode.written_calls(root, sid, r.get("oc_seen", 0)):
+            fields["oc_seen"] = t
+            name = self.store.spawned(pid)[token]["name"]
+            try:
+                if tool == "chat_join" and not name:
+                    name = self.store.join(pid, args.get("name", ""), "opencode", spawn=token)["name"]
+                    self.linked(pid, token, name)
+                    note = "You joined the chat as %s." % name
+                elif tool == "chat_post" and name:
+                    self.store.post(pid, name, args.get("text", ""))
+                    note = "Your message was posted."
+                else:
+                    continue
+            except StoreError as e:
+                note = "Your %s failed: %s." % (tool, e)
+            send_text(self.store.spawned(pid)[token]["session"],
+                      "[chat] %s (Your tool call came out as text; agent-chat ran it for you.)" % note)
+        return self.store.update_spawned(pid, token, **fields)
 
     def _type_unread(self, pid, r, text):
         """Type the oldest unread message that wakes this OpenCode agent, if its

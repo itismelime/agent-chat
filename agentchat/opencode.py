@@ -3,6 +3,9 @@
 The service starts OpenCode with XDG_CONFIG_HOME pointing at this config, so
 the user's own OpenCode settings and MCP servers are neither used nor changed.
 """
+import json
+import re
+import sqlite3
 from pathlib import Path
 
 from . import rating
@@ -11,6 +14,11 @@ from .store import write_json
 
 DEFAULT = "qwen3-coder:30b"
 CLONE = Path(__file__).resolve().parent.parent
+LINK_MS = 60_000  # a start's OpenCode session opens within this after the start
+# a chat tool call written out as text, as qwen3-coder does under OpenCode's long
+# prompt: "<function=agent-chat_chat_join>\n<parameter=name>\nx\n</parameter>\n</function>"
+CALL = re.compile(r"<function=agent-chat_(chat_join|chat_post)>(.*?)</function>", re.S)
+PARAM = re.compile(r"<parameter=(\w+)>\n?(.*?)\n?</parameter>", re.S)
 
 
 def tool_models(ollama, gpu_total):
@@ -52,3 +60,52 @@ def write_config(root, ollama_url, models, port):
                                "environment": {"AGENT_CHAT_PORT": str(port)}}},
         "tools": {"skill": False}})
     return path
+
+
+def _db(root):
+    f = data_home(root) / "opencode" / "opencode.db"
+    return sqlite3.connect("file:%s?mode=ro" % f, uri=True, timeout=2) if f.exists() else None
+
+
+def find_session(root, directory, since_ms, taken=()):
+    """The OpenCode session a start opened: the first top-level session in its
+    folder created within LINK_MS after the start that no other start took, or None."""
+    # ponytail: two OpenCode starts in one folder within a minute can swap;
+    # OpenCode taking a session id on start would fix it.
+    db = _db(root)
+    if db is None:
+        return None
+    try:
+        rows = db.execute("SELECT id FROM session WHERE directory = ? AND parent_id IS NULL "
+                          "AND time_created BETWEEN ? AND ? ORDER BY time_created",
+                          (directory, since_ms, since_ms + LINK_MS)).fetchall()
+    except sqlite3.Error:
+        return None
+    finally:
+        db.close()
+    return next((r[0] for r in rows if r[0] not in taken), None)
+
+
+def written_calls(root, session, after_ms):
+    """chat_join and chat_post calls the model wrote as text in that session
+    after after_ms: [(time_ms, tool, {param: value})], oldest first."""
+    db = _db(root)
+    if db is None:
+        return []
+    try:
+        rows = db.execute("SELECT time_created, data FROM part WHERE session_id = ? AND "
+                          "time_created > ? ORDER BY time_created", (session, after_ms)).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        db.close()
+    out = []
+    for t, data in rows:
+        try:
+            part = json.loads(data)
+        except ValueError:
+            continue
+        if part.get("type") == "text":
+            for m in CALL.finditer(part.get("text") or ""):
+                out.append((t, m[1], dict(PARAM.findall(m[2]))))
+    return out
