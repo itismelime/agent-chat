@@ -40,15 +40,16 @@ box-shadow:0 1px 0 var(--line)}.p.missing{opacity:.5}
 
 /* header */
 main{flex:1;display:flex;flex-direction:column;min-width:0}
-header{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+header{display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .title{flex:1;min-width:120px;display:flex;align-items:baseline;gap:12px;overflow:hidden}
+#name{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 h1{font:700 22px/1.2 var(--display);margin:0;white-space:nowrap;letter-spacing:-.01em}
 #path{color:var(--mute);font:12px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .views{display:flex;background:var(--soft);border-radius:8px;padding:3px;gap:2px}
 .views button{background:none;color:var(--mute);padding:4px 14px;font-weight:600}
 .views button.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px #0002}
 #boardcount{font-weight:500;color:var(--mute)}
-#search{width:190px;padding:5px 10px}#menubtn,#rosterbtn{display:none}
+#search{width:170px;padding:5px 10px}#menubtn,#rosterbtn{display:none}
 
 #wrap{flex:1;display:flex;min-height:0}
 #chat{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
@@ -277,3 +278,19 @@ body.roster aside{display:block;position:fixed;inset:0 0 0 auto;z-index:15;backg
 transition:transform .2s}body.rail #rail{transform:none}#menubtn{display:block}#path{display:none}header{padding:10px 12px}
 #log,#f,#status{padding-left:12px;padding-right:12px}.m{padding-right:10px}.m .t{display:none}#search{order:9;flex:1 0 100%;width:auto}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* rules */
+#rulespanel{width:min(620px,94vw)}.rhelp{margin:0;color:var(--mute);font-size:13px}
+#rulelist{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
+#rulelist li{padding:2px 0}#rulelist li::marker{color:var(--mute);font-weight:600}
+#rulelist li{display:list-item}#rulelist .rtext{line-height:1.45}
+#rulelist button{padding:1px 8px;font-size:12px;margin-left:6px}
+#ruletext{width:100%;resize:vertical}
+#rulecount:not(:empty){background:var(--soft);border-radius:8px;padding:0 6px;margin-left:2px;font-size:12px}
+
+/* reactions */
+.reacts{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}.reacts:empty{display:none}
+.react{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:0 8px;font-size:13px;line-height:22px;
+color:var(--ink);font-weight:500}.react:hover{border-color:var(--mute)}
+.react.mine{border-color:var(--attn);background:var(--attn-bg)}
+#menu.emojis{display:flex;min-width:0;gap:2px}#menu.emojis div{font-size:18px;padding:4px 7px}

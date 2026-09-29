@@ -1,5 +1,5 @@
 // Needs an answer: agent messages posted with ask, or addressed to you (@user or @you up front) or private
-// to you and offering choices, in every
+// to you and offering choices, that you have not reacted to, in every
 // project, oldest first, until you post to that agent or to everyone after it, or answer or dismiss them
 // here. Answers to a private message stay private. When a
 // question lists options (A) B) C), Option 1: …) they become choices: ↑/↓ and Enter, or the letter.
@@ -11,7 +11,8 @@ function pending(){const out=[];
       if(m.from==='user'&&m.dm){answered.add(current(m.dm,p.id));continue;}
       if(m.from==='user'){if(!lead(m.text).length)all=true;
         for(const x of m.text.matchAll(/@([\w-]+)/g))answered.add(current(x[1].toLowerCase(),p.id));continue;}
-      if(m.kind!=='board'&&!answered.has(current(m.from,p.id))&&!gone.has(m.n)&&(m.ask||(m.dm||lead(m.text).some(n=>n==='user'||n==='you'))&&options(m.text).length))out.push({p,m});}}
+      if(m.kind!=='board'&&!answered.has(current(m.from,p.id))&&!gone.has(m.n)&&(m.ask||(m.dm||lead(m.text).some(n=>n==='user'||n==='you'))&&options(m.text).length)
+        &&!Object.values((reactsBy[p.id]||{})[m.n]||{}).some(w=>w.includes('user')))out.push({p,m});}}  // a reaction acknowledges it
   return out.sort((a,b)=>a.m.time<b.m.time?-1:a.m.time>b.m.time?1:a.m.n-b.m.n);}
 // options: lines like "A) …", "**B.** …", "- C: …", "Option 1: …", in order from A or 1, at least two
 const OPT_RE=/^\s*(?:[-*]\s+)?(?:\*\*)?(?:option\s+([A-Za-z]|\d)|\(?([A-H])\))(?:\*\*)?\s*[.):—–-]?\s*(?:\*\*)?\s*(.+)$|^\s*(?:[-*]\s+)?(?:\*\*)?([A-H])(?:\*\*)?\s*[.:—–-]\s*(?:\*\*)?\s*(.+)$/i;

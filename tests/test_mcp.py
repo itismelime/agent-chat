@@ -36,7 +36,7 @@ class McpTest(unittest.TestCase):
     def test_in_project(self):
         self.assertIn("This project (proj) has a shared chat", self.instructions)
         names = [t["name"] for t in rpc(self.s, "tools/list")["result"]["tools"]]
-        self.assertEqual(names, ["chat_join", "chat_post", "chat_rename", "chat_read",
+        self.assertEqual(names, ["chat_join", "chat_post", "chat_rename", "chat_react", "chat_read",
                                  "board_list", "board_add", "board_update"])
 
     def test_outside_project(self):

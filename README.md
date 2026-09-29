@@ -133,13 +133,18 @@ Codex does not resume on its own, so the service queues messages into its sessio
 ### Talking
 
 Messages render as Markdown: code blocks with Copy, lists, tables and links. Hover a
-message to **Reply**, **Copy** or **Add to board**. A reply quotes the original, for agents
+message to **Reply**, **React**, **Copy** or **Add to board**. A reply quotes the original, for agents
 too. A file path in a message opens in a viewer, with Markdown rendered, if it lies inside
 the project folder. Each agent keeps its own color and avatar in the chat, the Agents list
 and Needs an answer.
 
 Agents are told how the page renders messages. They put code in fenced blocks, and they
 post with `ask: true` only when you have to answer or decide.
+
+**Reactions** acknowledge a message without a reply: 👍 ✅ 👀 ❤️ 🎉 🙏 😄 👎. They show as
+chips under the message (click one to add or take off yours) and wake nobody. Agents react
+with `chat_react`; they see each message's number (`#12`) to refer to it. Your reaction on an
+agent's question also takes it off Needs an answer.
 
 **Private messages**: an agent posts with `chat_post` `private: true`, or you pick
 **Message <name> privately** in the Agents list. Only you and that agent see them, and
@@ -149,11 +154,22 @@ a lock: agents run as your user and could read the chat files.
 **Search messages** (Ctrl+K) filters the chat. Unsent text is kept per project. **Theme**
 switches light, dark or your system's.
 
+### Rules
+
+**Rules** in the header lists the rules of the open project: standing instructions every agent
+there has to follow, like *When you mention a PR by number, link to it*. Add, edit or delete
+them there (up to 50 of 500 characters each). Agents get them when they join and with every
+message that wakes them, as `Project rules (follow them): 1. … 2. …`, so they hold through
+long sessions; Codex, OpenCode and local models get them the same way. Every change shows in
+the chat as a notice that wakes nobody. Only you change rules; agents have no tool for it.
+
 ### Needs an answer
 
 A column that lists, from every project and oldest first:
 - messages an agent posted with `ask: true`
 - `@user` or private messages that offer choices
+
+that you have not reacted to.
 
 Plain reports ("@user done, merged") stay in the chat. Options written as `A)`, `B)` … or
 `Option 1:` become choices: ↑/↓ and Enter, or the letter. Each question has its own reply
@@ -168,7 +184,7 @@ tmux session in the project folder and joins by itself.
 
 - **Needs you**: when it asks for permission, it shows under **Needs you** and as a banner
   above the chat. A project in the sidebar gets an orange **!**, and you get a browser
-  notification (after **Enable notifications**), whichever project is open.
+  notification (after **Notifications** in the header), whichever project is open.
 - **View terminal** (right-click the agent) shows its screen, with buttons and a text line to
   answer, and the `tmux attach -t …` command to take over.
 - **Stop** ends it.

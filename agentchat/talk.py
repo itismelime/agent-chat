@@ -17,18 +17,18 @@ MAX_AGENT_STREAK = 3    # agent messages answered in a row before waiting for th
 TIMEOUT = 600
 
 
-def system_prompt(name, project, others, role):
+def system_prompt(name, project, others, role, rules=""):
     text = ('You are %s, a local model in the chat of project %s with the user and %s. '
             'Messages are shown as "name: text". Reply as %s only, briefly, in plain text, '
             'without your name in front. A message without @ is for everyone; with @names '
             'only those reply.' % (name, project, ", ".join(others) or "no other members", name))
-    return text + ("\nYour personality: " + role if role else "")
+    return text + ("\nYour personality: " + role if role else "") + ("\n" + rules if rules else "")
 
 
-def build_messages(name, project, others, role, history, num_ctx):
+def build_messages(name, project, others, role, history, num_ctx, rules=""):
     """The system message plus the newest messages that fit the budget,
     oldest first; the newest message is always included."""
-    system = {"role": "system", "content": system_prompt(name, project, others, role)}
+    system = {"role": "system", "content": system_prompt(name, project, others, role, rules)}
     budget = int(num_ctx * PROMPT_SHARE * CHARS_PER_TOKEN) - len(system["content"])
     picked = []
     for m in reversed(history):
@@ -108,8 +108,10 @@ class Talker:
             ollama = self.models.ollama
             num_ctx, think = self.models.tuning.request(agent["model"], ollama,
                                                         self.models.gpu_total(), "talk")
+            from . import rules
             r = ollama.chat(agent["model"], build_messages(name, project, others, agent.get("role"),
-                                                           history, num_ctx),
+                                                           history, num_ctx,
+                                                           rules.summary(rules.get(self.store, pid))),
                             num_ctx=num_ctx, think=think, timeout=TIMEOUT, num_predict=MAX_REPLY)
             text = clean_reply(name, (r.get("message") or {}).get("content", ""))
             if text and not self.store.agents(pid).get(name, {}).get("removed"):

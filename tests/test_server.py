@@ -298,14 +298,14 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(label(dict(m, text="@cody you were assigned #1"), "cody"), "addressed to you: reply")
 
     def test_fmt_and_label(self):
-        m = {"time": "2026-09-27T18:30:16+02:00", "from": "user", "text": "@bob hi"}
-        self.assertEqual(fmt(m), "[18:30:16] user: @bob hi")
+        m = {"n": 7, "time": "2026-09-27T18:30:16+02:00", "from": "user", "text": "@bob hi"}
+        self.assertEqual(fmt(m), "[18:30:16] #7 user: @bob hi")
         self.assertEqual(label(m, "bob"), "addressed to you: reply")
         self.assertEqual(label(m, "alice"), "for others: read only")
         self.assertEqual(label(dict(m, text="hi"), "alice"), "for everyone: reply")
         self.assertIn("private", label(dict(m, dm="bob"), "bob"))
         m["reply"] = {"n": 3, "from": "bob", "text": "Pick A or B?\nMore"}
-        self.assertEqual(fmt(m), '[18:30:16] user (replying to bob #3 "Pick A or B? More"): @bob hi')
+        self.assertEqual(fmt(m), '[18:30:16] #7 user (replying to bob #3 "Pick A or B? More"): @bob hi')
 
     def test_project_files(self):
         pid = self.add()
@@ -411,7 +411,9 @@ class ModelRoutesTest(unittest.TestCase):
                                     ("marked.js", b"marked", "text/javascript"),
                                     ("markdown.js", b"function renderText", "text/javascript"),
                                     ("answers.js", b"function drawAnswers", "text/javascript"),
-                                    ("format.js", b"function wrap", "text/javascript")]:
+                                    ("format.js", b"function wrap", "text/javascript"),
+                                    ("rules.js", b"function loadRules", "text/javascript"),
+                                    ("reactions.js", b"function reactRow", "text/javascript")]:
             conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
             conn.request("GET", "/" + name)
             r = conn.getresponse()
