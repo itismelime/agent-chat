@@ -63,11 +63,13 @@ def claude_session(path, name, home=None):
     """The id of the Claude Code session in this project that took the chat
     name: the newest session log under ~/.claude/projects whose chat_join or
     chat_rename set it. None if there is none."""
-    # ponytail: a name set with `chat rename` from a shell is not found; the
+    # ponytail: a name set with `bullpen rename` from a shell is not found; the
     # MCP tools are what agents use.
     root = Path(home or Path.home()) / ".claude" / "projects"
     slug = re.sub(r"[^A-Za-z0-9]", "-", str(path))
-    needles = ['"name":"mcp__agent-chat__chat_%s","input":{"name":%s' % (tool, json.dumps(name))
+    # sessions from before the rename used the MCP server name agent-chat
+    needles = ['"name":"mcp__%s__chat_%s","input":{"name":%s' % (server, tool, json.dumps(name))
+               for server in ("bullpen", "agent-chat")
                for tool in ("join", "rename")]
     best = None
     for d in root.glob(slug + "*"):  # the folder and its subfolders
@@ -93,7 +95,7 @@ def start(tool, path, session, token, model=None, config_home=None, data_home=No
     missing = [t for t in ("tmux", tool) if shutil.which(t) is None]
     if missing:
         raise StoreError(503, "%s is not installed" % " and ".join(missing))
-    env = ["-e", "AGENT_CHAT_SPAWN=" + token]
+    env = ["-e", "BULLPEN_SPAWN=" + token]
     if tool == "opencode":
         env += ["-e", "XDG_CONFIG_HOME=" + config_home] if config_home else []
         env += ["-e", "XDG_DATA_HOME=" + data_home] if data_home else []
@@ -109,7 +111,7 @@ def start(tool, path, session, token, model=None, config_home=None, data_home=No
                    else ["codex", "resume", resume, "%s (start %s)" % (prompt, token)])
     else:
         # Codex's MCP servers are started by its app-server daemon and do not see
-        # AGENT_CHAT_SPAWN, so Codex gets the token in its prompt for chat_join.
+        # BULLPEN_SPAWN, so Codex gets the token in its prompt for chat_join.
         prompt = PROMPT + (" with a name that fits your personality: %s" % personality
                            if personality else "")
         command = [tool, prompt if tool == "claude" else "%s (start %s)" % (prompt, token)]
@@ -201,7 +203,7 @@ class Spawner:
         self.store._check_role(personality)  # before tmux starts anything
         project = self.store.project(pid)
         token = secrets.token_hex(16)
-        session = "agent-chat-%s-%s" % (pid, token[:6])
+        session = "bullpen-%s-%s" % (pid, token[:6])
         home = None
         if tool == "opencode":
             from . import opencode
@@ -236,7 +238,7 @@ class Spawner:
         if not sid:
             raise StoreError(404, "no session of %s found to resume" % name)
         token = secrets.token_hex(16)
-        session = "agent-chat-%s-%s" % (pid, token[:6])
+        session = "bullpen-%s-%s" % (pid, token[:6])
         start(agent["kind"], project["path"], session, token, resume=sid, name=name)
         self.store.add_spawned(pid, token, agent["kind"], session)
         return self.store.update_spawned(pid, token, resume=name)
@@ -249,7 +251,7 @@ class Spawner:
 
     def linked(self, pid, token, name):
         """After a join: give the tmux session the agent's name, if free."""
-        new = "agent-chat-%s-%s" % (pid, name)
+        new = "bullpen-%s-%s" % (pid, name)
         with self.lock:
             if rename(self.record(pid, token)["session"], new):
                 self.store.update_spawned(pid, token, session=new)
@@ -262,7 +264,7 @@ class Spawner:
             try:
                 self.models.ollama.unload(r["model"])
             except Exception as e:  # stopping still succeeded
-                print("agent-chat: could not unload %s: %s" % (r["model"], e), file=sys.stderr)
+                print("bullpen: could not unload %s: %s" % (r["model"], e), file=sys.stderr)
 
     def _model_in_use(self, model):
         for p in self.store.projects():
@@ -286,7 +288,7 @@ class Spawner:
                         self.store.drop_spawned(pid, token, session=r["session"])
                         continue
                 if r["name"] and self.store.waiting.get((pid, r["name"])):
-                    need = False  # an open chat wait means the agent is idle
+                    need = False  # an open bullpen wait means the agent is idle
                 else:
                     try:
                         text = screen(r["session"])
@@ -332,7 +334,7 @@ class Spawner:
             except StoreError as e:
                 note = "Your %s failed: %s." % (tool, e)
             send_text(self.store.spawned(pid)[token]["session"],
-                      "[chat] %s (Your tool call came out as text; agent-chat ran it for you.)" % note)
+                      "[chat] %s (Your tool call came out as text; bullpen ran it for you.)" % note)
         return self.store.update_spawned(pid, token, **fields)
 
     def _type_unread(self, pid, r, text):
@@ -358,7 +360,7 @@ class Spawner:
             try:
                 self.poll()
             except Exception as e:  # keep watching whatever one poll ran into
-                print("agent-chat: poll failed: %s" % e, file=sys.stderr)
+                print("bullpen: poll failed: %s" % e, file=sys.stderr)
             time.sleep(POLL_SECONDS)
 
     def start_poller(self):

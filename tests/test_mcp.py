@@ -1,10 +1,10 @@
 import unittest
 
-from agentchat.client import Client
-from agentchat import mcp
-from agentchat.client import ApiError
-from agentchat.mcp import Relay, Session, handle, kind_of
-from agentchat.server import announce_update
+from bullpen.client import Client
+from bullpen import mcp
+from bullpen.client import ApiError
+from bullpen.mcp import Relay, Session, handle, kind_of
+from bullpen.server import announce_update
 from tests.helpers import start, stop
 
 
@@ -63,7 +63,7 @@ class McpTest(unittest.TestCase):
         text, err = tool(self.s, "chat_post", {"text": "hello"})
         self.assertFalse(err)
         self.assertIn("posted #2", text)
-        self.assertIn("Reminder: your chat wait is not running", text)
+        self.assertIn("Reminder: your bullpen wait is not running", text)
         self.assertIn("posted #3", tool(self.s, "chat_post", {"text": "@user psst", "private": True})[0])
         self.assertEqual(self.store.messages("proj")[-1]["dm"], "alice")
         self.store.post("proj", "user", "@alice ok")
@@ -92,7 +92,7 @@ class McpTest(unittest.TestCase):
         text, err = tool(s, "chat_join", {"name": "cody"})
         self.assertFalse(err, text)
         self.assertIn("delivered into this session", text)
-        self.assertNotIn("chat wait", text)
+        self.assertNotIn("bullpen wait", text)
         self.assertNotIn(" wait --as", text)
         self.assertEqual(self.store.agents("proj")["cody"]["thread"], "01a0e3df-6b97-7233-b194-a7cb90765ce4")
         self.assertNotIn("Reminder", tool(s, "chat_post", {"text": "hi"})[0])
@@ -106,7 +106,7 @@ class McpTest(unittest.TestCase):
 
     def test_join_sends_the_start_token(self):
         # a session name no real tmux has: linking tries to rename it and must fail harmlessly
-        self.store.add_spawned("proj", "tok", "claude", "agent-chat-test-no-such-session")
+        self.store.add_spawned("proj", "tok", "claude", "bullpen-test-no-such-session")
         s = Session(Client(self.port), str(self.dir), spawn_token="tok")
         rpc(s, "initialize", {"clientInfo": {"name": "claude-code"}})
         text, err = tool(s, "chat_join", {"name": "alice"})
@@ -114,25 +114,25 @@ class McpTest(unittest.TestCase):
         self.assertEqual(self.store.spawned("proj")["tok"]["name"], "alice")
 
     def test_join_takes_a_start_token_argument(self):
-        self.store.add_spawned("proj", "tok", "codex", "agent-chat-test-no-such-session")
-        self.store.add_spawned("proj", "other", "codex", "agent-chat-test-no-such-session-2")
+        self.store.add_spawned("proj", "tok", "codex", "bullpen-test-no-such-session")
+        self.store.add_spawned("proj", "other", "codex", "bullpen-test-no-such-session-2")
         s, _ = self.codex("01a0e3df-6b97-7233-b194-a7cb90765ce4")
         text, err = tool(s, "chat_join", {"name": "cody", "spawn": "tok"})
         self.assertFalse(err, text)
         self.assertEqual(self.store.spawned("proj")["tok"]["name"], "cody")
 
     def test_a_hand_started_opencode_is_not_typed_to(self):
-        s = Session(Client(self.port), str(self.dir))   # no AGENT_CHAT_SPAWN
+        s = Session(Client(self.port), str(self.dir))   # no BULLPEN_SPAWN
         init = rpc(s, "initialize", {"clientInfo": {"name": "opencode"}})
         self.assertEqual(s.kind, "llm")
         self.assertIn("wait", tool(s, "chat_join", {"name": "hand"})[0])
 
     def test_opencode_session(self):
         s = Session(Client(self.port), str(self.dir), spawn_token="tok")
-        self.store.add_spawned("proj", "tok", "opencode", "agent-chat-test-no-such-session")
+        self.store.add_spawned("proj", "tok", "opencode", "bullpen-test-no-such-session")
         init = rpc(s, "initialize", {"clientInfo": {"name": "opencode", "version": "1.18.32"}})
         self.assertEqual(s.kind, "opencode")
-        self.assertNotIn("chat wait", init["result"]["instructions"])
+        self.assertNotIn("bullpen wait", init["result"]["instructions"])
         self.assertNotIn("spawn", init["result"]["instructions"])
         join = next(t for t in rpc(s, "tools/list")["result"]["tools"] if t["name"] == "chat_join")
         self.assertNotIn("spawn", join["inputSchema"]["properties"])
@@ -146,7 +146,7 @@ class McpTest(unittest.TestCase):
         self.assertIn("spawn", cjoin["inputSchema"]["properties"])
 
     def test_join_tells_the_personality(self):
-        self.store.add_spawned("proj", "tok", "claude", "agent-chat-test-no-such-session", personality="You test")
+        self.store.add_spawned("proj", "tok", "claude", "bullpen-test-no-such-session", personality="You test")
         s = Session(Client(self.port), str(self.dir), spawn_token="tok")
         rpc(s, "initialize", {"clientInfo": {"name": "claude-code"}})
         text, err = tool(s, "chat_join", {"name": "kit"})
@@ -259,7 +259,7 @@ class RelayTest(unittest.TestCase):
         announce_update(self.store)
         notes = [m["text"] for m in self.store.messages("proj") if m["from"] == "board"]
         self.assertEqual(notes, [mcp.NEWS])
-        old, mcp.NEWS = mcp.NEWS, "agent-chat was updated: something else."
+        old, mcp.NEWS = mcp.NEWS, "bullpen was updated: something else."
         self.addCleanup(setattr, mcp, "NEWS", old)
         announce_update(self.store)
         self.assertEqual(len([m for m in self.store.messages("proj") if m["from"] == "board"]), 2)

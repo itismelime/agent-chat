@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agentchat.board import Board
-from agentchat.store import Store, StoreError
+from bullpen.board import Board
+from bullpen.store import Store, StoreError
 
 
 class BoardTest(unittest.TestCase):
@@ -83,7 +83,7 @@ class BoardTest(unittest.TestCase):
         self.assertEqual(self.board.get("proj")["cards"], [])
 
     def test_notices_wake_only_the_addressed(self):
-        from agentchat.store import wakes
+        from bullpen.store import wakes
         c = self.board.add("proj", "user", "x")
         self.board.update("proj", c["id"], "user", assignee="cody")
         added, assigned = [m for m in self.store.messages("proj") if m["from"] == "board"]

@@ -1,4 +1,4 @@
-"""Talks to the agent-chat service, for the CLI and the MCP server."""
+"""Talks to the bullpen service, for the CLI and the MCP server."""
 import json
 import os
 from urllib.error import HTTPError
@@ -7,8 +7,8 @@ from urllib.request import Request, urlopen
 
 from .store import addressed
 
-DOWN = ("agent-chat service not running (%s)" % (
-    "schtasks /run /tn agent-chat" if os.name == "nt" else "systemctl --user start agent-chat"))
+DOWN = ("bullpen service not running (%s)" % (
+    "schtasks /run /tn bullpen" if os.name == "nt" else "systemctl --user start bullpen"))
 
 
 class ServiceDown(Exception):
@@ -23,12 +23,12 @@ class ApiError(Exception):
 
 class Client:
     def __init__(self, port=None):
-        port = port or os.environ.get("AGENT_CHAT_PORT", "8765")
+        port = port or os.environ.get("BULLPEN_PORT", "8765")
         self.base = "http://127.0.0.1:%s" % port
 
     def call(self, method, path, body=None, timeout=10):
         data = None if body is None else json.dumps(body).encode()
-        headers = {"X-Agent-Chat": "1"}
+        headers = {"X-Bullpen": "1"}
         if data:
             headers["Content-Type"] = "application/json"
         try:

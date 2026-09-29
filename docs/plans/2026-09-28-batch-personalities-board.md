@@ -7,7 +7,7 @@
 
 ## Global Constraints
 - Python 3.9+ stdlib; files under 500 lines (the page's board goes in
-  `agentchat/board.js` like `models.js`); commit only on a green suite.
+  `bullpen/board.js` like `models.js`); commit only on a green suite.
 - `board` becomes a reserved name; board notices wake only addressed names.
 
 ## Tasks
@@ -23,11 +23,11 @@
    `role`); start records take `personality` and `join` copies it; route
    `…/agents/<name>/personality`, `role` stays an alias; `POST spawned` accepts
    `personality`. Tests.
-4. **Personalities (delivery)** — `chat_join` result line; CLI `chat wait`
+4. **Personalities (delivery)** — `chat_join` result line; CLI `bullpen wait`
    prints `Your personality: …` first (from `GET agents`); Codex queued text
    first line; `spawn.format_message(m, name, personality=None)`; talk
    `system_prompt` uses it. Tests.
-5. **Board (store, routes, notices)** — `agentchat/board.py` (`Board(store)`:
+5. **Board (store, routes, notices)** — `bullpen/board.py` (`Board(store)`:
    `get`, `add`, `update`, `delete`; validation; notices through
    `store.post(pid, "board", …)`; `board` reserved but allowed as a poster for
    notices only); routes. Tests: ids, validation, moves, assignment notice wakes
@@ -37,6 +37,6 @@
    for claude/codex/opencode kinds; not for kind llm. Tests.
 7. **Page** — code formatting (`renderText` in page.html), Forget, Edit
    personality with presets, personality prompt on Start, Chat | Board switch
-   and board UI in `agentchat/board.js` (served like `models.js`). Firefox check.
+   and board UI in `bullpen/board.js` (served like `models.js`). Firefox check.
 8. **Docs, deploy, live check** — README; final review; merge; restart; live
    check with the user.

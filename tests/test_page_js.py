@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from pathlib import Path
 
-ANSWERS = Path(__file__).parent.parent / "agentchat" / "answers.js"
+ANSWERS = Path(__file__).parent.parent / "bullpen" / "answers.js"
 CHECK = r"""
 // evaluates only this repo's own answers.js, to test options() without a browser
 const src=require('fs').readFileSync(process.argv[1],'utf8');
@@ -33,7 +33,7 @@ assert.deepStrictEqual(pending().map(x=>x.m.n),[2]);
 """
 
 
-FORMAT = Path(__file__).parent.parent / "agentchat" / "format.js"
+FORMAT = Path(__file__).parent.parent / "bullpen" / "format.js"
 FORMAT_CHECK = r"""
 // format.js against a stand-in textarea (no DOM; insertText falls back to setRangeText)
 const src=require('fs').readFileSync(process.argv[1],'utf8'),assert=require('assert');

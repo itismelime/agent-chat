@@ -1,4 +1,4 @@
-// agent-chat page: projects, transcript, composer, roster, terminal, dialogs.
+// bullpen page: projects, transcript, composer, roster, terminal, dialogs.
 // models.js and board.js load after this and use its globals.
 const $=id=>document.getElementById(id),log=$('log'),t=$('t'),ac=$('ac'),bell=$('bell');
 const saved={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v===null?d:v}catch(e){return d}},
@@ -28,15 +28,15 @@ function day(iso){const d=new Date(iso),today=new Date(),y=new Date(today-864e5)
   return d.toDateString()===today.toDateString()?'Today':d.toDateString()===y.toDateString()?'Yesterday':
     d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});}
 async function api(path,body){
-  const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json','X-Agent-Chat':'1'},
-    body:JSON.stringify(body)}:{headers:{'X-Agent-Chat':'1'}});
+  const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json','X-Bullpen':'1'},
+    body:JSON.stringify(body)}:{headers:{'X-Bullpen':'1'}});
   const x=r.status===204?null:await r.json();
   if(!r.ok)throw new Error(x&&x.error||r.statusText);return x;}
 function away(){return document.hidden||!document.hasFocus();}
 function lastN(id){const l=msgs[id]||[];return l.length?l[l.length-1].n:0;}
 function unread(p){return (msgs[p.id]||[]).filter(m=>m.n>(seen[p.id]||0)&&m.from!=='user').length;}
 function notify(p,m){if(window.Notification&&Notification.permission==='granted')
-  new Notification(m.from+' in '+p.name,{body:m.text.slice(0,300),tag:'agent-chat-'+p.id+'-'+m.n});}
+  new Notification(m.from+' in '+p.name,{body:m.text.slice(0,300),tag:'bullpen-'+p.id+'-'+m.n});}
 function say(note,err){$('note').textContent=note||'';$('err').textContent=err||'';}
 
 async function refresh(){
@@ -70,7 +70,7 @@ async function refresh(){
     saved.set('seen',seen);if(down){say();down=false;}render();
     if(typeof drawBoard==='function'&&!$('boardview').hidden&&boardData)drawBoard(boardData);
     if(typeof drawEpics==='function'&&!$('epicview').hidden&&boardData)drawEpics(boardData);
-  }catch(e){down=true;say('','Cannot reach the agent-chat service: '+e.message+'. Is it running? systemctl --user status agent-chat');}
+  }catch(e){down=true;say('','Cannot reach the bullpen service: '+e.message+'. Is it running? systemctl --user status bullpen');}
   finally{busy=false;}
 }
 function atEnd(){return log.scrollHeight-log.scrollTop-log.clientHeight<60;}
@@ -88,9 +88,9 @@ function render(){
     if(n)d.append(el('span','badge',String(n)));else if(i<9&&!ask)d.append(el('kbd','','Alt+'+(i+1)));
     d.onclick=()=>select(p.id);return d;}));
   if(typeof drawAnswers==='function')drawAnswers();const total=projects.reduce((s,p)=>s+unread(p),0);
-  document.title=(needed.size||answerCount?'● ':'')+(total?`(${total}) `:'')+'agent-chat';
+  document.title=(needed.size||answerCount?'● ':'')+(total?`(${total}) `:'')+'bullpen';
   const p=projects.find(p=>p.id===cur);
-  $('name').textContent=p?p.name:'agent-chat';$('path').textContent=p?p.path:'';
+  $('name').textContent=p?p.name:'bullpen';$('path').textContent=p?p.path:'';
   const open=boardData?boardData.cards.filter(c=>c.column!=='done'):[];
   $('boardcount').textContent=String(open.filter(c=>c.kind!=='epic').length||'');
   $('epiccount').textContent=String(open.filter(c=>c.kind==='epic').length||'');
@@ -104,7 +104,7 @@ function render(){
 // transcript: messages grouped by speaker, board notices as one line, a rule per day
 function drawLog(p){
   if(!p){log.replaceChildren(empty('Add a project to start',
-    'Choose + next to Projects and give a folder, or run chat add <folder> in a terminal.'));return;}
+    'Choose + next to Projects and give a folder, or run bullpen add <folder> in a terminal.'));return;}
   const q=query.toLowerCase(),all=msgs[p.id]||[];
   const list=q?all.filter(m=>m.text.toLowerCase().includes(q)||m.from.includes(q)):all;
   if(!all.length){log.replaceChildren(empty('No messages yet',
@@ -210,7 +210,7 @@ function openMenu(e,items){
   menu.style.top=Math.max(8,Math.min(e.clientY,innerHeight-r.height-8))+'px';}
 const path=(token,x)=>`api/projects/${cur}/spawned/${token}/${x}`;
 const agentPath=(a,x)=>`api/projects/${cur}/agents/${encodeURIComponent(a.name)}/${x}`;
-const NO_TMUX=navigator.platform.startsWith('Win')?'Needs tmux: run agent-chat in WSL to start agents from the page':'tmux is not installed';
+const NO_TMUX=navigator.platform.startsWith('Win')?'Needs tmux: run bullpen in WSL to start agents from the page':'tmux is not installed';
 function agentItems(a){
   const items=[];
   if(!a.starting&&a.status!=='removed')items.push(['Message '+a.name,()=>{t.value='@'+a.name+' ';t.focus();grow();hint();}],

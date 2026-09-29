@@ -5,9 +5,9 @@ import time
 import unittest
 from pathlib import Path
 
-from agentchat import spawn
-from agentchat import models as models_mod
-from agentchat.store import StoreError
+from bullpen import spawn
+from bullpen import models as models_mod
+from bullpen.store import StoreError
 from tests.fake_ollama import GIB, FakeOllama
 
 SCREENS = Path(__file__).resolve().parent / "data" / "screens"
@@ -64,24 +64,24 @@ class TmuxTest(unittest.TestCase):
         self.assertFalse(spawn.available()["codex"])
 
     def test_start_runs_the_tool_in_tmux(self):
-        spawn.start("claude", "/proj dir", "agent-chat-p-abc123", "tok")
+        spawn.start("claude", "/proj dir", "bullpen-p-abc123", "tok")
         self.assertEqual(calls(self.d), [
-            "new-session -d -s agent-chat-p-abc123 -c /proj dir -e AGENT_CHAT_SPAWN=tok "
+            "new-session -d -s bullpen-p-abc123 -c /proj dir -e BULLPEN_SPAWN=tok "
             "-- claude join the chat"])
 
     def test_codex_gets_its_start_token_in_the_prompt(self):
-        spawn.start("codex", "/p", "agent-chat-p-abc123", "tok")
+        spawn.start("codex", "/p", "bullpen-p-abc123", "tok")
         self.assertEqual(calls(self.d), [
-            "new-session -d -s agent-chat-p-abc123 -c /p -e AGENT_CHAT_SPAWN=tok "
+            "new-session -d -s bullpen-p-abc123 -c /p -e BULLPEN_SPAWN=tok "
             "-- codex join the chat (start tok)"])
 
     def test_start_opencode(self):
         (self.d / "opencode").write_text("#!/bin/sh\nexit 0\n")
         (self.d / "opencode").chmod(0o755)
-        spawn.start("opencode", "/p", "agent-chat-p-abc123", "tok", model="qwen3-coder:30b",
+        spawn.start("opencode", "/p", "bullpen-p-abc123", "tok", model="qwen3-coder:30b",
                     config_home="/data/opencode-config", data_home="/data/opencode-data")
         self.assertEqual(calls(self.d), [
-            "new-session -d -s agent-chat-p-abc123 -c /p -e AGENT_CHAT_SPAWN=tok "
+            "new-session -d -s bullpen-p-abc123 -c /p -e BULLPEN_SPAWN=tok "
             "-e XDG_CONFIG_HOME=/data/opencode-config -e XDG_DATA_HOME=/data/opencode-data "
             "-e OPENCODE_DISABLE_CLAUDE_CODE=1 -e OPENCODE_CONFIG= -e OPENCODE_CONFIG_DIR= "
             "-e OPENCODE_CONFIG_CONTENT= -- opencode -m ac/qwen3-coder:30b --prompt join the chat"])
@@ -197,7 +197,7 @@ class NeedsYouTest(unittest.TestCase):
 
 class SpawnerTest(unittest.TestCase):
     def setUp(self):
-        from agentchat.store import Store
+        from bullpen.store import Store
         self.d = stub_tools(self)
         tmp = Path(tempfile.mkdtemp())
         (tmp / "proj").mkdir()
@@ -277,7 +277,7 @@ class SpawnerTest(unittest.TestCase):
             db.execute("INSERT INTO session VALUES (?, ?, NULL, ?)",
                        (sid, self.store.project("proj")["path"], t))
         call = lambda tool, param, value: json.dumps({"type": "text", "text": (
-            "<function=agent-chat_%s>\n<parameter=%s>\n%s\n</parameter>\n</function>\n</tool_call>"
+            "<function=bullpen_%s>\n<parameter=%s>\n%s\n</parameter>\n</function>\n</tool_call>"
             % (tool, param, value))})
         db.execute("INSERT INTO part VALUES ('p1', 'ses_1', ?, ?)",
                    (started + 900, call("chat_join", "name", "coder")))
@@ -321,13 +321,13 @@ class SpawnerTest(unittest.TestCase):
         a, b = self.sp.start("proj", "claude"), self.sp.start("proj", "claude")
         self.assertNotEqual(a["token"], b["token"])
         self.assertNotEqual(a["session"], b["session"])
-        self.assertTrue(a["session"].startswith("agent-chat-proj-"))
+        self.assertTrue(a["session"].startswith("bullpen-proj-"))
         self.assertEqual(len(self.store.spawned("proj")), 2)
 
     def test_linked_renames_the_session(self):
         r = self.sp.start("proj", "claude")
         self.sp.linked("proj", r["token"], "alice")
-        self.assertEqual(self.store.spawned("proj")[r["token"]]["session"], "agent-chat-proj-alice")
+        self.assertEqual(self.store.spawned("proj")[r["token"]]["session"], "bullpen-proj-alice")
         r2 = self.sp.start("proj", "codex")
         (self.d / "norename").touch()
         self.sp.linked("proj", r2["token"], "alice")  # name clash in tmux: keeps its old name
@@ -340,8 +340,8 @@ class SpawnerTest(unittest.TestCase):
         path = self.store.project("proj")["path"]
         logs = home / ".claude" / "projects" / re.sub(r"[^A-Za-z0-9]", "-", path)
         logs.mkdir(parents=True)
-        (logs / "s-alice.jsonl").write_text('{"name":"mcp__agent-chat__chat_join","input":{"name":"alice"}}\n')
-        (logs / "s-bob.jsonl").write_text('{"name":"mcp__agent-chat__chat_join","input":{"name":"bob"}}\n')
+        (logs / "s-alice.jsonl").write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"alice"}}\n')
+        (logs / "s-bob.jsonl").write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"bob"}}\n')
         self.store.join("proj", "alice", "claude")
         with self.assertRaises(StoreError) as e:  # just joined: not offline
             self.sp.resume("proj", "alice")
@@ -407,7 +407,7 @@ class SpawnerTest(unittest.TestCase):
 
         def alive(session):  # a join renames the session while the poller checks it
             if session == r["session"]:
-                self.store.update_spawned("proj", r["token"], session="agent-chat-proj-alice")
+                self.store.update_spawned("proj", r["token"], session="bullpen-proj-alice")
                 return False
             return True
         spawn.alive = alive
@@ -432,7 +432,7 @@ class SpawnerTest(unittest.TestCase):
         self.assertEqual(self.store.status("proj")[0]["status"], "waiting")
 
     def test_records_survive_a_restart(self):
-        from agentchat.store import Store
+        from bullpen.store import Store
         r = self.sp.start("proj", "claude")
         again = spawn.Spawner(Store(self.store.root))
         self.assertEqual(again.record("proj", r["token"])["tool"], "claude")
@@ -442,7 +442,7 @@ class RealTmuxTest(unittest.TestCase):
     """A fake `claude` in a real tmux server of its own."""
 
     def setUp(self):
-        from agentchat.store import Store
+        from bullpen.store import Store
         tmp = Path(tempfile.mkdtemp())
         (tmp / "bin").mkdir()
         (tmp / "proj").mkdir()

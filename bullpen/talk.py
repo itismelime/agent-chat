@@ -1,6 +1,6 @@
 """Local-model members: chat messages in, Ollama requests out, replies posted.
 
-One worker answers every local member, one reply at a time (agent-chat's
+One worker answers every local member, one reply at a time (bullpen's
 Ollama loads one model at a time)."""
 import queue
 import re
@@ -83,7 +83,7 @@ class Talker:
                 try:
                     self.answer(*key, m)
                 except Exception as e:  # keep answering the other members
-                    print("agent-chat: local member %s failed: %s" % (key[1], e), file=sys.stderr)
+                    print("bullpen: local member %s failed: %s" % (key[1], e), file=sys.stderr)
 
     def answer(self, pid, name, m):
         key = (pid, name)

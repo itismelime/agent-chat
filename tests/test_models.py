@@ -3,9 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agentchat import models
-from agentchat.ollama import Ollama, OllamaError
-from agentchat.store import StoreError
+from bullpen import models
+from bullpen.ollama import Ollama, OllamaError
+from bullpen.store import StoreError
 from tests.fake_ollama import GIB, FakeOllama
 
 NVIDIA = """#!/bin/sh

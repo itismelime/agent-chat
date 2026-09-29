@@ -1,15 +1,15 @@
-"""Against a real Ollama: AGENT_CHAT_TEST_OLLAMA=<url> AGENT_CHAT_TEST_MODEL=<small model>."""
+"""Against a real Ollama: BULLPEN_TEST_OLLAMA=<url> BULLPEN_TEST_MODEL=<small model>."""
 import os
 import tempfile
 import unittest
 
-from agentchat import models
-from agentchat.ollama import Ollama
+from bullpen import models
+from bullpen.ollama import Ollama
 
-URL, MODEL = os.environ.get("AGENT_CHAT_TEST_OLLAMA"), os.environ.get("AGENT_CHAT_TEST_MODEL")
+URL, MODEL = os.environ.get("BULLPEN_TEST_OLLAMA"), os.environ.get("BULLPEN_TEST_MODEL")
 
 
-@unittest.skipUnless(URL and MODEL, "set AGENT_CHAT_TEST_OLLAMA and AGENT_CHAT_TEST_MODEL")
+@unittest.skipUnless(URL and MODEL, "set BULLPEN_TEST_OLLAMA and BULLPEN_TEST_MODEL")
 class RealOllamaTest(unittest.TestCase):
     def test_benchmark_and_unload(self):
         ollama, tuning, jobs = Ollama(URL), models.Tuning(tempfile.mkdtemp()), models.Jobs()

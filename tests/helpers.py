@@ -2,8 +2,8 @@ import tempfile
 import threading
 from pathlib import Path
 
-from agentchat.server import serve
-from agentchat.store import Store
+from bullpen.server import serve
+from bullpen.store import Store
 
 
 def start(wait_seconds=1, models=None):

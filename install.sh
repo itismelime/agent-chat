@@ -1,34 +1,34 @@
 #!/usr/bin/env bash
-# Install agent-chat for the current user (Linux with systemd; on Windows use install.ps1). Safe to rerun.
+# Install bullpen for the current user (Linux with systemd; on Windows use install.ps1). Safe to rerun.
 #   ./install.sh                     install or update
 #   ./install.sh --ollama-url <url>  use an existing Ollama (http://127.0.0.1:<port>),
-#                                    or "own" for agent-chat's own
-#   ./install.sh --uninstall         remove; chats and models stay in ~/.local/share/agent-chat
+#                                    or "own" for bullpen's own
+#   ./install.sh --uninstall         remove; chats and models stay in ~/.local/share/bullpen
 set -euo pipefail
 here=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
 bin=$HOME/.local/bin
 units=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
-unit=$units/agent-chat.service
-ollama_unit=$units/agent-chat-ollama.service
-data=${XDG_DATA_HOME:-$HOME/.local/share}/agent-chat
-port=${AGENT_CHAT_PORT:-8765}
-runtime=${AGENT_CHAT_RUNTIME:-$here/runtime}
+unit=$units/bullpen.service
+ollama_unit=$units/bullpen-ollama.service
+data=${XDG_DATA_HOME:-$HOME/.local/share}/bullpen
+port=${BULLPEN_PORT:-8765}
+runtime=${BULLPEN_RUNTIME:-$here/runtime}
 ollama_version=v0.34.2
-ollama_sha256=${AGENT_CHAT_OLLAMA_SHA256:-e155b83589986d2c581fdbf1381ea3ebdb16549883679cd5a0627f7cdc05b12b}
-ollama_download=${AGENT_CHAT_OLLAMA_DOWNLOAD:-https://github.com/ollama/ollama/releases/download/$ollama_version/ollama-linux-amd64.tar.zst}
-ollama_port=${AGENT_CHAT_OLLAMA_PORT:-11436}
+ollama_sha256=${BULLPEN_OLLAMA_SHA256:-e155b83589986d2c581fdbf1381ea3ebdb16549883679cd5a0627f7cdc05b12b}
+ollama_download=${BULLPEN_OLLAMA_DOWNLOAD:-https://github.com/ollama/ollama/releases/download/$ollama_version/ollama-linux-amd64.tar.zst}
+ollama_port=${BULLPEN_OLLAMA_PORT:-11436}
 say() { printf '  %s\n' "$*"; }
 usage() { echo "usage: ./install.sh [--uninstall | --ollama-url <url>|own]" >&2; exit 2; }
-# ~/.local/bin/chat may be replaced if it is missing, a dangling link, or ours
+# ~/.local/bin/bullpen may be replaced if it is missing, a dangling link, or ours
 replaceable() {
     [[ ! -e $1 ]] && return 0
-    [[ -L $1 ]] && [[ -f $(dirname "$(readlink -f "$1")")/../agentchat/store.py ]]
+    [[ -L $1 ]] && [[ -f $(dirname "$(readlink -f "$1")")/../bullpen/store.py ]]
 }
 wait_for() {  # url [tries]: poll every 0.5 s
     for _ in $(seq "${2:-20}"); do
         if python3 - "$1" 2>/dev/null <<'PY'
 import sys, urllib.request
-urllib.request.urlopen(urllib.request.Request(sys.argv[1], headers={"X-Agent-Chat": "1"}), timeout=2)
+urllib.request.urlopen(urllib.request.Request(sys.argv[1], headers={"X-Bullpen": "1"}), timeout=2)
 PY
         then return 0; fi
         sleep 0.5
@@ -45,36 +45,53 @@ case ${1:-} in
 esac
 
 if [[ $mode == uninstall ]]; then
-    for u in agent-chat agent-chat-ollama; do
+    for u in bullpen bullpen-ollama; do
         systemctl --user disable --now "$u" >/dev/null 2>&1 || true
     done
     rm -f "$unit" "$ollama_unit"
     systemctl --user daemon-reload >/dev/null 2>&1 || true
     rm -rf "$runtime/ollama" "$runtime/ollama.new"
-    if [[ $(readlink "$bin/chat" || true) == "$here/bin/chat" ]]; then rm "$bin/chat"; fi
-    if command -v claude >/dev/null; then claude mcp remove --scope user agent-chat >/dev/null 2>&1 || true; fi
-    if command -v codex >/dev/null; then codex mcp remove agent-chat >/dev/null 2>&1 || true; fi
-    echo "agent-chat removed; chats and models kept in $data"
+    if [[ $(readlink "$bin/bullpen" || true) == "$here/bin/bullpen" ]]; then rm "$bin/bullpen"; fi
+    if command -v claude >/dev/null; then claude mcp remove --scope user bullpen >/dev/null 2>&1 || true; fi
+    if command -v codex >/dev/null; then codex mcp remove bullpen >/dev/null 2>&1 || true; fi
+    echo "bullpen removed; chats and models kept in $data"
     exit 0
 fi
 
-echo "Installing agent-chat from $here"
+echo "Installing bullpen from $here"
+
+# from agent-chat, this project's name before bullpen: its services, command and MCP entry go,
+# and its chats, models and settings move over
+for u in agent-chat agent-chat-ollama; do
+    if [[ -f $units/$u.service ]]; then
+        systemctl --user disable --now "$u" >/dev/null 2>&1 || true
+        rm -f "$units/$u.service"
+        say "removed the old $u service"
+    fi
+done
+systemctl --user daemon-reload >/dev/null 2>&1 || true
+for d in "${XDG_DATA_HOME:-$HOME/.local/share}" "${XDG_CONFIG_HOME:-$HOME/.config}"; do
+    if [[ -d $d/agent-chat && ! -e $d/bullpen ]]; then mv "$d/agent-chat" "$d/bullpen"; say "moved $d/agent-chat to $d/bullpen"; fi
+done
+if [[ -L $bin/chat && $(readlink -f "$bin/chat") == "$here/bin/chat" ]]; then rm "$bin/chat"; say "removed the old command chat"; fi
+if command -v claude >/dev/null; then claude mcp remove --scope user agent-chat >/dev/null 2>&1 || true; fi
+if command -v codex >/dev/null; then codex mcp remove agent-chat >/dev/null 2>&1 || true; fi
 python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null ||
-    { echo "agent-chat needs python3 3.9 or newer" >&2; exit 1; }
+    { echo "bullpen needs python3 3.9 or newer" >&2; exit 1; }
 mkdir -p "$bin" "$units"
-if replaceable "$bin/chat"; then
-    ln -sfn "$here/bin/chat" "$bin/chat"
-    say "linked $bin/chat"
+if replaceable "$bin/bullpen"; then
+    ln -sfn "$here/bin/bullpen" "$bin/bullpen"
+    say "linked $bin/bullpen"
 else
-    say "warning: $bin/chat is another program; left it alone (run $here/bin/chat instead)"
+    say "warning: $bin/bullpen is another program; left it alone (run $here/bin/bullpen instead)"
 fi
 case ":$PATH:" in *":$bin:"*) ;; *) say "warning: $bin is not on your PATH" ;; esac
 
-# Ollama: agent-chat's own, or the one the setting names
+# Ollama: bullpen's own, or the one the setting names
 if [[ -n $url ]]; then
-    AGENT_CHAT_OLLAMA_PORT=$ollama_port "$here/bin/chat" config ollama-url "$url" || exit 2
+    BULLPEN_OLLAMA_PORT=$ollama_port "$here/bin/bullpen" config ollama-url "$url" || exit 2
 fi
-in_use=$(AGENT_CHAT_OLLAMA_PORT=$ollama_port "$here/bin/chat" config ollama-url)
+in_use=$(BULLPEN_OLLAMA_PORT=$ollama_port "$here/bin/bullpen" config ollama-url)
 if [[ $in_use == "http://127.0.0.1:$ollama_port" ]]; then
     if [[ $(cat "$runtime/ollama/.version" 2>/dev/null) == "$ollama_version" ]]; then
         say "Ollama $ollama_version already installed"
@@ -103,7 +120,7 @@ if [[ $in_use == "http://127.0.0.1:$ollama_port" ]]; then
     mkdir -p "$data/ollama-models"
     cat >"$ollama_unit" <<EOF
 [Unit]
-Description=agent-chat's Ollama (127.0.0.1:$ollama_port)
+Description=bullpen's Ollama (127.0.0.1:$ollama_port)
 
 [Service]
 ExecStart="$runtime/ollama/bin/ollama" serve
@@ -124,26 +141,26 @@ TimeoutStopSec=60
 WantedBy=default.target
 EOF
     systemctl --user daemon-reload
-    systemctl --user enable agent-chat-ollama
-    systemctl --user restart agent-chat-ollama
+    systemctl --user enable bullpen-ollama
+    systemctl --user restart bullpen-ollama
     wait_for "http://127.0.0.1:$ollama_port/api/version" 60 ||
-        { echo "agent-chat's Ollama did not start; see: journalctl --user -u agent-chat-ollama" >&2; exit 1; }
+        { echo "bullpen's Ollama did not start; see: journalctl --user -u bullpen-ollama" >&2; exit 1; }
     say "Ollama running on http://127.0.0.1:$ollama_port"
 else
-    systemctl --user disable --now agent-chat-ollama >/dev/null 2>&1 || true
+    systemctl --user disable --now bullpen-ollama >/dev/null 2>&1 || true
     rm -f "$ollama_unit"
-    say "Ollama: using $in_use (agent-chat's own is not installed)"
+    say "Ollama: using $in_use (bullpen's own is not installed)"
 fi
 
 cat >"$unit" <<EOF
 [Unit]
-Description=agent-chat service (127.0.0.1:$port)
+Description=bullpen service (127.0.0.1:$port)
 
 [Service]
-Environment=AGENT_CHAT_PORT=$port
-Environment=AGENT_CHAT_OLLAMA_PORT=$ollama_port
+Environment=BULLPEN_PORT=$port
+Environment=BULLPEN_OLLAMA_PORT=$ollama_port
 Environment=PATH=$PATH
-ExecStart=/usr/bin/env python3 "$here/bin/chat" serve
+ExecStart=/usr/bin/env python3 "$here/bin/bullpen" serve
 Restart=on-failure
 RestartSec=5
 # agents started from the page live in tmux servers this service may start;
@@ -154,24 +171,24 @@ KillMode=process
 WantedBy=default.target
 EOF
 systemctl --user daemon-reload
-systemctl --user enable agent-chat
-systemctl --user restart agent-chat
+systemctl --user enable bullpen
+systemctl --user restart bullpen
 wait_for "http://127.0.0.1:$port/api/projects" ||
-    { echo "agent-chat did not start on port $port (is something else using it?);" \
-           "see: journalctl --user -u agent-chat" >&2; exit 1; }
-say "service agent-chat running on http://127.0.0.1:$port"
+    { echo "bullpen did not start on port $port (is something else using it?);" \
+           "see: journalctl --user -u bullpen" >&2; exit 1; }
+say "service bullpen running on http://127.0.0.1:$port"
 
 for tool in claude codex; do
     if ! command -v "$tool" >/dev/null; then say "$tool not found: skipped"; continue; fi
     # re-register every time: a moved clone leaves the old path behind
     if [[ $tool == claude ]]; then
-        claude mcp remove --scope user agent-chat >/dev/null 2>&1 || true
-        claude mcp add --scope user agent-chat -- "$here/bin/chat" mcp >/dev/null
-        say "claude: registered agent-chat for all your sessions"
+        claude mcp remove --scope user bullpen >/dev/null 2>&1 || true
+        claude mcp add --scope user bullpen -- "$here/bin/bullpen" mcp >/dev/null
+        say "claude: registered bullpen for all your sessions"
     else
-        codex mcp remove agent-chat >/dev/null 2>&1 || true
-        codex mcp add agent-chat -- "$here/bin/chat" mcp >/dev/null
-        say "codex: registered agent-chat for all your sessions"
+        codex mcp remove bullpen >/dev/null 2>&1 || true
+        codex mcp add bullpen -- "$here/bin/bullpen" mcp >/dev/null
+        say "codex: registered bullpen for all your sessions"
     fi
 done
-echo "Done. Open http://127.0.0.1:$port and add a project, or run: chat add <folder>"
+echo "Done. Open http://127.0.0.1:$port and add a project, or run: bullpen add <folder>"

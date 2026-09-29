@@ -64,7 +64,7 @@ function words(frag,pid,base){
 const rawCache=new Map();
 async function rawImage(img,pid){const key=pid+':'+img.dataset.path;
   try{if(!rawCache.has(key)){const r=await fetch(`api/projects/${pid}/file?raw=1&path=${encodeURIComponent(img.dataset.path)}`,
-      {headers:{'X-Agent-Chat':'1'}});if(!r.ok)throw new Error(r.statusText);rawCache.set(key,URL.createObjectURL(await r.blob()));}
+      {headers:{'X-Bullpen':'1'}});if(!r.ok)throw new Error(r.statusText);rawCache.set(key,URL.createObjectURL(await r.blob()));}
     img.src=rawCache.get(key);}catch(e){img.replaceWith(el('span','ferr','[image '+img.dataset.path+' not found]'));}}
 
 // the file viewer: Markdown rendered, other text with line numbers; links inside open the next file, Back returns

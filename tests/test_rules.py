@@ -1,11 +1,11 @@
 import unittest
 
-from agentchat import rules
-from agentchat.client import ApiError, Client
-from agentchat.mcp import Session, handle
-from agentchat.spawn import format_message
-from agentchat.store import StoreError
-from agentchat.talk import system_prompt
+from bullpen import rules
+from bullpen.client import ApiError, Client
+from bullpen.mcp import Session, handle
+from bullpen.spawn import format_message
+from bullpen.store import StoreError
+from bullpen.talk import system_prompt
 from tests.helpers import start, stop
 
 
@@ -49,7 +49,7 @@ class RulesTest(unittest.TestCase):
         rules.add(self.store, "proj", "Keep replies short")
         want = "Project rules (follow them): 1. Link every PR 2. Keep replies short"
         self.assertEqual(rules.summary(rules.get(self.store, "proj")), want)
-        # chat wait (Claude)
+        # bullpen wait (Claude)
         self.store.join("proj", "alice", "claude")
         self.store.post("proj", "user", "@alice hi")
         self.assertEqual(self.c.call("GET", "/api/projects/proj/agents/alice/wait")[1]["rules"], want)

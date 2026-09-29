@@ -1,4 +1,4 @@
-# agent-chat: local models (runtime and Model Hub)
+# bullpen: local models (runtime and Model Hub)
 
 Status: draft for review, 2026-09-27. Roadmap feature 6, part 1 of 3:
 1. **this spec:** a tuned local Ollama and a Model Hub on the page;
@@ -13,7 +13,7 @@ GPU hand-off between them are not taken.
 
 ## Goal
 
-- `./install.sh` gives agent-chat its own tuned Ollama, or points it at an
+- `./install.sh` gives bullpen its own tuned Ollama, or points it at an
   existing one.
 - On the page, the user finds a GGUF model on Hugging Face that fits the
   GPU, gets it with one click, benchmarks it, and sees it tuned and
@@ -34,9 +34,9 @@ reads `nvidia-smi` only), automatic GPU hand-off with local-ai-chat.
 (git-ignored, about 2.1 GB). A rerun skips the download when that version
 is already unpacked. It needs `curl`, `tar` and `zstd`.
 
-Models live in `${XDG_DATA_HOME:-~/.local/share}/agent-chat/ollama-models/`.
+Models live in `${XDG_DATA_HOME:-~/.local/share}/bullpen/ollama-models/`.
 
-The user service `agent-chat-ollama.service` runs `ollama serve` with:
+The user service `bullpen-ollama.service` runs `ollama serve` with:
 
 ```
 OLLAMA_HOST=127.0.0.1:11436   OLLAMA_MODELS=<data>/ollama-models
@@ -50,18 +50,18 @@ coordinator's 11435. `--uninstall` removes the service and `runtime/`, not
 the models.
 
 **External Ollama (setting).** `./install.sh --ollama-url <url>` writes
-`{"ollama_url": "<url>"}` to `${XDG_CONFIG_HOME:-~/.config}/agent-chat/config.json`
+`{"ollama_url": "<url>"}` to `${XDG_CONFIG_HOME:-~/.config}/bullpen/config.json`
 and skips the download and the service; `--ollama-url own` switches back.
 The URL must be `http://127.0.0.1:<port>` or `http://localhost:<port>`.
-The agent-chat service reads the setting at start.
+The bullpen service reads the setting at start.
 
-**GPU sharing.** With its own Ollama, agent-chat and local-ai-chat compete
+**GPU sharing.** With its own Ollama, bullpen and local-ai-chat compete
 for video memory when both have a model loaded. Nothing coordinates them;
 a failed load shows Ollama's message with that hint (see Failure behaviour).
 
 ## Model Hub (service)
 
-New module `agentchat/models.py`. All Ollama calls go to the configured URL;
+New module `bullpen/models.py`. All Ollama calls go to the configured URL;
 chat-style calls use the native `/api/chat`, whose `think` field Ollama's
 OpenAI endpoint ignores. `think` is set per model (see Thinking).
 
@@ -146,7 +146,7 @@ An import or pull can be cancelled; one of each kind runs at a time per model.
 
 ## API
 
-All under the core protections (Host, Origin, `X-Agent-Chat`, JSON bodies,
+All under the core protections (Host, Origin, `X-Bullpen`, JSON bodies,
 own Unix user only).
 
 | Method and path | Does |
@@ -187,7 +187,7 @@ The panel refreshes every 2 s while open.
 ## Failure behaviour
 
 - Ollama unreachable: the panel says so and names the fix
-  (`systemctl --user start agent-chat-ollama`, or the external URL setting).
+  (`systemctl --user start bullpen-ollama`, or the external URL setting).
 - Hugging Face unreachable or rate-limited: the search shows the error; the
   last cached results stay.
 - Not enough disk space: the import job fails before downloading.
@@ -223,4 +223,4 @@ The panel refreshes every 2 s while open.
 
 ## Verified
 
-2026-09-27, live: `./install.sh` downloaded Ollama v0.34.2 (checksum matched), started `agent-chat-ollama` on 11436; the panel status shows it and the RTX 5070 Ti (15.9 GiB). Pulled `qwen3:0.6b` through the API; recommended context 32768; benchmark 5.8 s load + generate, 66 tok/s, about 2.8 GiB video memory; thinking off 0.03 s / 12 tokens, on 21.5 s / 5432 tokens (5239 thinking) for the same answer. `tests/test_real_ollama.py` passed against it.
+2026-09-27, live: `./install.sh` downloaded Ollama v0.34.2 (checksum matched), started `bullpen-ollama` on 11436; the panel status shows it and the RTX 5070 Ti (15.9 GiB). Pulled `qwen3:0.6b` through the API; recommended context 32768; benchmark 5.8 s load + generate, 66 tok/s, about 2.8 GiB video memory; thinking off 0.03 s / 12 tokens, on 21.5 s / 5432 tokens (5239 thinking) for the same answer. `tests/test_real_ollama.py` passed against it.

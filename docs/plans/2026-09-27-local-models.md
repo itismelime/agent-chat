@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** agent-chat installs and runs its own tuned Ollama (or uses an existing one), and the page gets a Models panel: Hugging Face search with fit verdicts and scores, one-click GGUF import, pull, benchmark (with thinking off and on), per-model context and thinking settings, and Unload now.
+**Goal:** bullpen installs and runs its own tuned Ollama (or uses an existing one), and the page gets a Models panel: Hugging Face search with fit verdicts and scores, one-click GGUF import, pull, benchmark (with thinking off and on), per-model context and thinking settings, and Unload now.
 
-**Architecture:** `agentchat/config.py` holds the Ollama URL setting; `agentchat/ollama.py` is a small client for Ollama's native API; `agentchat/rating.py` ports local-ai-chat's Model Hub rules; `agentchat/models.py` has the GPU reading, tuning store, Hugging Face search, jobs, import/pull/benchmark and the `Models` facade the server uses. `install.sh` downloads the pinned Ollama and runs it as `agent-chat-ollama.service`. The page loads the panel from `agentchat/models.js`.
+**Architecture:** `bullpen/config.py` holds the Ollama URL setting; `bullpen/ollama.py` is a small client for Ollama's native API; `bullpen/rating.py` ports local-ai-chat's Model Hub rules; `bullpen/models.py` has the GPU reading, tuning store, Hugging Face search, jobs, import/pull/benchmark and the `Models` facade the server uses. `install.sh` downloads the pinned Ollama and runs it as `bullpen-ollama.service`. The page loads the panel from `bullpen/models.js`.
 
 **Tech Stack:** Python ≥ 3.9 stdlib (urllib, threading, hashlib, concurrent.futures), bash, systemd user units, vanilla JS.
 
@@ -14,13 +14,13 @@
 
 - Python 3.9+ standard library only.
 - Ollama `v0.34.2`, `ollama-linux-amd64.tar.zst`, SHA-256 `e155b83589986d2c581fdbf1381ea3ebdb16549883679cd5a0627f7cdc05b12b` (1 427 542 079 bytes, from GitHub's release asset digest).
-- Own Ollama on `127.0.0.1:11436`; env for tests: `AGENT_CHAT_OLLAMA_PORT`, `AGENT_CHAT_OLLAMA_DOWNLOAD`, `AGENT_CHAT_OLLAMA_SHA256`, `AGENT_CHAT_RUNTIME` (runtime folder; default `<clone>/runtime`). Tests must never touch the real `<clone>/runtime`.
+- Own Ollama on `127.0.0.1:11436`; env for tests: `BULLPEN_OLLAMA_PORT`, `BULLPEN_OLLAMA_DOWNLOAD`, `BULLPEN_OLLAMA_SHA256`, `BULLPEN_RUNTIME` (runtime folder; default `<clone>/runtime`). Tests must never touch the real `<clone>/runtime`.
 - Service env: `OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 OLLAMA_CONTEXT_LENGTH=32768 OLLAMA_KEEP_ALIVE=5m OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0`.
 - External Ollama URL must match `http://(127.0.0.1|localhost):<port>`.
 - Rating numbers exactly as the spec (margin 1.2, limit 0.9, fit thresholds, quant table, score parts, labels).
 - Import: `https://huggingface.co/.../resolve/...` only, plain `.gguf` file name, free disk ≥ 3.1 × size.
 - Context 512–131072; thinking values `off`, `on` (on/off models) or `low`/`medium`/`high` (level models); default `off` for use `talk`, `on` for `agent`; `on` for a level model means `medium`.
-- Files under 500 lines; the Models panel's JS lives in `agentchat/models.js`.
+- Files under 500 lines; the Models panel's JS lives in `bullpen/models.js`.
 - Tests: `python3 -m unittest`; no network beyond 127.0.0.1.
 
 ## Review Focus
@@ -35,15 +35,15 @@
 
 | File | Responsibility |
 |---|---|
-| `agentchat/config.py` | new: `config.json`, Ollama URL setting |
-| `agentchat/ollama.py` | new: Ollama client |
-| `agentchat/rating.py` | new: best file, fit, score, suggested name |
-| `agentchat/models.py` | new: GPU, context, thinking, tuning store, Hub search, jobs, import/pull/benchmark, `Models` |
-| `agentchat/models.js` | new: the Models panel |
-| `agentchat/server.py` | model routes, `/models.js` |
-| `agentchat/page.html` | Models button, panel markup, CSS, script tag |
-| `bin/chat` | `chat config ollama-url [<url>|own]` |
-| `install.sh` | Ollama download, `agent-chat-ollama.service`, `--ollama-url`, uninstall |
+| `bullpen/config.py` | new: `config.json`, Ollama URL setting |
+| `bullpen/ollama.py` | new: Ollama client |
+| `bullpen/rating.py` | new: best file, fit, score, suggested name |
+| `bullpen/models.py` | new: GPU, context, thinking, tuning store, Hub search, jobs, import/pull/benchmark, `Models` |
+| `bullpen/models.js` | new: the Models panel |
+| `bullpen/server.py` | model routes, `/models.js` |
+| `bullpen/page.html` | Models button, panel markup, CSS, script tag |
+| `bin/bullpen` | `bullpen config ollama-url [<url>|own]` |
+| `install.sh` | Ollama download, `bullpen-ollama.service`, `--ollama-url`, uninstall |
 | `.gitignore` | `runtime/` |
 | `tests/fake_ollama.py` | new: fake Ollama and fake file host |
 | `tests/test_config.py`, `test_rating.py`, `test_models.py` | new |
@@ -54,11 +54,11 @@
 ### Task 1: The Ollama URL setting
 
 **Files:**
-- Create: `agentchat/config.py`, `tests/test_config.py`
-- Modify: `bin/chat`
+- Create: `bullpen/config.py`, `tests/test_config.py`
+- Modify: `bin/bullpen`
 
 **Interfaces:**
-- Produces: `config.OWN_OLLAMA` (`"http://127.0.0.1:%s" % os.environ.get("AGENT_CHAT_OLLAMA_PORT", "11436")`, read at import), `config.config_path() -> Path`, `config.load() -> dict`, `config.ollama_url() -> str`, `config.set_ollama_url(url)` (`"own"` clears; `ValueError` otherwise); CLI `chat config ollama-url` prints the URL in use, `chat config ollama-url <url|own>` sets it (exit 2 with the message on a bad URL).
+- Produces: `config.OWN_OLLAMA` (`"http://127.0.0.1:%s" % os.environ.get("BULLPEN_OLLAMA_PORT", "11436")`, read at import), `config.config_path() -> Path`, `config.load() -> dict`, `config.ollama_url() -> str`, `config.set_ollama_url(url)` (`"own"` clears; `ValueError` otherwise); CLI `bullpen config ollama-url` prints the URL in use, `bullpen config ollama-url <url|own>` sets it (exit 2 with the message on a bad URL).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -71,7 +71,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agentchat import config
+from bullpen import config
 
 CHAT = str(Path(__file__).resolve().parent.parent / "bin" / "chat")
 
@@ -123,26 +123,26 @@ if __name__ == "__main__":
 - [ ] **Step 2: Run them to verify they fail**
 
 Run: `python3 -m unittest tests.test_config`
-Expected: `ImportError: cannot import name 'config' from 'agentchat'`
+Expected: `ImportError: cannot import name 'config' from 'bullpen'`
 
 - [ ] **Step 3: Implement**
 
-`agentchat/config.py`:
+`bullpen/config.py`:
 
 ```python
-"""agent-chat settings, in ${XDG_CONFIG_HOME:-~/.config}/agent-chat/config.json."""
+"""bullpen settings, in ${XDG_CONFIG_HOME:-~/.config}/bullpen/config.json."""
 import json
 import os
 import re
 from pathlib import Path
 
-OWN_OLLAMA = "http://127.0.0.1:%s" % os.environ.get("AGENT_CHAT_OLLAMA_PORT", "11436")
+OWN_OLLAMA = "http://127.0.0.1:%s" % os.environ.get("BULLPEN_OLLAMA_PORT", "11436")
 LOCAL_URL = re.compile(r"^http://(?:127\.0\.0\.1|localhost):\d{1,5}$")
 
 
 def config_path():
     base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-    return Path(base) / "agent-chat" / "config.json"
+    return Path(base) / "bullpen" / "config.json"
 
 
 def load():
@@ -154,13 +154,13 @@ def load():
 
 
 def ollama_url():
-    """The Ollama in use: the configured one, else agent-chat's own."""
+    """The Ollama in use: the configured one, else bullpen's own."""
     url = load().get("ollama_url")
     return url if isinstance(url, str) and LOCAL_URL.match(url) else OWN_OLLAMA
 
 
 def set_ollama_url(url):
-    """Use the Ollama at url; "own" goes back to agent-chat's own."""
+    """Use the Ollama at url; "own" goes back to bullpen's own."""
     data = load()
     if url == "own":
         data.pop("ollama_url", None)
@@ -176,9 +176,9 @@ def set_ollama_url(url):
     os.replace(tmp, path)
 ```
 
-In `bin/chat`:
-1. In the docstring, after the `chat mcp` line add:
-   `  chat config ollama-url [<url>|own]  show or set the Ollama agent-chat uses`
+In `bin/bullpen`:
+1. In the docstring, after the `bullpen mcp` line add:
+   `  bullpen config ollama-url [<url>|own]  show or set the Ollama bullpen uses`
 2. After `    sub.add_parser("mcp")` add:
 
 ```python
@@ -191,7 +191,7 @@ In `bin/chat`:
 
 ```python
     if args.cmd == "config":
-        from agentchat import config
+        from bullpen import config
         if args.value is None:
             print(config.ollama_url())
             return
@@ -211,8 +211,8 @@ Expected: all `ok`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agentchat/config.py tests/test_config.py bin/chat
-git commit -m "Setting for the Ollama agent-chat uses"
+git add bullpen/config.py tests/test_config.py bin/bullpen
+git commit -m "Setting for the Ollama bullpen uses"
 ```
 
 ---
@@ -224,8 +224,8 @@ git commit -m "Setting for the Ollama agent-chat uses"
 - Create: `tests/fake_ollama.py`
 
 **Interfaces:**
-- Consumes: `chat config ollama-url` (Task 1).
-- Produces: `./install.sh [--uninstall | --ollama-url <url|own>]`; `agent-chat-ollama.service`; `<runtime>/ollama/bin/ollama` and `<runtime>/ollama/.version`; `tests.fake_ollama.FakeOllama` (`.url`, `.add(name, size=, capabilities=, arch=, ctx=)`, `.models`, `.loaded`, `.blobs`, `.calls`, `.fail_chat`, `.close()`) and `tests.fake_ollama.FileHost(data, chunk_delay=0)` (`.url_for(path)`, `.close()`).
+- Consumes: `bullpen config ollama-url` (Task 1).
+- Produces: `./install.sh [--uninstall | --ollama-url <url|own>]`; `bullpen-ollama.service`; `<runtime>/ollama/bin/ollama` and `<runtime>/ollama/.version`; `tests.fake_ollama.FakeOllama` (`.url`, `.add(name, size=, capabilities=, arch=, ctx=)`, `.models`, `.loaded`, `.blobs`, `.calls`, `.fail_chat`, `.close()`) and `tests.fake_ollama.FileHost(data, chunk_delay=0)` (`.url_for(path)`, `.close()`).
 
 - [ ] **Step 1: The fake servers**
 
@@ -408,11 +408,11 @@ In `tests/test_install.py`:
 
 ```python
         env = {"HOME": str(self.home), "PATH": "%s:/usr/bin:/bin" % self.stubs,
-               "AGENT_CHAT_PORT": str(self.port),
-               "AGENT_CHAT_RUNTIME": str(self.runtime),
-               "AGENT_CHAT_OLLAMA_DOWNLOAD": "file://%s" % self.tarball,
-               "AGENT_CHAT_OLLAMA_SHA256": hashlib.sha256(self.tarball.read_bytes()).hexdigest(),
-               "AGENT_CHAT_OLLAMA_PORT": self.ollama.url.rsplit(":", 1)[1]}
+               "BULLPEN_PORT": str(self.port),
+               "BULLPEN_RUNTIME": str(self.runtime),
+               "BULLPEN_OLLAMA_DOWNLOAD": "file://%s" % self.tarball,
+               "BULLPEN_OLLAMA_SHA256": hashlib.sha256(self.tarball.read_bytes()).hexdigest(),
+               "BULLPEN_OLLAMA_PORT": self.ollama.url.rsplit(":", 1)[1]}
         env.update(getattr(self, "extra_env", {}))
 ```
 
@@ -424,19 +424,19 @@ In `tests/test_install.py`:
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertTrue((self.runtime / "ollama" / "bin" / "ollama").exists())
         self.assertEqual((self.runtime / "ollama" / ".version").read_text().strip(), "v0.34.2")
-        unit = (self.home / ".config/systemd/user/agent-chat-ollama.service").read_text()
+        unit = (self.home / ".config/systemd/user/bullpen-ollama.service").read_text()
         for line in ("OLLAMA_HOST=127.0.0.1:%s" % self.ollama.url.rsplit(":", 1)[1],
                      "OLLAMA_FLASH_ATTENTION=1", "OLLAMA_KV_CACHE_TYPE=q8_0",
                      "OLLAMA_NUM_PARALLEL=1", "OLLAMA_MAX_LOADED_MODELS=1",
                      "OLLAMA_CONTEXT_LENGTH=32768", "OLLAMA_KEEP_ALIVE=5m",
-                     "agent-chat/ollama-models"):
+                     "bullpen/ollama-models"):
             self.assertIn(line, unit)
-        self.assertIn("systemctl --user restart agent-chat-ollama", self.calls_made())
+        self.assertIn("systemctl --user restart bullpen-ollama", self.calls_made())
         again = self.install()
         self.assertIn("already installed", again.stdout)
 
     def test_a_bad_checksum_installs_nothing(self):
-        self.extra_env = {"AGENT_CHAT_OLLAMA_SHA256": "0" * 64}
+        self.extra_env = {"BULLPEN_OLLAMA_SHA256": "0" * 64}
         r = self.install()
         self.assertEqual(r.returncode, 1)
         self.assertIn("checksum", r.stderr)
@@ -447,8 +447,8 @@ In `tests/test_install.py`:
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("using http://127.0.0.1:11434", r.stdout)
         self.assertFalse((self.runtime / "ollama").exists())
-        self.assertNotIn("systemctl --user restart agent-chat-ollama", self.calls_made())
-        cfg = self.home / ".config/agent-chat/config.json"
+        self.assertNotIn("systemctl --user restart bullpen-ollama", self.calls_made())
+        cfg = self.home / ".config/bullpen/config.json"
         self.assertIn("11434", cfg.read_text())
         r = self.install("--ollama-url", "own")
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -457,12 +457,12 @@ In `tests/test_install.py`:
 
     def test_uninstall_keeps_the_models(self):
         self.install()
-        models = self.home / ".local/share/agent-chat/ollama-models"
+        models = self.home / ".local/share/bullpen/ollama-models"
         self.assertTrue(models.is_dir())
         r = self.install("--uninstall")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertFalse((self.runtime / "ollama").exists())
-        self.assertFalse((self.home / ".config/systemd/user/agent-chat-ollama.service").exists())
+        self.assertFalse((self.home / ".config/systemd/user/bullpen-ollama.service").exists())
         self.assertTrue(models.is_dir())
 
     def test_tests_leave_the_real_runtime_alone(self):
@@ -475,7 +475,7 @@ In `tests/test_install.py`:
 - [ ] **Step 3: Run them to verify they fail**
 
 Run: `python3 -m unittest tests.test_install 2>&1 | tail -3`
-Expected: failures (no `agent-chat-ollama.service`, no `--ollama-url`).
+Expected: failures (no `bullpen-ollama.service`, no `--ollama-url`).
 
 - [ ] **Step 4: Rewrite install.sh**
 
@@ -483,36 +483,36 @@ Replace `install.sh` with:
 
 ```bash
 #!/usr/bin/env bash
-# Install agent-chat for the current user (Linux with systemd). Safe to rerun.
+# Install bullpen for the current user (Linux with systemd). Safe to rerun.
 #   ./install.sh                     install or update
 #   ./install.sh --ollama-url <url>  use an existing Ollama (http://127.0.0.1:<port>),
-#                                    or "own" for agent-chat's own
-#   ./install.sh --uninstall         remove; chats and models stay in ~/.local/share/agent-chat
+#                                    or "own" for bullpen's own
+#   ./install.sh --uninstall         remove; chats and models stay in ~/.local/share/bullpen
 set -euo pipefail
 here=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
 bin=$HOME/.local/bin
 units=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
-unit=$units/agent-chat.service
-ollama_unit=$units/agent-chat-ollama.service
-data=${XDG_DATA_HOME:-$HOME/.local/share}/agent-chat
-port=${AGENT_CHAT_PORT:-8765}
-runtime=${AGENT_CHAT_RUNTIME:-$here/runtime}
+unit=$units/bullpen.service
+ollama_unit=$units/bullpen-ollama.service
+data=${XDG_DATA_HOME:-$HOME/.local/share}/bullpen
+port=${BULLPEN_PORT:-8765}
+runtime=${BULLPEN_RUNTIME:-$here/runtime}
 ollama_version=v0.34.2
-ollama_sha256=${AGENT_CHAT_OLLAMA_SHA256:-e155b83589986d2c581fdbf1381ea3ebdb16549883679cd5a0627f7cdc05b12b}
-ollama_download=${AGENT_CHAT_OLLAMA_DOWNLOAD:-https://github.com/ollama/ollama/releases/download/$ollama_version/ollama-linux-amd64.tar.zst}
-ollama_port=${AGENT_CHAT_OLLAMA_PORT:-11436}
+ollama_sha256=${BULLPEN_OLLAMA_SHA256:-e155b83589986d2c581fdbf1381ea3ebdb16549883679cd5a0627f7cdc05b12b}
+ollama_download=${BULLPEN_OLLAMA_DOWNLOAD:-https://github.com/ollama/ollama/releases/download/$ollama_version/ollama-linux-amd64.tar.zst}
+ollama_port=${BULLPEN_OLLAMA_PORT:-11436}
 say() { printf '  %s\n' "$*"; }
 usage() { echo "usage: ./install.sh [--uninstall | --ollama-url <url>|own]" >&2; exit 2; }
-# ~/.local/bin/chat may be replaced if it is missing, a dangling link, or ours
+# ~/.local/bin/bullpen may be replaced if it is missing, a dangling link, or ours
 replaceable() {
     [[ ! -e $1 ]] && return 0
-    [[ -L $1 ]] && [[ -f $(dirname "$(readlink -f "$1")")/../agentchat/store.py ]]
+    [[ -L $1 ]] && [[ -f $(dirname "$(readlink -f "$1")")/../bullpen/store.py ]]
 }
 wait_for() {  # url [tries]: poll every 0.5 s
     for _ in $(seq "${2:-20}"); do
         if python3 - "$1" 2>/dev/null <<'PY'
 import sys, urllib.request
-urllib.request.urlopen(urllib.request.Request(sys.argv[1], headers={"X-Agent-Chat": "1"}), timeout=2)
+urllib.request.urlopen(urllib.request.Request(sys.argv[1], headers={"X-Bullpen": "1"}), timeout=2)
 PY
         then return 0; fi
         sleep 0.5
@@ -529,36 +529,36 @@ case ${1:-} in
 esac
 
 if [[ $mode == uninstall ]]; then
-    for u in agent-chat agent-chat-ollama; do
+    for u in bullpen bullpen-ollama; do
         systemctl --user disable --now "$u" >/dev/null 2>&1 || true
     done
     rm -f "$unit" "$ollama_unit"
     systemctl --user daemon-reload >/dev/null 2>&1 || true
     rm -rf "$runtime/ollama" "$runtime/ollama.new"
-    if [[ $(readlink "$bin/chat" || true) == "$here/bin/chat" ]]; then rm "$bin/chat"; fi
-    if command -v claude >/dev/null; then claude mcp remove --scope user agent-chat >/dev/null 2>&1 || true; fi
-    if command -v codex >/dev/null; then codex mcp remove agent-chat >/dev/null 2>&1 || true; fi
-    echo "agent-chat removed; chats and models kept in $data"
+    if [[ $(readlink "$bin/bullpen" || true) == "$here/bin/bullpen" ]]; then rm "$bin/bullpen"; fi
+    if command -v claude >/dev/null; then claude mcp remove --scope user bullpen >/dev/null 2>&1 || true; fi
+    if command -v codex >/dev/null; then codex mcp remove bullpen >/dev/null 2>&1 || true; fi
+    echo "bullpen removed; chats and models kept in $data"
     exit 0
 fi
 
-echo "Installing agent-chat from $here"
+echo "Installing bullpen from $here"
 python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null ||
-    { echo "agent-chat needs python3 3.9 or newer" >&2; exit 1; }
+    { echo "bullpen needs python3 3.9 or newer" >&2; exit 1; }
 mkdir -p "$bin" "$units"
-if replaceable "$bin/chat"; then
-    ln -sfn "$here/bin/chat" "$bin/chat"
-    say "linked $bin/chat"
+if replaceable "$bin/bullpen"; then
+    ln -sfn "$here/bin/bullpen" "$bin/bullpen"
+    say "linked $bin/bullpen"
 else
-    say "warning: $bin/chat is another program; left it alone (run $here/bin/chat instead)"
+    say "warning: $bin/bullpen is another program; left it alone (run $here/bin/bullpen instead)"
 fi
 case ":$PATH:" in *":$bin:"*) ;; *) say "warning: $bin is not on your PATH" ;; esac
 
-# Ollama: agent-chat's own, or the one the setting names
+# Ollama: bullpen's own, or the one the setting names
 if [[ -n $url ]]; then
-    AGENT_CHAT_OLLAMA_PORT=$ollama_port "$here/bin/chat" config ollama-url "$url" || exit 2
+    BULLPEN_OLLAMA_PORT=$ollama_port "$here/bin/bullpen" config ollama-url "$url" || exit 2
 fi
-in_use=$(AGENT_CHAT_OLLAMA_PORT=$ollama_port "$here/bin/chat" config ollama-url)
+in_use=$(BULLPEN_OLLAMA_PORT=$ollama_port "$here/bin/bullpen" config ollama-url)
 if [[ $in_use == "http://127.0.0.1:$ollama_port" ]]; then
     if [[ $(cat "$runtime/ollama/.version" 2>/dev/null) == "$ollama_version" ]]; then
         say "Ollama $ollama_version already installed"
@@ -587,7 +587,7 @@ if [[ $in_use == "http://127.0.0.1:$ollama_port" ]]; then
     mkdir -p "$data/ollama-models"
     cat >"$ollama_unit" <<EOF
 [Unit]
-Description=agent-chat's Ollama (127.0.0.1:$ollama_port)
+Description=bullpen's Ollama (127.0.0.1:$ollama_port)
 
 [Service]
 ExecStart="$runtime/ollama/bin/ollama" serve
@@ -608,26 +608,26 @@ TimeoutStopSec=60
 WantedBy=default.target
 EOF
     systemctl --user daemon-reload
-    systemctl --user enable agent-chat-ollama
-    systemctl --user restart agent-chat-ollama
+    systemctl --user enable bullpen-ollama
+    systemctl --user restart bullpen-ollama
     wait_for "http://127.0.0.1:$ollama_port/api/version" 60 ||
-        { echo "agent-chat's Ollama did not start; see: journalctl --user -u agent-chat-ollama" >&2; exit 1; }
+        { echo "bullpen's Ollama did not start; see: journalctl --user -u bullpen-ollama" >&2; exit 1; }
     say "Ollama running on http://127.0.0.1:$ollama_port"
 else
-    systemctl --user disable --now agent-chat-ollama >/dev/null 2>&1 || true
+    systemctl --user disable --now bullpen-ollama >/dev/null 2>&1 || true
     rm -f "$ollama_unit"
-    say "Ollama: using $in_use (agent-chat's own is not installed)"
+    say "Ollama: using $in_use (bullpen's own is not installed)"
 fi
 
 cat >"$unit" <<EOF
 [Unit]
-Description=agent-chat service (127.0.0.1:$port)
+Description=bullpen service (127.0.0.1:$port)
 
 [Service]
-Environment=AGENT_CHAT_PORT=$port
-Environment=AGENT_CHAT_OLLAMA_PORT=$ollama_port
+Environment=BULLPEN_PORT=$port
+Environment=BULLPEN_OLLAMA_PORT=$ollama_port
 Environment=PATH=$PATH
-ExecStart=/usr/bin/env python3 "$here/bin/chat" serve
+ExecStart=/usr/bin/env python3 "$here/bin/bullpen" serve
 Restart=on-failure
 RestartSec=5
 # agents started from the page live in tmux servers this service may start;
@@ -638,26 +638,26 @@ KillMode=process
 WantedBy=default.target
 EOF
 systemctl --user daemon-reload
-systemctl --user enable agent-chat
-systemctl --user restart agent-chat
+systemctl --user enable bullpen
+systemctl --user restart bullpen
 wait_for "http://127.0.0.1:$port/api/projects" ||
-    { echo "agent-chat did not start on port $port (is something else using it?);" \
-           "see: journalctl --user -u agent-chat" >&2; exit 1; }
-say "service agent-chat running on http://127.0.0.1:$port"
+    { echo "bullpen did not start on port $port (is something else using it?);" \
+           "see: journalctl --user -u bullpen" >&2; exit 1; }
+say "service bullpen running on http://127.0.0.1:$port"
 
 for tool in claude codex; do
     if ! command -v "$tool" >/dev/null; then say "$tool not found: skipped"; continue; fi
-    if "$tool" mcp get agent-chat >/dev/null 2>&1; then
-        say "$tool: agent-chat already registered"
+    if "$tool" mcp get bullpen >/dev/null 2>&1; then
+        say "$tool: bullpen already registered"
     elif [[ $tool == claude ]]; then
-        claude mcp add --scope user agent-chat -- "$here/bin/chat" mcp >/dev/null
-        say "claude: registered agent-chat for all your sessions"
+        claude mcp add --scope user bullpen -- "$here/bin/bullpen" mcp >/dev/null
+        say "claude: registered bullpen for all your sessions"
     else
-        codex mcp add agent-chat -- "$here/bin/chat" mcp >/dev/null
-        say "codex: registered agent-chat for all your sessions"
+        codex mcp add bullpen -- "$here/bin/bullpen" mcp >/dev/null
+        say "codex: registered bullpen for all your sessions"
     fi
 done
-echo "Done. Open http://127.0.0.1:$port and add a project, or run: chat add <folder>"
+echo "Done. Open http://127.0.0.1:$port and add a project, or run: bullpen add <folder>"
 ```
 
 Add `runtime/` to `.gitignore`.
@@ -671,7 +671,7 @@ Expected: all `ok`.
 
 ```bash
 git add install.sh .gitignore tests/test_install.py tests/fake_ollama.py
-git commit -m "install.sh: agent-chat's own tuned Ollama, or an existing one"
+git commit -m "install.sh: bullpen's own tuned Ollama, or an existing one"
 ```
 
 ---
@@ -679,7 +679,7 @@ git commit -m "install.sh: agent-chat's own tuned Ollama, or an existing one"
 ### Task 3: Ratings (ported from local-ai-chat)
 
 **Files:**
-- Create: `agentchat/rating.py`, `tests/test_rating.py`
+- Create: `bullpen/rating.py`, `tests/test_rating.py`
 
 **Interfaces:**
 - Produces: `rating.GIB`, `MARGIN`, `LIMIT`, `file_size(f)`, `quant_quality(name)`, `usable(f)`, `best_file(model, gpu_bytes=0) -> dict|None`, `fit(size, gpu_bytes) -> (points, verdict)`, `community(model)`, `freshness(last_modified, now=None)`, `suggest_name(repo_id, filename) -> str`, `rate(model, gpu_bytes, now=None) -> {"id","score","label","file","size","verdict","downloads","likes","name","url"}`. `model` is a Hugging Face record: `id, downloads, likes, trendingScore, lastModified, siblings[{rfilename, size|lfs.size}]`.
@@ -693,7 +693,7 @@ import time
 import unittest
 from datetime import datetime, timezone
 
-from agentchat import rating
+from bullpen import rating
 
 GIB = rating.GIB
 NOW = datetime.now(timezone.utc).isoformat()
@@ -773,7 +773,7 @@ Expected: `ImportError: cannot import name 'rating'`
 
 - [ ] **Step 3: Implement**
 
-`agentchat/rating.py`:
+`bullpen/rating.py`:
 
 ```python
 """Model Hub ratings for GGUF chat models, ported from local-ai-chat's
@@ -884,7 +884,7 @@ Expected: all `ok`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agentchat/rating.py tests/test_rating.py
+git add bullpen/rating.py tests/test_rating.py
 git commit -m "Model Hub ratings ported from local-ai-chat"
 ```
 
@@ -893,7 +893,7 @@ git commit -m "Model Hub ratings ported from local-ai-chat"
 ### Task 4: Ollama client, GPU, context and thinking
 
 **Files:**
-- Create: `agentchat/ollama.py`, `agentchat/models.py` (first part), `tests/test_models.py`
+- Create: `bullpen/ollama.py`, `bullpen/models.py` (first part), `tests/test_models.py`
 
 **Interfaces:**
 - Produces:
@@ -910,9 +910,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agentchat import models
-from agentchat.ollama import Ollama, OllamaError
-from agentchat.store import StoreError
+from bullpen import models
+from bullpen.ollama import Ollama, OllamaError
+from bullpen.store import StoreError
 from tests.fake_ollama import GIB, FakeOllama
 
 NVIDIA = """#!/bin/sh
@@ -1039,11 +1039,11 @@ if __name__ == "__main__":
 - [ ] **Step 2: Run them to verify they fail**
 
 Run: `python3 -m unittest tests.test_models`
-Expected: `ImportError: cannot import name 'models'` (or `No module named 'agentchat.ollama'`).
+Expected: `ImportError: cannot import name 'models'` (or `No module named 'bullpen.ollama'`).
 
 - [ ] **Step 3: The Ollama client**
 
-`agentchat/ollama.py`:
+`bullpen/ollama.py`:
 
 ```python
 """A small client for Ollama's native API (urllib, no dependencies)."""
@@ -1138,7 +1138,7 @@ class Ollama:
 
 - [ ] **Step 4: models.py, first part**
 
-`agentchat/models.py`:
+`bullpen/models.py`:
 
 ```python
 """Local models: the GPU, per-model context and thinking, Hugging Face
@@ -1295,7 +1295,7 @@ Expected: `OK`.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add agentchat/ollama.py agentchat/models.py tests/test_models.py
+git add bullpen/ollama.py bullpen/models.py tests/test_models.py
 git commit -m "Ollama client, GPU reading, context and thinking per model"
 ```
 
@@ -1304,7 +1304,7 @@ git commit -m "Ollama client, GPU reading, context and thinking per model"
 ### Task 5: Hub search, jobs, import, pull, benchmark
 
 **Files:**
-- Modify: `agentchat/models.py` (append), `tests/test_models.py` (append)
+- Modify: `bullpen/models.py` (append), `tests/test_models.py` (append)
 
 **Interfaces:**
 - Consumes: Tasks 3 and 4.
@@ -1508,11 +1508,11 @@ class FacadeTest(unittest.TestCase):
 - [ ] **Step 2: Run them to verify they fail**
 
 Run: `python3 -m unittest tests.test_models 2>&1 | tail -3`
-Expected: errors — `AttributeError: module 'agentchat.models' has no attribute 'Hub'` (and `Jobs`, …).
+Expected: errors — `AttributeError: module 'bullpen.models' has no attribute 'Hub'` (and `Jobs`, …).
 
 - [ ] **Step 3: Append to models.py**
 
-Append to `agentchat/models.py`:
+Append to `bullpen/models.py`:
 
 ```python
 HF = rating.HF
@@ -1527,7 +1527,7 @@ LOAD_HINT = (" (if the model did not load: free video memory, another program ma
 
 
 def fetch_json(url):
-    with urlopen(Request(url, headers={"User-Agent": "agent-chat"}), timeout=20) as r:
+    with urlopen(Request(url, headers={"User-Agent": "bullpen"}), timeout=20) as r:
         return json.loads(r.read())
 
 
@@ -1655,7 +1655,7 @@ def import_gguf(job, ollama, url, filename, model, work_dir,
     work_dir.mkdir(parents=True, exist_ok=True)
     tmp = work_dir / (uuid.uuid4().hex + ".gguf.part")
     try:
-        with urlopen(Request(url, headers={"User-Agent": "agent-chat"}), timeout=60) as r:
+        with urlopen(Request(url, headers={"User-Agent": "bullpen"}), timeout=60) as r:
             total = int(r.headers.get("Content-Length") or 0)
             if total and free(work_dir) < total * DISK_FACTOR:
                 raise StoreError(507, "not enough disk space: importing %s needs %.1f GB free"
@@ -1757,7 +1757,7 @@ Expected: `OK`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agentchat/models.py tests/test_models.py
+git add bullpen/models.py tests/test_models.py
 git commit -m "Hugging Face search, jobs, GGUF import, pull and benchmark"
 ```
 
@@ -1766,8 +1766,8 @@ git commit -m "Hugging Face search, jobs, GGUF import, pull and benchmark"
 ### Task 6: Routes and the Models panel
 
 **Files:**
-- Modify: `agentchat/server.py`, `agentchat/page.html`, `tests/helpers.py`, `tests/test_server.py`
-- Create: `agentchat/models.js`
+- Modify: `bullpen/server.py`, `bullpen/page.html`, `tests/helpers.py`, `tests/test_server.py`
+- Create: `bullpen/models.js`
 
 **Interfaces:**
 - Consumes: `models.Models` and friends (Task 5).
@@ -1777,7 +1777,7 @@ git commit -m "Hugging Face search, jobs, GGUF import, pull and benchmark"
 
 In `tests/helpers.py`, change `def start(wait_seconds=1):` to `def start(wait_seconds=1, models=None):` and the `serve(...)` call to `serve(port=0, store=store, wait_seconds=wait_seconds, deliver=False, models=models)`.
 
-Add to `tests/test_server.py` (imports: `from agentchat import models as models_mod` and `from tests.fake_ollama import GIB, FakeOllama`), a new class before `if __name__`:
+Add to `tests/test_server.py` (imports: `from bullpen import models as models_mod` and `from tests.fake_ollama import GIB, FakeOllama`), a new class before `if __name__`:
 
 ```python
 class ModelRoutesTest(unittest.TestCase):
@@ -1839,7 +1839,7 @@ Expected: `TypeError: serve() got an unexpected keyword argument 'models'`.
 
 - [ ] **Step 3: The routes**
 
-In `agentchat/server.py`:
+In `bullpen/server.py`:
 
 1. Imports: add `from . import models as models_mod` and `from .ollama import OllamaError`.
 2. After `PAGE = Path(__file__).with_name("page.html")` add `MODELS_JS = Path(__file__).with_name("models.js")`.
@@ -1950,7 +1950,7 @@ with
 
 - [ ] **Step 4: The panel**
 
-`agentchat/models.js`:
+`bullpen/models.js`:
 
 ```js
 // Models panel: installed models, Hugging Face search, jobs.
@@ -1966,8 +1966,8 @@ function merr(e){$('merr').textContent=e?e.message||String(e):'';}
 async function mrefresh(){
   try{
     const s=await api('api/models/status');
-    $('mstatus').textContent=(s.own?"agent-chat's Ollama":'External Ollama')+' at '+s.url+' · '+
-      (s.reachable?'v'+s.version:'not reachable: '+(s.own?'systemctl --user start agent-chat-ollama':
+    $('mstatus').textContent=(s.own?"bullpen's Ollama":'External Ollama')+' at '+s.url+' · '+
+      (s.reachable?'v'+s.version:'not reachable: '+(s.own?'systemctl --user start bullpen-ollama':
         'check the address (./install.sh --ollama-url)'))+' · '+
       (s.gpu?`${s.gpu.name}, ${GB(s.gpu.used)} of ${GB(s.gpu.total)} used`:'GPU unknown');
     if(mtab==='installed'&&s.reachable)drawInstalled((await api('api/models')).models);
@@ -2026,7 +2026,7 @@ $('munload').onclick=async()=>{try{merr();const r=await api('api/models/unload',
 addEventListener('keydown',e=>{if(e.key==='Escape'&&!mp.hidden&&!['INPUT','SELECT'].includes(document.activeElement.tagName))closeModels();});
 ```
 
-In `agentchat/page.html`:
+In `bullpen/page.html`:
 
 1. CSS: change `#term,#help{position:fixed` to `#term,#help,#modelspanel{position:fixed`, `#term .box,#help .box{` to `#term .box,#help .box,#modelspanel .box{`, `#term .top,#help .top{` to `#term .top,#help .top,#modelspanel .top{`, and before `@media (max-width:800px)` add:
 
@@ -2086,7 +2086,7 @@ Stop the demo service by its PID (check it with `ss -ltnp | grep 8799`).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add agentchat/server.py agentchat/models.js agentchat/page.html tests/helpers.py tests/test_server.py
+git add bullpen/server.py bullpen/models.js bullpen/page.html tests/helpers.py tests/test_server.py
 git commit -m "Model routes and the Models panel"
 ```
 
@@ -2103,18 +2103,18 @@ git commit -m "Model routes and the Models panel"
 `tests/test_real_ollama.py`:
 
 ```python
-"""Against a real Ollama: AGENT_CHAT_TEST_OLLAMA=<url> AGENT_CHAT_TEST_MODEL=<small model>."""
+"""Against a real Ollama: BULLPEN_TEST_OLLAMA=<url> BULLPEN_TEST_MODEL=<small model>."""
 import os
 import tempfile
 import unittest
 
-from agentchat import models
-from agentchat.ollama import Ollama
+from bullpen import models
+from bullpen.ollama import Ollama
 
-URL, MODEL = os.environ.get("AGENT_CHAT_TEST_OLLAMA"), os.environ.get("AGENT_CHAT_TEST_MODEL")
+URL, MODEL = os.environ.get("BULLPEN_TEST_OLLAMA"), os.environ.get("BULLPEN_TEST_MODEL")
 
 
-@unittest.skipUnless(URL and MODEL, "set AGENT_CHAT_TEST_OLLAMA and AGENT_CHAT_TEST_MODEL")
+@unittest.skipUnless(URL and MODEL, "set BULLPEN_TEST_OLLAMA and BULLPEN_TEST_MODEL")
 class RealOllamaTest(unittest.TestCase):
     def test_benchmark_and_unload(self):
         ollama, tuning, jobs = Ollama(URL), models.Tuning(tempfile.mkdtemp()), models.Jobs()
@@ -2140,9 +2140,9 @@ Add under "Install", after the paragraph about `--uninstall`:
 
 ```markdown
 `install.sh` also downloads Ollama v0.34.2 (about 1.4 GB, checksum-checked)
-into `runtime/` and runs it as `agent-chat-ollama` on 127.0.0.1:11436, tuned
+into `runtime/` and runs it as `bullpen-ollama` on 127.0.0.1:11436, tuned
 like local-ai-chat (flash attention, q8_0 KV cache, one model at a time, 5
-minute keep-alive). Models go to `~/.local/share/agent-chat/ollama-models`.
+minute keep-alive). Models go to `~/.local/share/bullpen/ollama-models`.
 To use an Ollama you already run instead: `./install.sh --ollama-url
 http://127.0.0.1:11434` (`--ollama-url own` switches back). Two Ollamas
 share the GPU without coordinating, so only one should have a model loaded.
@@ -2168,6 +2168,6 @@ Merge into `main` in the live checkout (fast-forward), push. Before running `./i
 
 - [ ] **Step 4: Live check with the user**
 
-With the user: open **Models**, confirm the header shows agent-chat's Ollama and the RTX 5070 Ti, pull a small model (for example `qwen3:0.6b`), benchmark it, then run
-`AGENT_CHAT_TEST_OLLAMA=http://127.0.0.1:11436 AGENT_CHAT_TEST_MODEL=qwen3:0.6b python3 -m unittest tests.test_real_ollama`.
+With the user: open **Models**, confirm the header shows bullpen's Ollama and the RTX 5070 Ti, pull a small model (for example `qwen3:0.6b`), benchmark it, then run
+`BULLPEN_TEST_OLLAMA=http://127.0.0.1:11436 BULLPEN_TEST_MODEL=qwen3:0.6b python3 -m unittest tests.test_real_ollama`.
 Search Hugging Face for a model the user wants and Get it if they like. Record a "Verified" line in the spec, commit, push.

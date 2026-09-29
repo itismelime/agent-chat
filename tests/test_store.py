@@ -6,7 +6,7 @@ import time
 import unittest
 from pathlib import Path
 
-from agentchat.store import Store, StoreError, addressed, slug, wakes
+from bullpen.store import Store, StoreError, addressed, moved, slug, wakes
 
 
 class StoreTest(unittest.TestCase):
@@ -17,6 +17,16 @@ class StoreTest(unittest.TestCase):
         (self.dir / "sub").mkdir(parents=True)
         self.p, _ = self.store.add_project(str(self.dir))
         self.pid = self.p["id"]
+
+    def test_the_folder_from_before_the_rename_moves_once(self):
+        old, new = self.tmp / "agent-chat", self.tmp / "bullpen"
+        (old / "projects").mkdir(parents=True)
+        self.assertEqual(moved(old, new), new)
+        self.assertTrue((new / "projects").is_dir())
+        self.assertFalse(old.exists())
+        (old / "x").mkdir(parents=True)  # both there: nothing moves again
+        moved(old, new)
+        self.assertTrue(old.exists())
 
     def test_add_project_new_existing_and_child(self):
         self.assertEqual(self.p["id"], "openvibes")
@@ -220,8 +230,8 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(self.store.read(self.pid, "cody"), [])
 
     def test_spawned_records_and_join_by_token(self):
-        self.store.add_spawned(self.pid, "tok1", "claude", "agent-chat-openvibes-tok1")
-        self.store.add_spawned(self.pid, "tok2", "claude", "agent-chat-openvibes-tok2")
+        self.store.add_spawned(self.pid, "tok1", "claude", "bullpen-openvibes-tok1")
+        self.store.add_spawned(self.pid, "tok2", "claude", "bullpen-openvibes-tok2")
         self.assertEqual([(s["token"], s["state"]) for s in self.store.spawned_list(self.pid)],
                          [("tok1", "starting"), ("tok2", "starting")])
         a = self.store.join(self.pid, "alice", "claude", spawn="tok2")

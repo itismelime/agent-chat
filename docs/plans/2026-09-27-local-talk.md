@@ -4,7 +4,7 @@
 
 **Goal:** Installed local models can be added to a project as chat members that answer like other agents, with the same addressing rules, a loop guard and clear status.
 
-**Architecture:** The store keeps local members as agents of kind `llm` with `model` and `role`, calls a new `store.talk` hook when one is woken, and reports Working/Offline from in-memory state. `agentchat/talk.py` holds the prompt building and a `Talker` worker that answers one wake-up at a time through the Ollama client. The server adds two routes and wires the Talker; the page gets menu entries, prompts, a `/local` command and the member line.
+**Architecture:** The store keeps local members as agents of kind `llm` with `model` and `role`, calls a new `store.talk` hook when one is woken, and reports Working/Offline from in-memory state. `bullpen/talk.py` holds the prompt building and a `Talker` worker that answers one wake-up at a time through the Ollama client. The server adds two routes and wires the Talker; the page gets menu entries, prompts, a `/local` command and the member line.
 
 **Tech Stack:** Python ≥ 3.9 stdlib, vanilla JS.
 
@@ -33,7 +33,7 @@
 ### Task 1: Local members in the store
 
 **Files:**
-- Modify: `agentchat/store.py`
+- Modify: `bullpen/store.py`
 - Test: `tests/test_store.py`
 
 **Interfaces:**
@@ -92,7 +92,7 @@ Expected: errors, `AttributeError: 'Store' object has no attribute 'add_local'`.
 
 - [ ] **Step 3: Implement**
 
-In `agentchat/store.py`:
+In `bullpen/store.py`:
 
 1. After `LINK_SECONDS = 300 …` add `MAX_ROLE = 500`.
 2. After `        self.needs = set()  # …` in `__init__` add:
@@ -197,7 +197,7 @@ Expected: `OK`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agentchat/store.py tests/test_store.py
+git add bullpen/store.py tests/test_store.py
 git commit -m "Store: local-model members, talk hook, their status"
 ```
 
@@ -206,8 +206,8 @@ git commit -m "Store: local-model members, talk hook, their status"
 ### Task 2: The Talker
 
 **Files:**
-- Create: `agentchat/talk.py`, `tests/test_talk.py`
-- Modify: `agentchat/ollama.py` (`chat` gets `num_predict`), `tests/fake_ollama.py` (`reply`, `chat_delay`)
+- Create: `bullpen/talk.py`, `tests/test_talk.py`
+- Modify: `bullpen/ollama.py` (`chat` gets `num_predict`), `tests/fake_ollama.py` (`reply`, `chat_delay`)
 
 **Interfaces:**
 - Consumes: Task 1 store methods; `models.Models` (`ollama`, `tuning`, `gpu_total()`); `Ollama.chat`.
@@ -229,7 +229,7 @@ with
                         "391" if "17" in data["messages"][-1]["content"] else "benchmark ok")
 ```
 
-In `agentchat/ollama.py`, replace `chat` with:
+In `bullpen/ollama.py`, replace `chat` with:
 
 ```python
     def chat(self, model, messages, num_ctx=None, think=False, timeout=600, num_predict=None):
@@ -251,8 +251,8 @@ import time
 import unittest
 from pathlib import Path
 
-from agentchat import models, talk
-from agentchat.store import Store
+from bullpen import models, talk
+from bullpen.store import Store
 from tests.fake_ollama import GIB, FakeOllama
 
 
@@ -408,12 +408,12 @@ Expected: `ImportError: cannot import name 'talk'`.
 
 - [ ] **Step 4: Implement**
 
-`agentchat/talk.py`:
+`bullpen/talk.py`:
 
 ```python
 """Local-model members: chat messages in, Ollama requests out, replies posted.
 
-One worker answers every local member, one reply at a time (agent-chat's
+One worker answers every local member, one reply at a time (bullpen's
 Ollama loads one model at a time)."""
 import queue
 import re
@@ -489,7 +489,7 @@ class Talker:
                 try:
                     self.answer(*key, m)
                 except Exception as e:  # keep answering the other members
-                    print("agent-chat: local member %s failed: %s" % (key[1], e), file=sys.stderr)
+                    print("bullpen: local member %s failed: %s" % (key[1], e), file=sys.stderr)
 
     def answer(self, pid, name, m):
         key = (pid, name)
@@ -534,7 +534,7 @@ Expected: `OK`. Then the full suite: `python3 -m unittest 2>&1 | tail -1` → `O
 - [ ] **Step 6: Commit**
 
 ```bash
-git add agentchat/talk.py agentchat/ollama.py tests/test_talk.py tests/fake_ollama.py
+git add bullpen/talk.py bullpen/ollama.py tests/test_talk.py tests/fake_ollama.py
 git commit -m "Talker: local-model members answer in the chat"
 ```
 
@@ -543,7 +543,7 @@ git commit -m "Talker: local-model members answer in the chat"
 ### Task 3: Routes and wiring
 
 **Files:**
-- Modify: `agentchat/server.py`, `tests/test_server.py`
+- Modify: `bullpen/server.py`, `tests/test_server.py`
 
 **Interfaces:**
 - Consumes: Tasks 1–2.
@@ -581,7 +581,7 @@ Expected: FAIL with `ApiError: not found`.
 
 - [ ] **Step 3: Implement**
 
-In `agentchat/server.py`:
+In `bullpen/server.py`:
 
 1. Change `from . import spawn` to `from . import spawn, talk`.
 2. Before `                if what == ["spawned"] and method == "GET":` add:
@@ -649,7 +649,7 @@ Expected: `OK`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agentchat/server.py tests/test_server.py
+git add bullpen/server.py tests/test_server.py
 git commit -m "Routes to add local members and set their role; the Talker runs in the service"
 ```
 
@@ -658,7 +658,7 @@ git commit -m "Routes to add local members and set their role; the Talker runs i
 ### Task 4: The page
 
 **Files:**
-- Modify: `agentchat/page.html`
+- Modify: `bullpen/page.html`
 
 - [ ] **Step 1: Local-model state**
 
@@ -742,7 +742,7 @@ A demo service (script in the scratchpad) with a `FakeOllama` that has `tiny` in
 - [ ] **Step 6: Commit**
 
 ```bash
-git add agentchat/page.html
+git add bullpen/page.html
 git commit -m "Page: add local models as members, their line, Edit role, /local"
 ```
 
@@ -764,8 +764,8 @@ Under "Use", after the Models item, add:
 
 - [ ] **Step 2: Commit, merge, deploy**
 
-Commit the README; after the final review and its fixes, merge into `main` (fast-forward), push, and restart the service (`systemctl --user restart agent-chat`; no reinstall is needed).
+Commit the README; after the final review and its fixes, merge into `main` (fast-forward), push, and restart the service (`systemctl --user restart bullpen`; no reinstall is needed).
 
 - [ ] **Step 3: Live check with the user**
 
-In a scratch project registered with `chat add`: add `qwen3:0.6b` as `qwen`, post "hello", see it Working then answering; post "@someone-else hi" and see no answer; Edit role and see the role reflected in its next answer. Record a "Verified" line in the spec, commit, push.
+In a scratch project registered with `bullpen add`: add `qwen3:0.6b` as `qwen`, post "hello", see it Working then answering; post "@someone-else hi" and see no answer; Edit role and see the role reflected in its next answer. Record a "Verified" line in the spec, commit, push.

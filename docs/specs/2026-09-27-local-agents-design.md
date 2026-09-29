@@ -1,14 +1,14 @@
-# agent-chat: local agents (OpenCode)
+# bullpen: local agents (OpenCode)
 
 Status: draft for review, 2026-09-27. Roadmap feature 6, part 3 of 3. Builds
 on the spawn spec (tmux, View terminal, Needs you, Stop), the local-models
-spec (agent-chat's Ollama, Models panel) and the spike
+spec (bullpen's Ollama, Models panel) and the spike
 `2026-09-27-local-agents-spike.md`.
 
 ## Goal
 
 From the page, start an OpenCode agent that runs a local model from
-agent-chat's Ollama, joins the chat, reads and changes files in the project,
+bullpen's Ollama, joins the chat, reads and changes files in the project,
 and is woken by chat messages like Claude and Codex.
 
 ## Non-goals
@@ -30,8 +30,8 @@ headless mode; several models per agent.
 - The service starts, through the spawn machinery (tool `opencode`):
 
   ```
-  tmux new-session -d -s agent-chat-<project>-<suffix> -c <project path>
-       -e AGENT_CHAT_SPAWN=<token> -e XDG_CONFIG_HOME=<data>/opencode-config
+  tmux new-session -d -s bullpen-<project>-<suffix> -c <project path>
+       -e BULLPEN_SPAWN=<token> -e XDG_CONFIG_HOME=<data>/opencode-config
        -- opencode -m ac/<model> --prompt "join the chat"
   ```
 
@@ -47,12 +47,12 @@ Before every start the service writes
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "provider": {"ac": {"npm": "@ai-sdk/openai-compatible", "name": "agent-chat Ollama",
+  "provider": {"ac": {"npm": "@ai-sdk/openai-compatible", "name": "bullpen Ollama",
             "options": {"baseURL": "<Ollama in use>/v1"},
             "models": {"<model>": {"name": "<model>", "tools": true}, "…": {}}}},
-  "mcp": {"agent-chat": {"type": "local", "enabled": true,
-          "command": ["<clone>/bin/chat", "mcp"],
-          "environment": {"AGENT_CHAT_PORT": "<port>"}}},
+  "mcp": {"bullpen": {"type": "local", "enabled": true,
+          "command": ["<clone>/bin/bullpen", "mcp"],
+          "environment": {"BULLPEN_PORT": "<port>"}}},
   "tools": {"skill": false}
 }
 ```
@@ -68,11 +68,11 @@ believing it had no tools.
 
 - Kind `opencode` (added to the kinds); the MCP server maps a client name
   containing `opencode` to it. Shown as "OpenCode · <model>".
-- OpenCode starts the MCP server itself, so it sees `AGENT_CHAT_SPAWN` and
+- OpenCode starts the MCP server itself, so it sees `BULLPEN_SPAWN` and
   the join links by token. `chat_join` does not offer the `spawn` argument to
   kind `opencode` (it confused gpt-oss in the spike). Join instructions for
   this kind: "Chat messages for you are typed into this session as they
-  arrive; reply with chat_post." No `chat wait`.
+  arrive; reply with chat_post." No `bullpen wait`.
 - **Waking.** For each message that wakes an `opencode` agent (core rules),
   the service keeps it as pending for that agent. The spawn poller (every
   2 s) types pending messages into the agent's tmux session when its screen
@@ -105,7 +105,7 @@ project uses the same model.
 - OpenCode reaches Ollama through its OpenAI-compatible endpoint, which
   ignores per-request options, so the Models panel's context and thinking
   settings do not apply; OpenCode agents get Ollama's default context
-  (32 768 for agent-chat's own Ollama) and the model's default thinking.
+  (32 768 for bullpen's own Ollama) and the model's default thinking.
 - Devstral Small 2 is listed (Ollama reports tool support) but ignored the
   chat tools in the spike.
 - A model larger than video memory loads partly into RAM and is slower

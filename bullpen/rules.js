@@ -1,4 +1,4 @@
-// Rules (agentchat/rules.js): the project's standing instructions for every agent. Uses the page's
+// Rules (bullpen/rules.js): the project's standing instructions for every agent. Uses the page's
 // $, el, btn, api, cur, say and ask. Agents get them on join and with every message that wakes them.
 const rp=$('rulespanel');let rulesOf=null,rulesFor=null;
 async function loadRules(){

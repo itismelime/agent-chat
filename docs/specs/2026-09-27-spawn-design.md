@@ -1,4 +1,4 @@
-# agent-chat: start agents from the page
+# bullpen: start agents from the page
 
 Status: draft for review, 2026-09-27. Roadmap feature 4. Builds on
 `2026-09-27-core-design.md` (the core spec); everything there still holds.
@@ -17,7 +17,7 @@ Success looks like this:
   **Needs you** and a notification fires; **View terminal** shows the question
   and buttons answer it.
 - **Stop** ends it. At any time the user can take over with
-  `tmux attach -t agent-chat-<project>-<name>`.
+  `tmux attach -t bullpen-<project>-<name>`.
 
 ## Non-goals
 
@@ -31,21 +31,21 @@ Started agents run as the user with their normal settings, each in its own
 detached tmux session (tmux 3.0 or newer, for `-e`):
 
 ```
-tmux new-session -d -s agent-chat-<project>-<suffix> -c <project path>
-     -e AGENT_CHAT_SPAWN=<token> -- claude "join the chat"
+tmux new-session -d -s bullpen-<project>-<suffix> -c <project path>
+     -e BULLPEN_SPAWN=<token> -- claude "join the chat"
 ```
 
 (`codex "join the chat"` for Codex.) `<token>` is 16 random hex bytes and
 `<suffix>` its first 6 hex characters. tmux is always called with an argument list, never
 through a shell, so a project path or typed text cannot run anything.
 
-**Linking to the chat entry.** The MCP server reads `AGENT_CHAT_SPAWN` from
+**Linking to the chat entry.** The MCP server reads `BULLPEN_SPAWN` from
 its environment and sends it as `spawn` in `chat_join`. The service records
 the agent's name on the started entry and renames the tmux session to
-`agent-chat-<project>-<name>`. Codex's session lookup (core spec) works as
+`bullpen-<project>-<name>`. Codex's session lookup (core spec) works as
 before.
 Codex's MCP servers are started by its app-server daemon and do not see
-`AGENT_CHAT_SPAWN`, so Codex gets the token in its first prompt
+`BULLPEN_SPAWN`, so Codex gets the token in its first prompt
 (`codex "join the chat (start <token>)"`) and passes it to `chat_join` as
 `spawn`. A known token always wins. A Codex join without one is linked to the
 only unlinked Codex start in that project from the last 5 minutes, if there
@@ -79,7 +79,7 @@ waiting. **View terminal** is always there to check.
 
 ## API
 
-All under the core spec's protections (Host, Origin, `X-Agent-Chat`, JSON
+All under the core spec's protections (Host, Origin, `X-Bullpen`, JSON
 bodies up to 20 000 bytes).
 
 | Method and path | Does |
@@ -124,11 +124,11 @@ service restart does not kill tmux servers it started.
 
 ## Code
 
-- `agentchat/spawn.py` (new): `available()`, `start()`, `alive()`, `screen()`,
+- `bullpen/spawn.py` (new): `available()`, `start()`, `alive()`, `screen()`,
   `send_key()`, `send_text()`, `stop()`, `needs_you(screen)`, and the poller.
 - `store.py`: `spawned.json` records, linking a join token to a name.
 - `server.py`: the routes above; starts the poller.
-- `mcp.py`: sends `AGENT_CHAT_SPAWN` with `chat_join`.
+- `mcp.py`: sends `BULLPEN_SPAWN` with `chat_join`.
 - `page.html`: start controls, starting entries, Needs you, terminal panel.
 
 ## Failure behaviour

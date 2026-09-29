@@ -2,8 +2,8 @@
 
 Throwaway test for part 3 (local agents). OpenCode 1.18.29, `opencode run
 --auto`, isolated config (`XDG_CONFIG_HOME`/`XDG_DATA_HOME` in a scratch
-folder) with an OpenAI-compatible provider on agent-chat's Ollama
-(`http://127.0.0.1:11436/v1`) and the agent-chat MCP server pointed at a test
+folder) with an OpenAI-compatible provider on bullpen's Ollama
+(`http://127.0.0.1:11436/v1`) and the bullpen MCP server pointed at a test
 service. Task: read `notes.txt` (secret word), run `date +%Y`, join the chat
 with `chat_join` and post both with `chat_post`. RTX 5070 Ti 16 GB, 31 GB RAM.
 
@@ -22,7 +22,7 @@ Findings for the design:
   `"tools": {"skill": false}` the same model did the task in 16 s.
 - **`opencode run` waits for stdin** when it is not a terminal; give it
   `< /dev/null` (the TUI in tmux is not affected).
-- The join instructions for kind `llm` currently say to run `chat wait`; for
+- The join instructions for kind `llm` currently say to run `bullpen wait`; for
   agents started from the page the service can type messages into the tmux
   session instead, so those instructions must differ.
 - The optional `spawn` argument of `chat_join` confuses some models; hide it

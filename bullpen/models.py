@@ -154,7 +154,7 @@ LOAD_HINT = (" (if the model did not load: free video memory, another program ma
 
 
 def fetch_json(url):
-    with urlopen(Request(url, headers={"User-Agent": "agent-chat"}), timeout=20) as r:
+    with urlopen(Request(url, headers={"User-Agent": "bullpen"}), timeout=20) as r:
         return json.loads(r.read())
 
 
@@ -286,7 +286,7 @@ def import_gguf(job, ollama, url, filename, model, work_dir,
     work_dir.mkdir(parents=True, exist_ok=True)
     tmp = work_dir / (uuid.uuid4().hex + ".gguf.part")
     try:
-        with urlopen(Request(url, headers={"User-Agent": "agent-chat"}), timeout=60) as r:
+        with urlopen(Request(url, headers={"User-Agent": "bullpen"}), timeout=60) as r:
             total = int(r.headers.get("Content-Length") or 0)
             if total and free(work_dir) < total * DISK_FACTOR:
                 raise StoreError(507, "not enough disk space: importing %s needs %.1f GB free"

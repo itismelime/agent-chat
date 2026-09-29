@@ -2,7 +2,7 @@ import time
 import unittest
 from datetime import datetime, timezone
 
-from agentchat import rating
+from bullpen import rating
 
 GIB = rating.GIB
 NOW = datetime.now(timezone.utc).isoformat()

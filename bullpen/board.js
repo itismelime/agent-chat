@@ -1,4 +1,4 @@
-// Kanban board and epics views (agentchat/board.js). Uses the page's $, el, btn, api, avatar, who, cur,
+// Kanban board and epics views (bullpen/board.js). Uses the page's $, el, btn, api, avatar, who, cur,
 // agents, boardData (loaded with every refresh), saved, say and t. An epic is a card of kind "epic";
 // items point to theirs with "epic". The board shows items only, the Epics view groups them.
 const bv=$('boardview'),ev=$('epicview'),cp=$('cardpanel'),COLC={todo:'var(--mute)',doing:'var(--busy)',review:'var(--attn)',done:'var(--ok)'};

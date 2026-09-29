@@ -1,4 +1,4 @@
-# agent-chat: small batch, personalities, kanban board
+# bullpen: small batch, personalities, kanban board
 
 Status: approved in chat 2026-09-28 ("LGTM go ahead and build"); the user
 asked for all three in one go. Builds on the core, spawn, local-models,
@@ -36,7 +36,7 @@ local-talk and local-agents specs.
   "You look for how things break and write the smallest test that shows it.";
   Terse helper "You answer in as few words as possible."
 - Delivered: in the `chat_join` result (`Your personality: …`) and with every
-  wake-up: as the first line of the `chat wait` output (Claude) and of the
+  wake-up: as the first line of the `bullpen wait` output (Claude) and of the
   queued text (Codex), inside OpenCode's typed line as
   ` Your personality: <p>.` before `Reply with chat_post.` (within the 2000
   character limit), and in local members' system message.

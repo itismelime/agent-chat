@@ -4,7 +4,7 @@
 
 **Goal:** Start OpenCode agents with a local model from the page; they join the chat, are woken by messages typed into their terminal, show Needs you / Working / Available, and Stop unloads their model when nothing else uses it.
 
-**Architecture:** `agentchat/opencode.py` lists tool-capable models and writes OpenCode's own config. `spawn.py` learns tool `opencode` (command, `XDG_CONFIG_HOME`), OpenCode's question and working screens, and the typing of pending messages in the poller; the store gets kind `opencode` and a `type_in` hook; `mcp.py` maps the `opencode` client and gives it the right join text and schema. The server adds `/api/opencode/models` and passes the model to Start; the page adds the menu entries.
+**Architecture:** `bullpen/opencode.py` lists tool-capable models and writes OpenCode's own config. `spawn.py` learns tool `opencode` (command, `XDG_CONFIG_HOME`), OpenCode's question and working screens, and the typing of pending messages in the poller; the store gets kind `opencode` and a `type_in` hook; `mcp.py` maps the `opencode` client and gives it the right join text and schema. The server adds `/api/opencode/models` and passes the model to Start; the page adds the menu entries.
 
 **Tech Stack:** Python ≥ 3.9 stdlib, tmux, OpenCode 1.18, vanilla JS.
 
@@ -13,8 +13,8 @@
 ## Global Constraints
 
 - Facts from the build's probes (OpenCode 1.18.29/1.18.32): the TUI takes `--prompt <text>`; OpenCode's MCP client reports `clientInfo.name` `"opencode"`; working screens show `esc interrupt`; permission screens show `Permission required` and `enter confirm`; idle screens show neither.
-- Start command: `opencode -m ac/<model> --prompt "join the chat"` with `-e XDG_CONFIG_HOME=<data>/opencode-config` and `-e AGENT_CHAT_SPAWN=<token>`.
-- Config at `<data>/opencode-config/opencode/opencode.json`: provider `ac` (`@ai-sdk/openai-compatible`, `<ollama url>/v1`), all tool-capable models, MCP `agent-chat` (`[<clone>/bin/chat, "mcp"]`, env `AGENT_CHAT_PORT`), `"tools": {"skill": false}`.
+- Start command: `opencode -m ac/<model> --prompt "join the chat"` with `-e XDG_CONFIG_HOME=<data>/opencode-config` and `-e BULLPEN_SPAWN=<token>`.
+- Config at `<data>/opencode-config/opencode/opencode.json`: provider `ac` (`@ai-sdk/openai-compatible`, `<ollama url>/v1`), all tool-capable models, MCP `bullpen` (`[<clone>/bin/bullpen, "mcp"]`, env `BULLPEN_PORT`), `"tools": {"skill": false}`.
 - Default model `qwen3-coder:30b`, else the largest tool-capable one with `size × 1.2 ≤ GPU × 0.9`, else the largest.
 - Typed line: `[chat] <from>: <text> (<label>) Reply with chat_post.`; newlines → ` / `; at most 2000 characters, cut with `(… cut; chat_read has the whole message)`; one pending message per agent per poll, oldest first, only on an idle screen.
 - Files under 500 lines. Commit only after checking the full suite printed `OK`.
@@ -32,7 +32,7 @@
 ### Task 1: OpenCode in the tmux layer
 
 **Files:**
-- Modify: `agentchat/spawn.py`, `tests/test_spawn.py`, `tests/test_server.py`
+- Modify: `bullpen/spawn.py`, `tests/test_spawn.py`, `tests/test_server.py`
 - Create: `tests/data/screens/question-opencode-permission.txt`, `idle-opencode-idle.txt`, `working-opencode-working.txt` (copies)
 
 **Interfaces:**
@@ -65,10 +65,10 @@ In `tests/test_spawn.py`:
     def test_start_opencode(self):
         (self.d / "opencode").write_text("#!/bin/sh\nexit 0\n")
         (self.d / "opencode").chmod(0o755)
-        spawn.start("opencode", "/p", "agent-chat-p-abc123", "tok", model="qwen3-coder:30b",
+        spawn.start("opencode", "/p", "bullpen-p-abc123", "tok", model="qwen3-coder:30b",
                     config_home="/data/opencode-config")
         self.assertEqual(calls(self.d), [
-            "new-session -d -s agent-chat-p-abc123 -c /p -e AGENT_CHAT_SPAWN=tok "
+            "new-session -d -s bullpen-p-abc123 -c /p -e BULLPEN_SPAWN=tok "
             "-e XDG_CONFIG_HOME=/data/opencode-config -- opencode -m ac/qwen3-coder:30b "
             "--prompt join the chat"])
         with self.assertRaises(StoreError) as e:
@@ -93,7 +93,7 @@ Expected: failures (dict mismatch, 9 screens, `working` missing).
 
 - [ ] **Step 4: Implement**
 
-In `agentchat/spawn.py`:
+In `bullpen/spawn.py`:
 
 1. `TOOLS = ("claude", "codex")` → `TOOLS = ("claude", "codex", "opencode")`.
 2. Replace the `QUESTION = re.compile(...)` statement with:
@@ -117,13 +117,13 @@ def start(tool, path, session, token, model=None, config_home=None):
     missing = [t for t in ("tmux", tool) if shutil.which(t) is None]
     if missing:
         raise StoreError(503, "%s is not installed" % " and ".join(missing))
-    env = ["-e", "AGENT_CHAT_SPAWN=" + token]
+    env = ["-e", "BULLPEN_SPAWN=" + token]
     if tool == "opencode":
         env += ["-e", "XDG_CONFIG_HOME=" + config_home] if config_home else []
         command = ["opencode", "-m", "ac/" + model, "--prompt", PROMPT]
     else:
         # Codex's MCP servers are started by its app-server daemon and do not see
-        # AGENT_CHAT_SPAWN, so Codex gets the token in its prompt for chat_join.
+        # BULLPEN_SPAWN, so Codex gets the token in its prompt for chat_join.
         command = [tool, PROMPT if tool == "claude" else "%s (start %s)" % (PROMPT, token)]
     r = tmux("new-session", "-d", "-s", session, "-c", path, *env, "--", *command)
 ```
@@ -158,7 +158,7 @@ Run: `python3 -m unittest 2>&1 | tail -1` → `OK`.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add agentchat/spawn.py tests/test_spawn.py tests/test_server.py tests/data/screens
+git add bullpen/spawn.py tests/test_spawn.py tests/test_server.py tests/data/screens
 git commit -m "tmux layer: OpenCode start command, its question and working screens"
 ```
 
@@ -167,7 +167,7 @@ git commit -m "tmux layer: OpenCode start command, its question and working scre
 ### Task 2: OpenCode's config and models
 
 **Files:**
-- Create: `agentchat/opencode.py`, `tests/test_opencode.py`
+- Create: `bullpen/opencode.py`, `tests/test_opencode.py`
 
 **Interfaces:**
 - Produces: `opencode.DEFAULT = "qwen3-coder:30b"`; `opencode.tool_models(ollama, gpu_total) -> [name]` (tool-capable, default first); `opencode.config_home(root) -> Path` (`<root>/opencode-config`); `opencode.write_config(root, ollama_url, models, port) -> Path`.
@@ -182,8 +182,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agentchat import opencode
-from agentchat.ollama import Ollama
+from bullpen import opencode
+from bullpen.ollama import Ollama
 from tests.fake_ollama import GIB, FakeOllama
 
 CLONE = Path(__file__).resolve().parent.parent
@@ -217,10 +217,10 @@ class OpenCodeTest(unittest.TestCase):
         self.assertEqual(c["provider"]["ac"]["npm"], "@ai-sdk/openai-compatible")
         self.assertEqual(sorted(c["provider"]["ac"]["models"]), ["a:1", "b:2"])
         self.assertTrue(all(m["tools"] for m in c["provider"]["ac"]["models"].values()))
-        self.assertEqual(c["mcp"]["agent-chat"]["command"], [str(CLONE / "bin" / "chat"), "mcp"])
-        self.assertEqual(c["mcp"]["agent-chat"]["environment"], {"AGENT_CHAT_PORT": "8765"})
+        self.assertEqual(c["mcp"]["bullpen"]["command"], [str(CLONE / "bin" / "chat"), "mcp"])
+        self.assertEqual(c["mcp"]["bullpen"]["environment"], {"BULLPEN_PORT": "8765"})
         self.assertEqual(c["tools"], {"skill": False})
-        self.assertEqual(list(c["mcp"]), ["agent-chat"])  # nothing of the user's own config
+        self.assertEqual(list(c["mcp"]), ["bullpen"])  # nothing of the user's own config
         self.assertEqual(sorted(c["provider"]), ["ac"])
 ```
 
@@ -231,7 +231,7 @@ Expected: `ImportError: cannot import name 'opencode'`.
 
 - [ ] **Step 3: Implement**
 
-`agentchat/opencode.py`:
+`bullpen/opencode.py`:
 
 ```python
 """OpenCode agents: which local models they can use, and OpenCode's own config.
@@ -270,18 +270,18 @@ def config_home(root):
 
 
 def write_config(root, ollama_url, models, port):
-    """OpenCode's config: agent-chat's Ollama, the chat tools, no skill tool
+    """OpenCode's config: bullpen's Ollama, the chat tools, no skill tool
     (OpenCode would list every installed skill in its prompt)."""
     path = config_home(root) / "opencode" / "opencode.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     write_json(path, {
         "$schema": "https://opencode.ai/config.json",
-        "provider": {"ac": {"npm": "@ai-sdk/openai-compatible", "name": "agent-chat Ollama",
+        "provider": {"ac": {"npm": "@ai-sdk/openai-compatible", "name": "bullpen Ollama",
                             "options": {"baseURL": ollama_url.rstrip("/") + "/v1"},
                             "models": {m: {"name": m, "tools": True} for m in models}}},
-        "mcp": {"agent-chat": {"type": "local", "enabled": True,
+        "mcp": {"bullpen": {"type": "local", "enabled": True,
                                "command": [str(CLONE / "bin" / "chat"), "mcp"],
-                               "environment": {"AGENT_CHAT_PORT": str(port)}}},
+                               "environment": {"BULLPEN_PORT": str(port)}}},
         "tools": {"skill": False}})
     return path
 ```
@@ -295,7 +295,7 @@ Run: `python3 -m unittest tests.test_opencode -v 2>&1 | tail -3` → `OK`; full 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agentchat/opencode.py tests/test_opencode.py
+git add bullpen/opencode.py tests/test_opencode.py
 git commit -m "OpenCode: tool-capable local models and its own config"
 ```
 
@@ -304,7 +304,7 @@ git commit -m "OpenCode: tool-capable local models and its own config"
 ### Task 3: Kind opencode in the store and the agent tools
 
 **Files:**
-- Modify: `agentchat/store.py`, `agentchat/mcp.py`, `tests/test_store.py`, `tests/test_mcp.py`
+- Modify: `bullpen/store.py`, `bullpen/mcp.py`, `tests/test_store.py`, `tests/test_mcp.py`
 
 **Interfaces:**
 - Produces: kind `opencode` in `store.KINDS`; `Store.type_in` hook (`type_in(pid, name, m)`, default None) called for woken agents of kind `opencode`; `status()` for kind `opencode`: `needs_you` if flagged, else `busy` if `store.local[(pid, name)]["busy"]`, else `waiting`; `mcp.kind_of("opencode") == "opencode"`; `Session.tools()` offers `spawn` in `chat_join` only to kind `codex`; opencode join text "Chat messages for you are typed into this session as they arrive; reply with chat_post."; no reminder for kind `opencode`.
@@ -336,10 +336,10 @@ In `tests/test_mcp.py`, before `def test_name_taken(self):`:
 ```python
     def test_opencode_session(self):
         s = Session(Client(self.port), str(self.dir), spawn_token="tok")
-        self.store.add_spawned("proj", "tok", "opencode", "agent-chat-test-no-such-session")
+        self.store.add_spawned("proj", "tok", "opencode", "bullpen-test-no-such-session")
         init = rpc(s, "initialize", {"clientInfo": {"name": "opencode", "version": "1.18.32"}})
         self.assertEqual(s.kind, "opencode")
-        self.assertNotIn("chat wait", init["result"]["instructions"])
+        self.assertNotIn("bullpen wait", init["result"]["instructions"])
         join = next(t for t in rpc(s, "tools/list")["result"]["tools"] if t["name"] == "chat_join")
         self.assertNotIn("spawn", join["inputSchema"]["properties"])
         text, err = tool(s, "chat_join", {"name": "kit"})
@@ -361,7 +361,7 @@ Run: `python3 -m unittest tests.test_store tests.test_mcp 2>&1 | tail -3` → fa
 
 - [ ] **Step 3: Implement**
 
-`agentchat/store.py`:
+`bullpen/store.py`:
 
 1. `KINDS = {"claude", "codex", "llm"}` → `KINDS = {"claude", "codex", "llm", "opencode"}`, and in `join` the message `"kind must be one of: claude, codex, llm"` → `"kind must be one of: claude, codex, llm, opencode"`.
 2. After `        self.talk = None` in `__init__` add `        self.type_in = None  # type_in(pid, name, message): OpenCode agents (spawn.Spawner)`.
@@ -397,7 +397,7 @@ with
                     status = "busy" if self.local.get((pid, name), {}).get("busy") else "waiting"
 ```
 
-`agentchat/mcp.py`:
+`bullpen/mcp.py`:
 
 1. Replace `kind_of`:
 
@@ -450,7 +450,7 @@ with
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agentchat/store.py agentchat/mcp.py tests/test_store.py tests/test_mcp.py
+git add bullpen/store.py bullpen/mcp.py tests/test_store.py tests/test_mcp.py
 git commit -m "Kind opencode: typed-to agents in the store, right join text and schema"
 ```
 
@@ -459,7 +459,7 @@ git commit -m "Kind opencode: typed-to agents in the store, right join text and 
 ### Task 4: Spawner and routes
 
 **Files:**
-- Modify: `agentchat/spawn.py`, `agentchat/ollama.py`, `agentchat/server.py`, `tests/test_spawn.py`, `tests/test_server.py`
+- Modify: `bullpen/spawn.py`, `bullpen/ollama.py`, `bullpen/server.py`, `tests/test_spawn.py`, `tests/test_server.py`
 
 **Interfaces:**
 - Consumes: Tasks 1–3; `models.Models`; `opencode.tool_models`, `write_config`, `config_home`.
@@ -467,7 +467,7 @@ git commit -m "Kind opencode: typed-to agents in the store, right join text and 
 
 - [ ] **Step 1: Write the failing tests**
 
-Add to `SpawnerTest` in `tests/test_spawn.py` (its `setUp` already puts stub `tmux`, `claude`, `codex` on PATH); add `from tests.fake_ollama import GIB, FakeOllama` and `from agentchat import models as models_mod` to the imports:
+Add to `SpawnerTest` in `tests/test_spawn.py` (its `setUp` already puts stub `tmux`, `claude`, `codex` on PATH); add `from tests.fake_ollama import GIB, FakeOllama` and `from bullpen import models as models_mod` to the imports:
 
 ```python
     def opencode_setup(self):
@@ -555,14 +555,14 @@ Add to `ModelRoutesTest` in `tests/test_server.py`:
 
 - [ ] **Step 3: Implement**
 
-1. `agentchat/ollama.py`, add after `unload_all`:
+1. `bullpen/ollama.py`, add after `unload_all`:
 
 ```python
     def unload(self, model):
         self.json("POST", "/api/generate", {"model": model, "keep_alive": 0}, timeout=120)
 ```
 
-2. `agentchat/spawn.py`, replace the `Spawner` class's `__init__` and `start` with:
+2. `bullpen/spawn.py`, replace the `Spawner` class's `__init__` and `start` with:
 
 ```python
     def __init__(self, store, models=None, port=8765):
@@ -578,7 +578,7 @@ Add to `ModelRoutesTest` in `tests/test_server.py`:
     def start(self, pid, tool, model=None):
         project = self.store.project(pid)
         token = secrets.token_hex(16)
-        session = "agent-chat-%s-%s" % (pid, token[:6])
+        session = "bullpen-%s-%s" % (pid, token[:6])
         home = None
         if tool == "opencode":
             from . import opencode
@@ -606,7 +606,7 @@ Add to `ModelRoutesTest` in `tests/test_server.py`:
             try:
                 self.models.ollama.unload(r["model"])
             except Exception as e:  # stopping still succeeded
-                print("agent-chat: could not unload %s: %s" % (r["model"], e), file=sys.stderr)
+                print("bullpen: could not unload %s: %s" % (r["model"], e), file=sys.stderr)
 
     def _model_in_use(self, model):
         for p in self.store.projects():
@@ -622,7 +622,7 @@ Add to `ModelRoutesTest` in `tests/test_server.py`:
 
 ```python
                 if r["name"] and self.store.waiting.get((pid, r["name"])):
-                    need = False  # an open chat wait means the agent is idle
+                    need = False  # an open bullpen wait means the agent is idle
                 else:
                     try:
                         text = screen(r["session"])
@@ -654,7 +654,7 @@ and add the method:
         self.store.set_local(pid, r["name"], busy=busy or left or bool(m))
 ```
 
-5. `agentchat/server.py`:
+5. `bullpen/server.py`:
    - In `serve()`, move `models = models or models_mod.Models(store.root)` above `spawner = spawn.Spawner(store)`, and change that line to `spawner = spawn.Spawner(store, models, server.server_address[1])`; in the `if deliver:` block add `store.type_in = spawner`.
    - Replace `return 201, {"spawned": spawner.start(pid, self.field(self.body(), "tool"))}` with:
 
@@ -678,7 +678,7 @@ and add the method:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agentchat/spawn.py agentchat/ollama.py agentchat/server.py tests/test_spawn.py tests/test_server.py
+git add bullpen/spawn.py bullpen/ollama.py bullpen/server.py tests/test_spawn.py tests/test_server.py
 git commit -m "OpenCode agents: start with a model and config, typed messages, unload on Stop"
 ```
 
@@ -687,7 +687,7 @@ git commit -m "OpenCode agents: start with a model and config, typed messages, u
 ### Task 5: The page
 
 **Files:**
-- Modify: `agentchat/page.html`
+- Modify: `bullpen/page.html`
 
 - [ ] **Step 1: Models for OpenCode**
 
@@ -731,7 +731,7 @@ A demo service (scratchpad script) with a `FakeOllama` holding `coder:30b` (tool
 - [ ] **Step 6: Commit**
 
 ```bash
-git add agentchat/page.html
+git add bullpen/page.html
 git commit -m "Page: Start OpenCode with a local model, its member line, /start opencode"
 ```
 
@@ -744,12 +744,12 @@ git commit -m "Page: Start OpenCode with a local model, its member line, /start 
 ```markdown
 7. Start a local coding agent: **+ Agent → Start OpenCode: <model>** (or
    `/start opencode [model]`). OpenCode runs in tmux with a local model from
-   agent-chat's Ollama and its own config (your OpenCode settings are not
+   bullpen's Ollama and its own config (your OpenCode settings are not
    used), joins the chat, and gets chat messages typed into its terminal when
    it is idle. `qwen3-coder:30b` works best in tests; Stop unloads its model
    when nothing else uses it.
 ```
 
-- [ ] **Step 2:** commit; after the final review and its fixes merge into `main`, push, `systemctl --user restart agent-chat`.
+- [ ] **Step 2:** commit; after the final review and its fixes merge into `main`, push, `systemctl --user restart bullpen`.
 
-- [ ] **Step 3: Live check with the user** in a scratch project registered with `chat add`: start OpenCode with `qwen3-coder:30b`, ask it in the chat to create a small file, answer one permission question in View terminal, see the reply in the chat, Stop, and see the model unloaded (`Models → Installed`). Record a "Verified" line in the spec; commit; push.
+- [ ] **Step 3: Live check with the user** in a scratch project registered with `bullpen add`: start OpenCode with `qwen3-coder:30b`, ask it in the chat to create a small file, answer one permission question in View terminal, see the reply in the chat, Stop, and see the model unloaded (`Models → Installed`). Record a "Verified" line in the spec; commit; push.
