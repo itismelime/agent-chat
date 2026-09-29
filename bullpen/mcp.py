@@ -23,15 +23,16 @@ CHAT = Path(__file__).resolve().parent.parent / "bin" / "chat"
 VERSION = hashlib.sha1(Path(__file__).read_bytes()).hexdigest()[:12]
 WATCH_SECONDS = 30
 # posted to every chat once when it changes (update it with what agents should learn)
-NEWS = ("agent-chat was updated. For agents: messages now show their number (#12), and "
+NEWS = ("agent-chat is now called bullpen: your chat tools are mcp__bullpen__* from your next "
+        "session, and the command is bullpen (bullpen wait …). bullpen was updated. For agents: messages now show their number (#12), and "
         "chat_react (#12, 👍) acknowledges one without a reply; reactions wake nobody. Projects can "
         "have rules: they come with your instructions and every message that wakes you, as "
         "\"Project rules (follow them): ...\"; follow them. The board has epics (board_add kind "
         "\"epic\", or epic: <number>; board_update epic, 0 takes an item out), and chat_post "
         "ask: true marks the posts the user has to answer.")
-DOWN = ("The agent-chat service is not running, so this project's chat is unavailable "
+DOWN = ("The bullpen service is not running, so this project's chat is unavailable "
         "(%s; the chat tools work once it runs)." % (
-            "schtasks /run /tn agent-chat" if os.name == "nt" else "systemctl --user start agent-chat"))
+            "schtasks /run /tn bullpen" if os.name == "nt" else "systemctl --user start bullpen"))
 
 TOOLS = [
     {"name": "chat_join",
@@ -217,7 +218,7 @@ class Session:
         agents = self.client.call("GET", "/api/projects/%s/agents" % self.project["id"])[1]["agents"]
         if any(a["name"] == self.name and a["status"] == "waiting" for a in agents):
             return ""
-        return ("\n\nReminder: your chat wait is not running. Start it as a background "
+        return ("\n\nReminder: your bullpen wait is not running. Start it as a background "
                 "command: " + self.wait_command())
 
     def call(self, tool, args):
@@ -272,7 +273,7 @@ class Session:
                 old, self.name = self.name, str(args.get("name", "")).strip().lower()  # as the store has it
                 text = "You are now %s (was %s)." % (self.name, old)
                 if self.kind not in ("codex", "opencode"):
-                    text += (" A chat wait still running as %s keeps working; start the next one "
+                    text += (" A bullpen wait still running as %s keeps working; start the next one "
                              "as:\n%s" % (old, self.wait_command()))
                 return text, False
             if tool == "chat_react":
@@ -307,7 +308,7 @@ def handle(session, req):
             session.kind = "llm"  # started by hand, not by the page: nothing types into it
         result = {"protocolVersion": params.get("protocolVersion", "2025-06-18"),
                   "capabilities": {"tools": {"listChanged": True}},
-                  "serverInfo": {"name": "agent-chat", "version": "1"}}
+                  "serverInfo": {"name": "bullpen", "version": "1"}}
         instructions = session.instructions()
         if instructions:
             result["instructions"] = instructions
@@ -412,7 +413,7 @@ def watch(session, write, every=WATCH_SECONDS):
 
 
 def main():
-    session = Relay(Client(), os.getcwd(), spawn_token=os.environ.get("AGENT_CHAT_SPAWN"))
+    session = Relay(Client(), os.getcwd(), spawn_token=os.environ.get("BULLPEN_SPAWN"))
     lock = threading.Lock()
 
     def write(msg):
@@ -428,7 +429,7 @@ def main():
             req = json.loads(raw)
             reply = handle(session, req) if isinstance(req, dict) else None
         except ValueError as e:
-            print("agent-chat mcp: %s" % e, file=sys.stderr)
+            print("bullpen mcp: %s" % e, file=sys.stderr)
             continue
         if reply:
             write(reply)

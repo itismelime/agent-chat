@@ -8,14 +8,14 @@ import time
 import unittest
 from pathlib import Path
 
-from agentchat import models as models_mod
-from agentchat.client import ApiError, Client, ServiceDown, fmt, label
+from bullpen import models as models_mod
+from bullpen.client import ApiError, Client, ServiceDown, fmt, label
 from tests.fake_ollama import GIB, FakeOllama
-from agentchat.server import peer_uid, serve
+from bullpen.server import peer_uid, serve
 from tests.helpers import start, stop
 from tests.test_spawn import SCREENS, stub_tools  # noqa: F401
 
-API = {"X-Agent-Chat": "1"}
+API = {"X-Bullpen": "1"}
 JSON = dict(API, **{"Content-Type": "application/json"})
 
 
@@ -42,7 +42,7 @@ class ServerTest(unittest.TestCase):
     def test_page(self):
         status, body = self.raw("GET", "/")
         self.assertEqual(status, 200)
-        self.assertIn(b"agent-chat", body)
+        self.assertIn(b"bullpen", body)
 
     def test_localhost_checks(self):
         self.assertEqual(self.raw("GET", "/", headers={"Host": "evil.example"})[0], 403)
@@ -118,7 +118,7 @@ class ServerTest(unittest.TestCase):
         pid = self.add()
         self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})
         sock = socket.create_connection(("127.0.0.1", self.port))
-        sock.sendall(("GET %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nX-Agent-Chat: 1\r\n\r\n"
+        sock.sendall(("GET %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nX-Bullpen: 1\r\n\r\n"
                       % (self.c.agent_path(pid, "alice", "wait"), self.port)).encode())
         time.sleep(0.3)
         sock.close()
@@ -158,7 +158,7 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(joined["agent"]["spawn"], token)
         listed = self.c.call("GET", "/api/projects/%s/spawned" % pid)[1]["spawned"]
         self.assertEqual([(s["name"], s["state"], s["session"]) for s in listed],
-                         [("alice", "joined", "agent-chat-%s-alice" % pid)])
+                         [("alice", "joined", "bullpen-%s-alice" % pid)])
         self.c.call("POST", base + "/stop", {})
         self.assertEqual(self.c.call("GET", "/api/projects/%s/spawned" % pid)[1]["spawned"], [])
         for method, path, data, code in (
@@ -202,7 +202,7 @@ class ServerTest(unittest.TestCase):
         self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "kit", "kind": "claude", "spawn": token})
         self.c.call("POST", self.c.agent_path(pid, "kit", "remove"), {})
         self.assertEqual(self.c.call("GET", "/api/projects/%s/spawned" % pid)[1]["spawned"], [])
-        self.assertIn("kill-session -t =agent-chat-%s-kit" % pid, (d / "calls").read_text())
+        self.assertIn("kill-session -t =bullpen-%s-kit" % pid, (d / "calls").read_text())
         self.c.call("POST", "/api/projects/%s/agents" % pid, {"name": "alice", "kind": "claude"})
         self.c.call("POST", self.c.agent_path(pid, "alice", "remove"), {})  # not started: nothing to stop
 
@@ -296,6 +296,12 @@ class ServerTest(unittest.TestCase):
         m = {"time": "2026-09-27T18:30:16+02:00", "from": "board", "text": 'kit moved #1 "x" to Done'}
         self.assertEqual(label(m, "cody"), "board notice: no reply needed")
         self.assertEqual(label(dict(m, text="@cody you were assigned #1"), "cody"), "addressed to you: reply")
+
+    def test_sessions_from_before_the_rename_are_let_in(self):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.request("GET", "/api/projects", headers={"X-Agent-Chat": "1"})
+        self.assertEqual(conn.getresponse().status, 200)
+        conn.close()
 
     def test_fmt_and_label(self):
         m = {"n": 7, "time": "2026-09-27T18:30:16+02:00", "from": "user", "text": "@bob hi"}

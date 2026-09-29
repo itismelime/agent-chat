@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="360" height="80" viewBox="0 0 360 80" role="img" aria-label="agent-chat">
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="80" viewBox="0 0 360 80" role="img" aria-label="bullpen">
 <clipPath id="m76"><rect x="8" y="8" width="64" height="64" rx="17.7778"/></clipPath>
 <g clip-path="url(#m76)">
 <path d="M40.00 40.00L104.00 40.00L103.91 43.42Z" fill="#ff8880" stroke="#ff8880" stroke-width=".6"/>
@@ -126,5 +126,5 @@
 <circle cx="40" cy="39" r="3.2" fill="#6eca73"/>
 <circle cx="49" cy="39" r="3.2" fill="#5fb6ff"/>
 </g>
-<text x="88" y="53" font-family="'Red Hat Display','Inter','Segoe UI',system-ui,sans-serif" font-weight="700" font-size="40" fill="#e3e8ed" letter-spacing="-0.5">agent-chat</text>
+<text x="88" y="53" font-family="'Red Hat Display','Inter','Segoe UI',system-ui,sans-serif" font-weight="700" font-size="40" fill="#e3e8ed" letter-spacing="-0.5">bullpen</text>
 </svg>

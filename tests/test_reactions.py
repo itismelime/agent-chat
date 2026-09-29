@@ -1,7 +1,7 @@
 import unittest
 
-from agentchat.client import ApiError, Client
-from agentchat.mcp import Session, handle
+from bullpen.client import ApiError, Client
+from bullpen.mcp import Session, handle
 from tests.helpers import start, stop
 
 

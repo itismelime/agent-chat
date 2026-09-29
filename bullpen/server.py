@@ -1,7 +1,7 @@
-"""agent-chat HTTP service: the JSON API and the page, on 127.0.0.1 only.
+"""bullpen HTTP service: the JSON API and the page, on 127.0.0.1 only.
 
 Requests must name this server in Host and carry no foreign Origin; API
-requests must also send the X-Agent-Chat header and JSON bodies, which a
+requests must also send the X-Bullpen header and JSON bodies, which a
 foreign page cannot do without a CORS preflight we never answer. So other
 websites can neither post into the agents' sessions nor move their cursors
 with a plain GET such as <img src=...>.
@@ -89,7 +89,7 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 self.end_headers()
                 self.wfile.write(data)
             except (BrokenPipeError, ConnectionResetError):
-                pass  # the client went away, e.g. a killed chat wait
+                pass  # the client went away, e.g. a killed bullpen wait
 
         def body(self):
             if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
@@ -133,8 +133,9 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 return self.send(403, {"error": "cross-site request refused"})
             url = urlsplit(self.path)
             parts = [p for p in url.path.split("/") if p]
-            if parts[:1] == ["api"] and self.headers.get("X-Agent-Chat") != "1":
-                return self.send(403, {"error": "missing X-Agent-Chat header"})
+            # X-Agent-Chat: relays and waits started before the rename to bullpen
+            if parts[:1] == ["api"] and "1" not in (self.headers.get("X-Bullpen"), self.headers.get("X-Agent-Chat")):
+                return self.send(403, {"error": "missing X-Bullpen header"})
             query = {k: v[0] for k, v in parse_qs(url.query).items()}
             try:
                 self.send(*self.route(method, parts, query))
@@ -403,7 +404,7 @@ def serve(port=None, store=None, wait_seconds=WAIT_SECONDS, deliver=True, owner=
     """Bind the service; the caller runs serve_forever(). deliver=False
     leaves Codex sessions and tmux alone (tests)."""
     if port is None:
-        port = int(os.environ.get("AGENT_CHAT_PORT", "8765"))
+        port = int(os.environ.get("BULLPEN_PORT", "8765"))
     server = ThreadingHTTPServer(("127.0.0.1", port), BaseHTTPRequestHandler)
     server.daemon_threads = True
     store = store or Store()

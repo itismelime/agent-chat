@@ -16,8 +16,8 @@ DEFAULT = "gpt-oss:20b"
 CLONE = Path(__file__).resolve().parent.parent
 LINK_MS = 60_000  # a start's OpenCode session opens within this after the start
 # a chat tool call written out as text, as qwen3-coder does under OpenCode's long
-# prompt: "<function=agent-chat_chat_join>\n<parameter=name>\nx\n</parameter>\n</function>"
-CALL = re.compile(r"<function=agent-chat_(chat_join|chat_post)>(.*?)</function>", re.S)
+# prompt: "<function=bullpen_chat_join>\n<parameter=name>\nx\n</parameter>\n</function>"
+CALL = re.compile(r"<function=(?:bullpen|agent-chat)_(chat_join|chat_post)>(.*?)</function>", re.S)
 PARAM = re.compile(r"<parameter=(\w+)>\n?(.*?)\n?</parameter>", re.S)
 
 
@@ -46,18 +46,18 @@ def data_home(root):
 
 
 def write_config(root, ollama_url, models, port):
-    """OpenCode's config: agent-chat's Ollama, the chat tools, no skill tool
+    """OpenCode's config: bullpen's Ollama, the chat tools, no skill tool
     (OpenCode would list every installed skill in its prompt)."""
     path = config_home(root) / "opencode" / "opencode.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     write_json(path, {
         "$schema": "https://opencode.ai/config.json",
-        "provider": {"ac": {"npm": "@ai-sdk/openai-compatible", "name": "agent-chat Ollama",
+        "provider": {"ac": {"npm": "@ai-sdk/openai-compatible", "name": "bullpen Ollama",
                             "options": {"baseURL": ollama_url.rstrip("/") + "/v1"},
                             "models": {m: {"name": m, "tools": True} for m in models}}},
-        "mcp": {"agent-chat": {"type": "local", "enabled": True,
+        "mcp": {"bullpen": {"type": "local", "enabled": True,
                                "command": [str(CLONE / "bin" / "chat"), "mcp"],
-                               "environment": {"AGENT_CHAT_PORT": str(port)}}},
+                               "environment": {"BULLPEN_PORT": str(port)}}},
         "tools": {"skill": False}})
     return path
 

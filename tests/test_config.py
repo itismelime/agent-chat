@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agentchat import config
+from bullpen import config
 
 CHAT = str(Path(__file__).resolve().parent.parent / "bin" / "chat")
 

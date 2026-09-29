@@ -1,4 +1,4 @@
-/* agent-chat page. Speaker colors: --h (a hue from the name) through --sl/--sc. */
+/* bullpen page. Speaker colors: --h (a hue from the name) through --sl/--sc. */
 :root{--paper:#f2f4f6;--panel:#fff;--rail:#e6eaee;--ink:#17212b;--mute:#5d6975;--line:#d6dce2;--soft:#e9edf1;
 --attn:#b8620f;--attn-bg:#fdf1e3;--ok:#2f8f5b;--busy:#b8870f;--bad:#b3322f;--sl:52%;--sc:.15;
 --display:"Red Hat Display","Inter",system-ui,sans-serif;--text:"Red Hat Text","Inter",system-ui,sans-serif;

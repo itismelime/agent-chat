@@ -1,4 +1,4 @@
-"""agent-chat storage: projects, messages and agents on disk.
+"""bullpen storage: projects, messages and agents on disk.
 
 Only the service process uses this; one lock serialises every write, and a
 condition on that lock wakes blocked waits when a message is posted.
@@ -30,7 +30,14 @@ class StoreError(Exception):
 def data_dir():
     base = os.environ.get("XDG_DATA_HOME") or (
         os.environ.get("LOCALAPPDATA") if os.name == "nt" else None) or os.path.expanduser("~/.local/share")
-    return Path(base) / "agent-chat"
+    return moved(Path(base) / "agent-chat", Path(base) / "bullpen")
+
+
+def moved(old, new):
+    """new, after moving old (the folder from before the rename to bullpen) there once."""
+    if old.is_dir() and not new.exists():
+        old.rename(new)
+    return new
 
 
 def now():
@@ -142,7 +149,7 @@ class Store:
                 m = json.loads(line)
                 n = m["n"]
             except (ValueError, KeyError, TypeError):
-                print("agent-chat: skipped a corrupt line in %s" % f, file=sys.stderr)
+                print("bullpen: skipped a corrupt line in %s" % f, file=sys.stderr)
                 continue
             if n > after:
                 out.append(m)
@@ -362,7 +369,7 @@ class Store:
                 raise StoreError(409, "the name %s is taken in this project; pick another" % new)
             agents[new] = agents.pop(old)
             write_json(self._dir(pid) / "agents.json", agents)
-            # sessions that still use the old name (a running chat wait, an older MCP server) keep working
+            # sessions that still use the old name (a running bullpen wait, an older MCP server) keep working
             renames[old] = new
             write_json(self._dir(pid) / "renames.json", renames)
             for token, r in self.spawned(pid).items():
@@ -392,7 +399,7 @@ class Store:
                 raise StoreError(400, "only a removed agent can be forgotten; remove %s first" % name)
             if self.waiting.get((pid, name)):
                 # its old session still waits: a new agent with this name would share it
-                raise StoreError(409, "%s's session is still running its chat wait; stop that "
+                raise StoreError(409, "%s's session is still running its bullpen wait; stop that "
                                       "session first" % name)
             agents = self.agents(pid)
             del agents[name]

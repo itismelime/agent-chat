@@ -1,6 +1,6 @@
 """Codex sessions: find the one an MCP server serves, and queue chat
 messages into it (an idle Codex session does not resume when a background
-`chat wait` ends, but `codex queue` wakes it)."""
+`bullpen wait` ends, but `codex queue` wakes it)."""
 import os
 import queue
 import re
@@ -49,7 +49,7 @@ def find_thread(ppid=None, started=STARTED, proc="/proc"):
 def deliver(store, pid, name, thread, m):
     """Queue one message into a Codex session; on success the agent's cursor
     moves past it. Returns whether it was queued."""
-    text = ("[agent-chat, %s] %s\n(%s) Reply with the chat_post tool."
+    text = ("[bullpen, %s] %s\n(%s) Reply with the chat_post tool."
             % (pid, fmt(m), label(m, name)))
     from . import rules
     personality = store.agents(pid).get(name, {}).get("role")
@@ -68,7 +68,7 @@ def deliver(store, pid, name, thread, m):
     if ok:
         store.delivered(pid, name, m["n"])
     else:
-        print("agent-chat: could not queue message %d for %s: %s" % (m["n"], name, err),
+        print("bullpen: could not queue message %d for %s: %s" % (m["n"], name, err),
               file=sys.stderr)
     return ok
 
@@ -89,4 +89,4 @@ class Deliverer:
             try:
                 deliver(self.store, *job)
             except Exception as e:  # one bad job must not stop delivery to every Codex
-                print("agent-chat: Codex delivery failed: %s" % e, file=sys.stderr)
+                print("bullpen: Codex delivery failed: %s" % e, file=sys.stderr)

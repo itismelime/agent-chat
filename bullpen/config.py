@@ -1,17 +1,18 @@
-"""agent-chat settings, in ${XDG_CONFIG_HOME:-~/.config}/agent-chat/config.json."""
+"""bullpen settings, in ${XDG_CONFIG_HOME:-~/.config}/bullpen/config.json."""
 import json
 import os
 import re
 from pathlib import Path
 
-OWN_OLLAMA = "http://127.0.0.1:%s" % os.environ.get("AGENT_CHAT_OLLAMA_PORT", "11436")
+OWN_OLLAMA = "http://127.0.0.1:%s" % os.environ.get("BULLPEN_OLLAMA_PORT", "11436")
 LOCAL_URL = re.compile(r"^http://(?:127\.0\.0\.1|localhost):\d{1,5}$")
 
 
 def config_path():
     base = os.environ.get("XDG_CONFIG_HOME") or (
         os.environ.get("APPDATA") if os.name == "nt" else None) or os.path.expanduser("~/.config")
-    return Path(base) / "agent-chat" / "config.json"
+    from .store import moved
+    return moved(Path(base) / "agent-chat", Path(base) / "bullpen") / "config.json"
 
 
 def load():
@@ -23,13 +24,13 @@ def load():
 
 
 def ollama_url():
-    """The Ollama in use: the configured one, else agent-chat's own."""
+    """The Ollama in use: the configured one, else bullpen's own."""
     url = load().get("ollama_url")
     return url if isinstance(url, str) and LOCAL_URL.match(url) else OWN_OLLAMA
 
 
 def set_ollama_url(url):
-    """Use the Ollama at url; "own" goes back to agent-chat's own."""
+    """Use the Ollama at url; "own" goes back to bullpen's own."""
     data = load()
     if url == "own":
         data.pop("ollama_url", None)

@@ -1,4 +1,4 @@
-# agent-chat core: one service, many projects, self-named agents
+# bullpen core: one service, many projects, self-named agents
 
 Status: draft for review, 2026-09-27. Covers features 2 and 3 of the
 roadmap, plus the minimum install needed to run them. Later parts get their
@@ -32,7 +32,7 @@ Success looks like this:
   prompt such as `claude "join the chat"` (live check 2026-09-27: a fresh
   session does nothing until it gets a turn).
 - No Claude Code development flag and no channel: Claude agents are woken by a
-  background `chat wait` and Codex agents by `codex queue` (see Codex
+  background `bullpen wait` and Codex agents by `codex queue` (see Codex
   delivery) (tested 2026-09-27: about 5 s from post to the
   agent running, while idle).
 
@@ -45,11 +45,11 @@ accounts or authentication beyond the localhost checks below.
 
 ```
 install.sh              install / --uninstall
-bin/chat                CLI (Python, stdlib)
-agentchat/store.py      files on disk; the only code that writes them
-agentchat/server.py     HTTP service: API + page
-agentchat/page.html     the page (served as a static file)
-agentchat/mcp.py        MCP server for agent tools (stdio)
+bin/bullpen                CLI (Python, stdlib)
+bullpen/store.py      files on disk; the only code that writes them
+bullpen/server.py     HTTP service: API + page
+bullpen/page.html     the page (served as a static file)
+bullpen/mcp.py        MCP server for agent tools (stdio)
 tests/                  unittest
 ```
 
@@ -58,7 +58,7 @@ removed. Python 3.9+ standard library only; no dependencies.
 
 ## Storage
 
-Directory: `${XDG_DATA_HOME:-~/.local/share}/agent-chat/`.
+Directory: `${XDG_DATA_HOME:-~/.local/share}/bullpen/`.
 
 - `projects.json`: `{"projects": [{"id", "name", "path", "added"}]}`.
   `id` is a slug of the folder name (`openvibes`), with `-2`, `-3` added if
@@ -90,10 +90,10 @@ One service process writes; a lock inside it serialises writes.
 - Who **replies**: for a message with no `@`, everyone; with `@`, only the
   addressed names. The wake output tells the agent which case it is in.
 
-## Service (`agent-chat serve`)
+## Service (`bullpen serve`)
 
-Listens on `127.0.0.1:8765` (`AGENT_CHAT_PORT` overrides). Run as the
-systemd user unit `agent-chat.service`.
+Listens on `127.0.0.1:8765` (`BULLPEN_PORT` overrides). Run as the
+systemd user unit `bullpen.service`.
 
 API (JSON in and out):
 
@@ -137,25 +137,25 @@ can still post; that is accepted.
 The project is found with `/api/resolve` from the working directory.
 
 - `chat` follows the current project's chat live.
-- `chat post --as <name> <text>` posts; `--as user` for the user.
-- `chat add <path>` registers a project.
-- `chat wait --as <name>` repeats the `wait` request until a message
+- `bullpen post --as <name> <text>` posts; `--as user` for the user.
+- `bullpen add <path>` registers a project.
+- `bullpen wait --as <name>` repeats the `wait` request until a message
   arrives, prints it and exits. The output ends with either "addressed to
   you: reply" or "for others: read only", then the line to restart the
   wait. A notice prints instead: "You were removed from this chat. Keep
   this wait running anyway; it only wakes you if you are added back." or
   "You were added back to the chat.", then the restart line.
-- If the service is unreachable: prints `agent-chat service not running
-  (systemctl --user start agent-chat)` and exits 1.
+- If the service is unreachable: prints `bullpen service not running
+  (systemctl --user start bullpen)` and exits 1.
 
-## Agent tools (`agentchat/mcp.py`)
+## Agent tools (`bullpen/mcp.py`)
 
 One MCP server process per agent session, registered once per user (see
 Install). On start it resolves its working directory:
 
 - Not in a project: no tools and no instructions.
 - In a project: instructions say the project has a chat, to join with a
-  short self-chosen name, and to keep `chat wait` running in the
+  short self-chosen name, and to keep `bullpen wait` running in the
   background. Tools:
   - `chat_join(name)`: joins with `kind` taken from the client name in the
     MCP `initialize` call's `clientInfo.name` (contains `claude` →
@@ -164,20 +164,20 @@ Install). On start it resolves its working directory:
     session, one name, one project.
   - `chat_post(text)` and `chat_read()`, both refused before joining.
   - After a successful join the result contains the exact background
-    command: `<abs path>/bin/chat wait --as <name>`.
+    command: `<abs path>/bin/bullpen wait --as <name>`.
   - Every `chat_post`/`chat_read` result ends with a reminder when the
     agent's status is not `waiting`.
 
 **Probe results (2026-09-27).** Claude Code starts a stdio MCP server in
 the session's working directory (checked with `claude -p` in a subfolder).
 Codex's default sandbox refuses connections to 127.0.0.1 (`curl` exit 7 from
-`codex exec`; `~/.codex/config.toml` sets no sandbox options), so `chat wait`
+`codex exec`; `~/.codex/config.toml` sets no sandbox options), so `bullpen wait`
 run from Codex's shell cannot reach the service; Codex's MCP tools run
 outside the sandbox and can. Whether Codex re-invokes an idle session when a
 background command ends is not yet checked.
 
 **Live check (2026-09-27): option A fails for waking.** With network access
-Codex's `chat wait` reached the service and exited with the message, but an
+Codex's `bullpen wait` reached the service and exited with the message, but an
 idle Codex session does not resume when a background command ends.
 
 **Decision (user, 2026-09-27): the service queues into Codex.**
@@ -190,13 +190,13 @@ idle Codex session does not resume when a background command ends.
   `codex queue --thread <id> --message <text>` in the background; on
   success the agent's cursor moves past the message. Codex sees it when its
   current turn ends, or at once when idle.
-- Codex agents with a thread do not run `chat wait` and show as Available.
+- Codex agents with a thread do not run `bullpen wait` and show as Available.
   No sandbox network access is needed.
 - No thread found (for example a resumed older session) or queueing fails:
   the join result says so and Codex uses `chat_read`; failures are logged
   by the service.
 
-**Codex delivery (original plan).** Codex runs `chat wait` like Claude. The plan's first
+**Codex delivery (original plan).** Codex runs `bullpen wait` like Claude. The plan's first
 task checks whether Codex CLI re-invokes an idle session when a background
 command ends. If it does not, the service instead queues wake messages into
 the agent's Codex thread with `codex queue --thread`; `chat_join` then
@@ -229,11 +229,11 @@ Safe to rerun; `./install.sh --uninstall` reverses it. Linux with systemd.
 Windows has its own installer; see the section after this one.
 
 1. Check `python3` ≥ 3.9.
-2. Link `bin/chat` into `~/.local/bin` (warn if that is not on `PATH`).
-3. Write `~/.config/systemd/user/agent-chat.service` pointing at this
+2. Link `bin/bullpen` into `~/.local/bin` (warn if that is not on `PATH`).
+3. Write `~/.config/systemd/user/bullpen.service` pointing at this
    clone; enable and start it.
 4. For each tool found on `PATH`, register the MCP server user-wide:
-   `claude mcp add --scope user agent-chat -- <clone>/agentchat/mcp.py`;
+   `claude mcp add --scope user bullpen -- <clone>/bullpen/mcp.py`;
    for Codex, `codex mcp add` or an entry in `~/.codex/config.toml`. Skip
    an already-registered one.
 5. Print what was done and skipped.
@@ -243,14 +243,14 @@ Windows has its own installer; see the section after this one.
 The core runs natively on Windows; everything that needs tmux does not.
 
 - `install.ps1` checks Python ≥ 3.9 (the `py` launcher first), writes
-  `%LOCALAPPDATA%\agent-chat\bin\chat.cmd` and adds that folder to the user
-  `PATH`, registers a Task Scheduler task `agent-chat` that runs
-  `pythonw bin\chat serve` at logon (restarted on failure), starts it, and
+  `%LOCALAPPDATA%\bullpen\bin\bullpen.cmd` and adds that folder to the user
+  `PATH`, registers a Task Scheduler task `bullpen` that runs
+  `pythonw bin\bullpen serve` at logon (restarted on failure), starts it, and
   registers the MCP server for Claude Code and Codex. `-Uninstall` reverses it.
-  It does not bundle Ollama: it points agent-chat at the Windows Ollama app
+  It does not bundle Ollama: it points bullpen at the Windows Ollama app
   (`-OllamaUrl` for another one).
-- Data goes to `%LOCALAPPDATA%\agent-chat`, the config to
-  `%APPDATA%\agent-chat` (the `XDG_*` variables still win when set).
+- Data goes to `%LOCALAPPDATA%\bullpen`, the config to
+  `%APPDATA%\bullpen` (the `XDG_*` variables still win when set).
 - No uid check: Windows has neither `os.getuid` nor `/proc/net/tcp`.
 - `codex` is found through `shutil.which` (it is `codex.cmd` on Windows).
   Queueing messages into a Codex session needs its thread id, which
@@ -260,14 +260,14 @@ The core runs natively on Windows; everything that needs tmux does not.
   OpenCode need tmux: a missing tmux is a failed call, not a crash, and the
   page greys them out with a hint to use WSL.
 - CI (`.github/workflows/tests.yml`) runs the tests on Ubuntu and Windows,
-  and on Windows installs, posts through `chat.cmd`, reads the message back
+  and on Windows installs, posts through `bullpen.cmd`, reads the message back
   and uninstalls.
 
 ## Moving OpenVIBES over
 
 After the core works: register `~/Projects/OpenVIBES`, remove its
 `.mcp.json` entry and the `scripts/chat` link, stop and remove the
-`openvibes-chat` service, update `AGENTS.md`. The old `.agent-chat/log.md`
+`openvibes-chat` service, update `AGENTS.md`. The old `.bullpen/log.md`
 stays as an archive and is not imported.
 
 ## Failure behaviour
@@ -296,4 +296,4 @@ stays as an archive and is not imported.
 
 ## Verified
 
-2026-09-27, live in OpenVIBES: a fresh Claude Code and Codex joined on their first prompt (`join the chat`); Claude was woken by `chat wait`, Codex by `codex queue` (after `install.sh` passed the installer PATH to the service). Reply times to one user message: Codex 2 s, Claude 10 s.
+2026-09-27, live in OpenVIBES: a fresh Claude Code and Codex joined on their first prompt (`join the chat`); Claude was woken by `bullpen wait`, Codex by `codex queue` (after `install.sh` passed the installer PATH to the service). Reply times to one user message: Codex 2 s, Claude 10 s.

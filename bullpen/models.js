@@ -11,8 +11,8 @@ function merr(e){$('merr').textContent=e?e.message||String(e):'';}
 async function mrefresh(){
   try{
     const s=await api('api/models/status');
-    $('mstatus').textContent=(s.own?"agent-chat's Ollama":'External Ollama')+' at '+s.url+', '+
-      (s.reachable?'v'+s.version:'not reachable: '+(s.own?'systemctl --user start agent-chat-ollama':
+    $('mstatus').textContent=(s.own?"bullpen's Ollama":'External Ollama')+' at '+s.url+', '+
+      (s.reachable?'v'+s.version:'not reachable: '+(s.own?'systemctl --user start bullpen-ollama':
         'check the address (./install.sh --ollama-url)'))+'. '+
       (s.gpu?`${s.gpu.name}, ${GB(s.gpu.used)} of ${GB(s.gpu.total)} used`:'GPU unknown');
     if(mtab==='installed'&&s.reachable)drawInstalled((await api('api/models')).models);

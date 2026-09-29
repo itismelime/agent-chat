@@ -4,8 +4,8 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 
-from agentchat.codex import deliver, find_thread
-from agentchat.store import Store
+from bullpen.codex import deliver, find_thread
+from bullpen.store import Store
 
 T1 = "01a0e3df-6b97-7233-b194-a7cb90765ce4"
 T2 = "01a0e3b1-5a19-7bf1-a9ab-e18b595b5590"
@@ -74,7 +74,7 @@ class DeliverTest(unittest.TestCase):
         self.assertTrue(text.startswith("Your personality: You test things\n"), text)
 
     def test_the_delivery_thread_survives_errors(self):
-        from agentchat.codex import Deliverer
+        from bullpen.codex import Deliverer
         self.stub(0)
         d = Deliverer(self.store)
         self.store.set_personality("proj", "cody", "x")

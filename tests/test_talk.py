@@ -4,8 +4,8 @@ import time
 import unittest
 from pathlib import Path
 
-from agentchat import models, talk
-from agentchat.store import Store
+from bullpen import models, talk
+from bullpen.store import Store
 from tests.fake_ollama import GIB, FakeOllama
 
 

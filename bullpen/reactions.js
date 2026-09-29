@@ -1,4 +1,4 @@
-// Reactions (agentchat/reactions.js): acknowledge a message without a reply. Uses the page's el, btn,
+// Reactions (bullpen/reactions.js): acknowledge a message without a reply. Uses the page's el, btn,
 // api, cur, current, openMenu, menu, say and refresh; reactsBy comes with every message poll.
 const REACTIONS=['👍','✅','👀','❤️','🎉','🙏','😄','👎'];let reactsBy={};
 async function react(m,e){

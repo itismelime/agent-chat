@@ -5,7 +5,7 @@ import threading
 import unittest
 from pathlib import Path
 
-from agentchat.client import DOWN, Client
+from bullpen.client import DOWN, Client
 from tests.helpers import start, stop
 
 CHAT = str(Path(__file__).resolve().parent.parent / "bin" / "chat")
@@ -17,7 +17,7 @@ class CliTest(unittest.TestCase):
         self.addCleanup(stop, self.server)
         self.dir = self.tmp / "proj"
         (self.dir / "sub").mkdir(parents=True)
-        self.env = dict(os.environ, AGENT_CHAT_PORT=str(self.port))
+        self.env = dict(os.environ, BULLPEN_PORT=str(self.port))
 
     def chat(self, *args, cwd=None):
         return subprocess.run([sys.executable, CHAT, *args], cwd=cwd or self.dir, env=self.env,

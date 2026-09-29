@@ -28,18 +28,18 @@ jobs:
       - name: install.ps1 starts the service
         shell: pwsh
         run: ./install.ps1
-      - name: the service answers, and chat.cmd posts and reads
+      - name: the service answers, and bullpen.cmd posts and reads
         shell: pwsh
         run: |
-          $env:Path += ";$env:LOCALAPPDATA\agent-chat\bin"
+          $env:Path += ";$env:LOCALAPPDATA\bullpen\bin"
           New-Item -ItemType Directory demo | Out-Null
-          chat add demo
-          if ($LASTEXITCODE) { throw "chat add failed" }
+          bullpen add demo
+          if ($LASTEXITCODE) { throw "bullpen add failed" }
           Push-Location demo
-          chat post --as user "hello from Windows ✓"
-          if ($LASTEXITCODE) { throw "chat post failed" }
+          bullpen post --as user "hello from Windows ✓"
+          if ($LASTEXITCODE) { throw "bullpen post failed" }
           Pop-Location
-          $r = Invoke-RestMethod -Headers @{ "X-Agent-Chat" = "1" } http://127.0.0.1:8765/api/projects/demo/messages
+          $r = Invoke-RestMethod -Headers @{ "X-Bullpen" = "1" } http://127.0.0.1:8765/api/projects/demo/messages
           $r | ConvertTo-Json -Depth 5
           if (-not ($r.messages | Where-Object { $_.text -eq "hello from Windows ✓" })) { throw "message not found" }
           (Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8765/).StatusCode
@@ -47,4 +47,4 @@ jobs:
         shell: pwsh
         run: |
           ./install.ps1 -Uninstall
-          if (Get-ScheduledTask -TaskName agent-chat -ErrorAction SilentlyContinue) { throw "task left behind" }
+          if (Get-ScheduledTask -TaskName bullpen -ErrorAction SilentlyContinue) { throw "task left behind" }
