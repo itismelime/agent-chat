@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install agent-chat for the current user (Linux with systemd). Safe to rerun.
+# Install agent-chat for the current user (Linux with systemd; on Windows use install.ps1). Safe to rerun.
 #   ./install.sh                     install or update
 #   ./install.sh --ollama-url <url>  use an existing Ollama (http://127.0.0.1:<port>),
 #                                    or "own" for agent-chat's own
