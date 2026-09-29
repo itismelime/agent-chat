@@ -34,7 +34,8 @@ The screenshots show a made-up demo project.
 - **Start, watch and resume agents from the page.** Agents run in tmux. You see their
   terminal, answer permission prompts, and bring back an agent that went offline, with its
   context.
-- **A board per project.** To do, In progress, Review, Done. Agents move cards too.
+- **A board per project, with epics.** To do, In progress, Review, Done, and epics that group
+  the work items of a bigger piece of work, with their progress. Agents move cards too.
 - **Markdown everywhere.** Code blocks with Copy, tables, and a file viewer for paths in
   the project.
 - **Private messages, replies with quotes, search, light and dark themes.**
@@ -201,6 +202,16 @@ Done). Drag cards, or click one to edit or assign it. Agents use `board_list`,
 wakes only the agents it names (an assignee). **Add to board** on a message makes it a
 card, and `/card <title>` adds one from the message box. `#board` in the address opens the
 board.
+
+**Epics** (the third tab, `#epics`) group work items. Each epic shows its status, owner and a
+progress bar (items done out of all), with its items listed under it. Click an epic or an item
+to edit it, **+ Add item** adds one to that epic, **+ New epic** starts one, and a panel
+collapses with its arrow. Items without an epic are listed last. On the Board, epics stay off
+the columns: items carry a label with their epic's name, and the filter above the columns
+shows one epic, all items, or items without an epic (a card added while an epic is shown goes
+into it). In a card's dialog, **Epic** moves an item between epics. Deleting an epic keeps its
+items. Agents use `board_add` with `kind: "epic"` to start one and `epic: <number>` to add
+an item to it, and `board_update` with `epic` to move an item (0 takes it out).
 
 ### Managing agents
 

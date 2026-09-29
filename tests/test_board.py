@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,6 +32,39 @@ class BoardTest(unittest.TestCase):
         cards = self.board.get("proj")["cards"]
         self.assertEqual([c["id"] for c in cards], [1, 2])
         self.assertEqual(cards[1]["created_by"], "kit")
+
+    def test_epics_group_items(self):
+        e = self.board.add("proj", "user", "Checkout limits", kind="epic")
+        a = self.board.add("proj", "kit", "Middleware", epic=e["id"])
+        b = self.board.add("proj", "user", "Cart message")
+        self.assertEqual((e["kind"], a["kind"], a["epic"], b["epic"]), ("epic", "item", 1, None))
+        self.board.update("proj", b["id"], "user", epic=e["id"])
+        self.board.update("proj", b["id"], "user", epic=None)
+        self.assertEqual(self.notices(), [
+            'Epic #1 "Checkout limits" added by user (To do)',
+            '#2 "Middleware" added by kit (To do) in epic #1 "Checkout limits"',
+            '#3 "Cart message" added by user (To do)',
+            'user moved #3 "Cart message" in epic #1 "Checkout limits"',
+            'user moved #3 "Cart message" out of its epic'])
+        for bad in (dict(epic=a["id"]), dict(epic=99), dict(epic="1"), dict(epic=True)):
+            with self.assertRaises(StoreError, msg=bad) as x:
+                self.board.update("proj", b["id"], "user", **bad)
+            self.assertEqual(x.exception.code, 400)
+        with self.assertRaises(StoreError):  # epics do not nest
+            self.board.add("proj", "user", "Sub-epic", kind="epic", epic=e["id"])
+        with self.assertRaises(StoreError):
+            self.board.add("proj", "user", "x", kind="story")
+        self.board.delete("proj", e["id"], "user")  # its items stay, ungrouped
+        self.assertEqual([(c["id"], c["epic"]) for c in self.board.get("proj")["cards"]], [(2, None), (3, None)])
+
+    def test_cards_from_before_epics_are_items(self):
+        self.board.add("proj", "user", "Old")
+        f = self.store._dir("proj") / "board.json"
+        b = json.loads(f.read_text())
+        del b["cards"]["1"]["kind"], b["cards"]["1"]["epic"]
+        f.write_text(json.dumps(b))
+        c = self.board.get("proj")["cards"][0]
+        self.assertEqual((c["kind"], c["epic"]), ("item", None))
 
     def test_move_assign_edit_delete(self):
         c = self.board.add("proj", "user", "Fix login")

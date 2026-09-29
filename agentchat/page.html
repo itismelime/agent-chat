@@ -15,7 +15,8 @@
 <button id=menubtn class=icon type=button aria-label="Show projects">☰</button>
 <div class=title><h1 id=name></h1><span id=path></span></div>
 <div class=views role=tablist><button id=viewchat class=on type=button role=tab>Chat</button>
-<button id=viewboard type=button role=tab>Board <span id=boardcount></span></button></div>
+<button id=viewboard type=button role=tab>Board <span id=boardcount></span></button>
+<button id=viewepics type=button role=tab>Epics <span id=epiccount></span></button></div>
 <input id=search type=search placeholder="Search messages" aria-label="Search messages">
 <button id=answerchip class=ghost type=button hidden title="Show the questions (Alt+N)"></button>
 <button id=bell class=ghost type=button hidden>Enable notifications</button>
@@ -33,6 +34,7 @@
 <div class=box><textarea id=t rows=1 placeholder="Message everyone, or start with @name"></textarea>
 <button id=send>Send</button></div></form></div>
 <div id=boardview hidden></div>
+<div id=epicview hidden></div>
 <section id=answers aria-label="Needs an answer" hidden>
 <div class=top><h2>Needs an answer <span id=answercount></span></h2>
 <button id=answertoggle class=icon type=button title="Hide; the header shows how many wait" aria-label="Hide the questions">→</button></div>
@@ -84,6 +86,7 @@
 <textarea id=cdesc maxlength=4000 placeholder="Description" aria-label=Description></textarea>
 <div class=row><label for=ccolumn>Column</label><select id=ccolumn></select>
 <label for=cassignee>Assignee</label><select id=cassignee></select></div>
+<div class=row id=cepicrow><label for=cepic>Epic</label><select id=cepic></select></div>
 <div class=row><button id=cdelete class="ghost danger" type=button>Delete card</button><span></span>
 <button id=csave type=button>Save</button></div></dialog>
 

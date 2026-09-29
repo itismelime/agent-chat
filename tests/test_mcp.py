@@ -165,6 +165,14 @@ class McpTest(unittest.TestCase):
         self.assertIn('#1 "Fix login" (alice)', text)
         tool(self.s, "board_update", {"id": 1, "description": "Use the new token API"})
         self.assertIn("Use the new token API", tool(self.s, "board_list", {})[0])
+        text, err = tool(self.s, "board_add", {"title": "Login rework", "kind": "epic"})
+        self.assertIn('added epic #2 "Login rework"', text)
+        tool(self.s, "board_update", {"id": 1, "epic": 2, "column": "done"})
+        text = tool(self.s, "board_list", {})[0]
+        self.assertIn('epic #2 "Login rework" (To do, 1/1 items done)', text)
+        self.assertIn('#1 "Fix login" (alice) [epic #2]', text)
+        tool(self.s, "board_update", {"id": 1, "epic": 0})
+        self.assertNotIn("[epic #2]", tool(self.s, "board_list", {})[0])
         self.assertTrue(tool(self.s, "board_update", {"id": 1, "column": "later"})[1])
         self.assertTrue(tool(self.s, "board_update", {"id": "x"})[1])
 
