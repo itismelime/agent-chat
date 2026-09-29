@@ -7,7 +7,7 @@
 
 <p align="center">
   <b>One chat room per project for you, Claude Code, Codex, OpenCode and local models.</b><br>
-  Standard library Python and bash. Everything stays on 127.0.0.1.
+  Linux and Windows. Standard library Python. Everything stays on 127.0.0.1.
 </p>
 
 <p align="center">
@@ -33,7 +33,7 @@ The screenshots show a made-up demo project.
   `A)` `B)` `C)` become buttons.
 - **Start, watch and resume agents from the page.** Agents run in tmux. You see their
   terminal, answer permission prompts, and bring back an agent that went offline, with its
-  context.
+  context. On Windows this part needs WSL.
 - **A board per project, with epics.** To do, In progress, Review, Done, and epics that group
   the work items of a bigger piece of work, with their progress. Agents move cards too.
 - **Markdown everywhere.** Code blocks with Copy, tables, and a file viewer for paths in
@@ -65,6 +65,8 @@ The screenshots show a made-up demo project.
 </p>
 
 ## Install
+
+### Linux
 
 ```bash
 git clone https://github.com/itismelime/agent-chat && cd agent-chat && ./install.sh
@@ -180,7 +182,8 @@ or to everyone. × dismisses it.
 
 **Start agent** (or right-click the Agents list) → Start Claude, Start Codex or Start
 OpenCode. You can give it a personality, and it names itself to fit. It runs in a detached
-tmux session in the project folder and joins by itself.
+tmux session in the project folder and joins by itself. This needs tmux, so on Windows it
+works only under WSL (see [Windows](#windows)).
 
 - **Needs you**: when it asks for permission, it shows under **Needs you** and as a banner
   above the chat. A project in the sidebar gets an orange **!**, and you get a browser
@@ -195,7 +198,7 @@ An agent goes offline when its session ends or its `chat wait` stops. Right-clic
 **Resume** continues its own session (`claude --resume` or `codex resume`) in tmux. It
 rejoins under the same name with its context, and from then on has View terminal and Stop.
 Claude sessions are found in `~/.claude/projects`, and Codex sessions by the thread
-recorded when they joined.
+recorded when they joined. Like starting agents, this needs tmux (WSL on Windows).
 
 ### Local models and OpenCode
 
@@ -280,12 +283,17 @@ foreign Origin. API requests must also carry an `X-Agent-Chat: 1` header and JSO
 Browsers do not let other websites send either without a check the service never answers,
 so other websites cannot post into your agents' sessions or read their messages. The
 service also refuses connections from other Unix users of the machine, since agents started
-from the page can be typed into. Anything running as you, agents included, can still post
+from the page can be typed into. Windows has no such check, but agents cannot be started from
+the page there, so there is nothing to type into; other users of a shared Windows machine
+could still read and post to the chat. Anything running as you, agents included, can still post
 and answer agents' questions.
 
 ## Development
 
-`python3 -m unittest` runs the tests. Designs are in `docs/specs/`, plans in `docs/plans/`.
+`python3 -m unittest` runs the tests (`py -m unittest` on Windows; tests that need tmux,
+`/proc` or shell scripts are skipped there). CI runs them on Ubuntu and Windows, and on Windows
+also installs with `install.ps1`, posts a message and uninstalls
+(`.github/workflows/tests.yml`). Designs are in `docs/specs/`, plans in `docs/plans/`.
 The logo is `docs/assets/logo.svg` (and `logo-dark.svg`, `mark.svg`).
 
 MIT licensed.

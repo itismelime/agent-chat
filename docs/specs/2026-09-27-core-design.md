@@ -226,6 +226,7 @@ is revised before building further.
 ## Install (`install.sh`)
 
 Safe to rerun; `./install.sh --uninstall` reverses it. Linux with systemd.
+Windows has its own installer; see the section after this one.
 
 1. Check `python3` ≥ 3.9.
 2. Link `bin/chat` into `~/.local/bin` (warn if that is not on `PATH`).
@@ -236,6 +237,31 @@ Safe to rerun; `./install.sh --uninstall` reverses it. Linux with systemd.
    for Codex, `codex mcp add` or an entry in `~/.codex/config.toml`. Skip
    an already-registered one.
 5. Print what was done and skipped.
+
+## Windows (`install.ps1`, added 2026-09-29)
+
+The core runs natively on Windows; everything that needs tmux does not.
+
+- `install.ps1` checks Python ≥ 3.9 (the `py` launcher first), writes
+  `%LOCALAPPDATA%\agent-chat\bin\chat.cmd` and adds that folder to the user
+  `PATH`, registers a Task Scheduler task `agent-chat` that runs
+  `pythonw bin\chat serve` at logon (restarted on failure), starts it, and
+  registers the MCP server for Claude Code and Codex. `-Uninstall` reverses it.
+  It does not bundle Ollama: it points agent-chat at the Windows Ollama app
+  (`-OllamaUrl` for another one).
+- Data goes to `%LOCALAPPDATA%\agent-chat`, the config to
+  `%APPDATA%\agent-chat` (the `XDG_*` variables still win when set).
+- No uid check: Windows has neither `os.getuid` nor `/proc/net/tcp`.
+- `codex` is found through `shutil.which` (it is `codex.cmd` on Windows).
+  Queueing messages into a Codex session needs its thread id, which
+  `find_thread` reads from `/proc`, so on Windows Codex agents use `chat_read`.
+- The CLI reads and writes UTF-8 on every stream.
+- Starting agents from the page, View terminal, Needs you, Resume and
+  OpenCode need tmux: a missing tmux is a failed call, not a crash, and the
+  page greys them out with a hint to use WSL.
+- CI (`.github/workflows/tests.yml`) runs the tests on Ubuntu and Windows,
+  and on Windows installs, posts through `chat.cmd`, reads the message back
+  and uninstalls.
 
 ## Moving OpenVIBES over
 
