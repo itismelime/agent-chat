@@ -38,7 +38,7 @@ class OpenCodeTest(unittest.TestCase):
         self.assertEqual(c["provider"]["ac"]["npm"], "@ai-sdk/openai-compatible")
         self.assertEqual(sorted(c["provider"]["ac"]["models"]), ["a:1", "b:2"])
         self.assertTrue(all(m["tools"] for m in c["provider"]["ac"]["models"].values()))
-        self.assertEqual(c["mcp"]["bullpen"]["command"], [str(CLONE / "bin" / "chat"), "mcp"])
+        self.assertEqual(c["mcp"]["bullpen"]["command"], [str(CLONE / "bin" / "bullpen"), "mcp"])
         self.assertEqual(c["mcp"]["bullpen"]["environment"], {"BULLPEN_PORT": "8765"})
         self.assertEqual(c["tools"], {"skill": False})
         self.assertEqual(list(c["mcp"]), ["bullpen"])  # nothing of the user's own config

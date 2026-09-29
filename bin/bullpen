@@ -23,7 +23,7 @@ sys.path.insert(0, str(HERE))
 
 from bullpen.client import ApiError, Client, ServiceDown, fmt, label  # noqa: E402
 
-CHAT = HERE / "bin" / "chat"
+CHAT = HERE / "bin" / "bullpen"
 WAIT_TIMEOUT = 330  # longer than the service's 300 s long-poll
 RETRY_SECONDS = 60
 

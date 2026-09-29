@@ -18,7 +18,7 @@ from pathlib import Path
 from .client import ApiError, Client, ServiceDown, fmt, label
 from .codex import find_thread
 
-CHAT = Path(__file__).resolve().parent.parent / "bin" / "chat"
+CHAT = Path(__file__).resolve().parent.parent / "bin" / "bullpen"
 # changes with this file: running relays then tell their agent to fetch the tools again
 VERSION = hashlib.sha1(Path(__file__).read_bytes()).hexdigest()[:12]
 WATCH_SECONDS = 30

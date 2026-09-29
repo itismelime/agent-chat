@@ -7,7 +7,7 @@ from pathlib import Path
 
 from bullpen import config
 
-CHAT = str(Path(__file__).resolve().parent.parent / "bin" / "chat")
+CHAT = str(Path(__file__).resolve().parent.parent / "bin" / "bullpen")
 
 
 class ConfigTest(unittest.TestCase):

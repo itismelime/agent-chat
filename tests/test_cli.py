@@ -8,7 +8,7 @@ from pathlib import Path
 from bullpen.client import DOWN, Client
 from tests.helpers import start, stop
 
-CHAT = str(Path(__file__).resolve().parent.parent / "bin" / "chat")
+CHAT = str(Path(__file__).resolve().parent.parent / "bin" / "bullpen")
 
 
 class CliTest(unittest.TestCase):

@@ -79,7 +79,7 @@ if (((UserPath) -split ";") -notcontains $bin) {
 $env:Path = "$env:Path;$bin"
 
 # Ollama: bullpen does not bundle one on Windows; use the Windows app's (or another) one
-& $python $bullpen config ollama-url $OllamaUrl
+& $python $chat config ollama-url $OllamaUrl
 if ($LASTEXITCODE -ne 0) { exit 2 }
 Say "Ollama: $OllamaUrl (get it from https://ollama.com/download/windows)"
 
@@ -111,10 +111,10 @@ foreach ($tool in "claude", "codex") {
     if (-not (Has $tool)) { Say "${tool} not found: skipped"; continue }
     if ($tool -eq "claude") {
         Run claude mcp remove --scope user bullpen
-        & claude mcp add --scope user bullpen -- $python $bullpen mcp | Out-Null
+        & claude mcp add --scope user bullpen -- $python $chat mcp | Out-Null
     } else {
         Run codex mcp remove bullpen
-        & codex mcp add bullpen -- $python $bullpen mcp | Out-Null
+        & codex mcp add bullpen -- $python $chat mcp | Out-Null
     }
     Say "${tool}: registered bullpen for all your sessions"
 }

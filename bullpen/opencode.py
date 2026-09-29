@@ -56,7 +56,7 @@ def write_config(root, ollama_url, models, port):
                             "options": {"baseURL": ollama_url.rstrip("/") + "/v1"},
                             "models": {m: {"name": m, "tools": True} for m in models}}},
         "mcp": {"bullpen": {"type": "local", "enabled": True,
-                               "command": [str(CLONE / "bin" / "chat"), "mcp"],
+                               "command": [str(CLONE / "bin" / "bullpen"), "mcp"],
                                "environment": {"BULLPEN_PORT": str(port)}}},
         "tools": {"skill": False}})
     return path

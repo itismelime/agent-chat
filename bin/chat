@@ -2,7 +2,9 @@
 # The command from before the rename to bullpen, for agent sessions that still run it.
 # ponytail: remove once no session from before the rename is left.
 import os
+import subprocess
 import sys
 
-os.execv(sys.executable, [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "bullpen")]
-         + sys.argv[1:])
+# a child, not os.execv: on Windows execv would lose the exit code
+sys.exit(subprocess.call([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "bullpen")]
+                         + sys.argv[1:]))
