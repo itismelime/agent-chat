@@ -24,7 +24,7 @@ async function openProfile(pid,name,edit){
   for(const d of [big,small]){d.textContent=me?'Y':name[0];d.style.setProperty('--c','var(--mute)');}
   const upload=btn(a?'Upload new picture':'Upload a picture',()=>{pd.close();pickPicture(pid,name);});
   const row=el('div','row');row.append(upload);
-  if(a&&!edit)row.append(btn('Edit picture',()=>openProfile(pid,name,true)));
+  if(a&&!edit)row.append(btn('Edit picture',()=>openProfile(pid,name,true),'ghost'));
   if(a)row.append(btn('Remove picture',async()=>{tookAv(pid,name,await api(avPath(pid,name)+'/delete',{}));pd.close();refresh();},'ghost danger'));
   const url=a&&await picUrl(pid,name);
   if(url&&!edit)for(const d of [big,small]){d.textContent='';d.style.background=`${cropStyle(a.crop)} no-repeat url(${url})`;}
@@ -45,13 +45,15 @@ async function openProfile(pid,name,edit){
     draw();
     const save=btn('Save picture',async()=>{try{tookAv(pid,name,await api(avPath(pid,name)+'/crop',crop()));say('Picture saved.');openProfile(pid,name);refresh();}catch(e){say('',e.message);}});
     const zrow=el('label','zoom');zrow.append('Zoom ',zoom);
-    body.push(el('p','hint','Drag the square to the part to show; the previews show it as in the chat.'),stage,zrow,pics,row,save);
-  }else body.push(pics,row);
+    const head=el('div','head');head.append(pics,row);
+    body.push(el('p','hint','Drag the square to the part to show; the previews show it as in the chat.'),stage,zrow,head,save);
+  }else{const head=el('div','head');head.append(pics,row);body.push(head);}
   if(me){  // who you are, for the chat and for agents
-    const st=el('select');st.append(new Option('Online','on'),new Option('Away: agents sleep until you write or come back','away'));
-    st.value=profileData.away?'away':'on';
-    st.onchange=async()=>{try{showName(await api('api/profile',{away:st.value==='away'}));}catch(e){say('',e.message);}};
-    const l0=el('label','','Status');l0.append(st);body.push(l0);
+    const st=el('div','views'),sh=el('small','',''),set=async away=>{try{showName(await api('api/profile',{away}));mark();}catch(e){say('',e.message);}};
+    const on=btn('Online',()=>set(false)),off=btn('Away',()=>set(true));st.append(on,off);
+    const mark=()=>{on.classList.toggle('on',!profileData.away);off.classList.toggle('on',profileData.away);
+      sh.textContent=profileData.away?'Agents sleep until you write or come back.':'Agents wake for each other.';};mark();
+    const l0=el('div','status');l0.append(el('span','','Status'),st,sh);body.push(l0);
     const nm=el('input'),ab=el('textarea');nm.maxLength=32;nm.value=profileData.name;nm.placeholder='you';
     ab.maxLength=500;ab.rows=3;ab.value=profileData.about;ab.placeholder='e.g. Prefers short answers; works in CET; ask before pushing';
     const l1=el('label','','Your name (shown instead of “you”)'),l2=el('label','','About you (agents get this with their instructions)');
