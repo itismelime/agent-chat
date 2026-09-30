@@ -52,12 +52,16 @@ def sees(message, name):
     return message.get("dm") in (None, name)
 
 
-def wakes(message, name, away=False):
-    """User messages wake every agent; agent messages only those addressed, and
+def wakes(message, name, away=False, lead=None):
+    """User messages wake every agent, or with a lead only the lead and those they
+    @name (@all: everyone); agent messages wake only those addressed (or @all), and
     none while the user is away (agents stay asleep: no tokens spent on each other)."""
     if message["from"] == name or not sees(message, name):
         return False
-    return message["from"] == "user" or not away and name in addressed(message["text"])
+    to = addressed(message["text"])
+    if message["from"] == "user":
+        return lead is None or "all" in to or (name in to if to else name == lead)
+    return not away and (name in to or "all" in to)
 
 
 def write_json(path, data):
@@ -201,9 +205,9 @@ class Store:
             with open(self._dir(pid) / "messages.jsonl", "a") as f:
                 f.write(json.dumps(m) + "\n")
             self.changed.notify_all()
-            away = self.away()
+            away, lead = self.away(), self.lead(pid)
             for name, a in self.agents(pid).items():
-                if a.get("removed") or a.get("gone") or not wakes(m, name, away):
+                if a.get("removed") or a.get("gone") or not wakes(m, name, away, lead):
                     continue
                 if a.get("thread") and self.deliver:
                     self.deliver(pid, name, a["thread"], m)
@@ -363,6 +367,25 @@ class Store:
 
     set_personality = set_role
 
+    def lead(self, pid):
+        """The agent the user's un-addressed messages go to alone, or None (they go to all).
+        A lead that was removed or is gone leads no more."""
+        return next((n for n, a in self.agents(pid).items()
+                     if a.get("lead") and not a.get("removed") and not a.get("gone")), None)
+
+    def set_lead(self, pid, name, lead):
+        """Make name the project's lead (the one before it steps down), or not."""
+        if not isinstance(lead, bool):
+            raise StoreError(400, "lead must be true or false")
+        with self.changed:
+            self._agent(pid, name, active=False)
+            agents = self.agents(pid)
+            for n, a in agents.items():
+                a.pop("lead", None)
+            if lead:
+                agents[name]["lead"] = True
+            write_json(self._dir(pid) / "agents.json", agents)
+
     def rename(self, pid, old, new):
         """The agent takes a new name, keeping its record (color, personality,
         cursor), its start and its local state; its past messages keep the old
@@ -470,7 +493,7 @@ class Store:
                         return {"notice": agent["notice"], "messages": []}
                     if not agent.get("removed"):
                         msgs = self.messages(pid, agent["cursor"])
-                        if any(wakes(m, name, self.away()) for m in msgs):
+                        if any(wakes(m, name, self.away(), self.lead(pid)) for m in msgs):
                             self._touch(pid, name, msgs[-1]["n"])
                             return {"notice": None, "messages": [m for m in msgs if sees(m, name)]}
                     left = deadline - time.monotonic()
@@ -496,10 +519,11 @@ class Store:
                     status = "offline" if state.get("error") else "busy" if state.get("busy") else "waiting"
                 elif token and (pid, token) in self.needs:
                     status = "needs_you"
-                elif a["kind"] == "opencode":
-                    status = "busy" if self.local.get((pid, name), {}).get("busy") else "waiting"
                 elif self.waiting.get((pid, name)) or a.get("thread"):
                     status = "waiting"
+                elif a["kind"] == "opencode" or (a["kind"] == "claude" and token and (pid, name) in self.local):
+                    # typed to by the page (Spawner._type_unread), which knows whether it is at work
+                    status = "busy" if self.local.get((pid, name), {}).get("busy") else "waiting"
                 elif time.time() - seen < BUSY_SECONDS:
                     status = "busy"
                 else:
@@ -507,7 +531,8 @@ class Store:
                 out.append({"name": name, "kind": a["kind"], "joined": a["joined"],
                             "status": status, "spawn": token, "model": a.get("model"),
                             "last_seen": a["last_seen"],
-                            "role": a.get("role"), "personality": a.get("role"),
+                            "role": a.get("role"), "personality": a.get("role"), "lead": bool(a.get("lead")),
+                            "activity": self.local.get((pid, name), {}).get("activity") if status == "busy" else None,
                             "error": self.local.get((pid, name), {}).get("error")
                             if a.get("model") else None})
         return out

@@ -90,4 +90,26 @@ def summary(rules):
 def standing(store, pid):
     """What agents get with every wake: the rules, then the pinned messages."""
     from . import pins
-    return " ".join(x for x in (summary(get(store, pid)), pins.summary(store, pid)) if x)
+    lead = store.lead(pid)
+    line = ("The lead is %s: the user's messages without @names go to %s alone, who answers or "
+            "hands the work on: small things with @name, real work as board cards (board_add with "
+            "a description and an assignee wakes that agent with it; it moves the card to review "
+            "when done, which wakes %s). @all reaches everyone." % (lead, lead, lead)) if lead else ""
+    return " ".join(x for x in (line, summary(get(store, pid)), pins.summary(store, pid)) if x)
+
+
+def fresh(store, pid, name):
+    """(rules, personality) to send with a wake: the first time and after either
+    changed, else ("", None). An agent keeps what it was told, so every wake does
+    not pay for it again. Local models are stateless and take standing() each time."""
+    import hashlib
+    rules = standing(store, pid)
+    with store.changed:
+        agent = store.agents(pid).get(name)
+        if agent is None:
+            return rules, None
+        seen = hashlib.sha1(("%s\0%s" % (rules, agent.get("role") or "")).encode()).hexdigest()[:16]
+        if agent.get("told") == seen:
+            return "", None
+        store._update(pid, name, told=seen)
+        return rules, agent.get("role")

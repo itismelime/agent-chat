@@ -71,7 +71,8 @@ async function refresh(){
     spawnedBy={};projects.forEach((p,i)=>{spawnedBy[p.id]=starts[i];});spawned=spawnedBy[cur]||[];boardData=board;
     assignHues();
     if(cur&&(usageFor!==cur||Date.now()-usageAt>30e3)){usageAt=Date.now();usageFor=cur;  // every 30 s is plenty
-      const pid=cur;api(`api/projects/${pid}/usage`).then(r=>{usageBy[pid]=r.usage;drawRoster();}).catch(()=>{});}
+      const pid=cur;api(`api/projects/${pid}/usage`).then(r=>{usageBy[pid]=r.usage;drawRoster();}).catch(()=>{});
+      api('api/plan').then(r=>drawPlan(r.plan)).catch(()=>{});}
     for(const q of projects)for(const s of spawnedBy[q.id])if(s.state==='needs_you'&&!needed.has(s.token))
       notify(q,{from:s.name||('new '+(KIND[s.tool]||s.tool)),text:'needs you',n:'need-'+s.token});
     needed=new Set(projects.flatMap(q=>spawnedBy[q.id]).filter(s=>s.state==='needs_you').map(s=>s.token));
@@ -212,6 +213,15 @@ function drawNeeds(){
 const GROUPS=[['needs_you','Needs you'],['starting','Starting'],['waiting','Available'],
   ['busy','Working'],['offline','Offline'],['removed','Removed']];
 const kfmt=n=>n==null?'?':n>=1e6?(n/1e6).toFixed(n>=1e7?0:1)+'M':n>=1e3?Math.round(n/1e3)+'k':String(n);
+function drawPlan(p){  // your Claude plan: 5h 6% (4h 39m left) · 7d 31%, from a Claude started here
+  const left=ts=>{const s=Math.max(0,ts-Date.now()/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+    return d?`${d}d ${h}h`:`${h}h ${m}m`;};
+  const w=(k,l)=>p&&p[k]?`${l} ${p[k].used}% (${left(p[k].resets_at)} left)`:'';
+  const lines=[w('five_hour','5h'),w('seven_day','7d')].filter(Boolean);$('plan').hidden=!lines.length;
+  if(!lines.length)return;const age=Date.now()/1000-p.captured_at;
+  $('plan').replaceChildren(el('b','','Claude plan'+(age>900?`, as of ${ago(new Date(p.captured_at*1000).toISOString())}`:'')),
+    ...lines.map(l=>el('span','',l)));
+  $('plan').title='Your plan’s usage windows, read from the statusline of a Claude agent started here';}
 function usageLine(u){  // Claude: context and tokens out; Codex: context of its window and plan limits; local: memory
   let text,title;
   if(u.out!=null){text=`ctx ${kfmt(u.ctx)} · ${kfmt(u.out)} out`;title=`${u.model||'Claude'}: ${u.ctx} tokens of context in use, ${u.out} tokens written this session`;}
@@ -233,8 +243,10 @@ function drawRoster(){
     return [el('h3','',title+' ('+g.length+')'),...g.map(a=>{const d=who(el('div','a '+a.status),a.name);
       const sub=a.starting?'starting…':a.resuming?'resuming…':a.model?a.model:a.kind==='opencode'?'OpenCode '+((spawned.find(s=>s.token===a.spawn)||{}).model||''):KIND[a.kind]||a.kind;
       d.title=a.error?'Offline: '+a.error:'Click or right-click for options';
-      d.append(avatar(a.name),el('b','',a.starting?'new '+a.name:a.name),
-        el('small','',sub+(a.last_seen&&['offline','removed'].includes(a.status)?', seen '+ago(a.last_seen):'')));
+      const nm=el('b','',a.starting?'new '+a.name:a.name);if(a.lead)nm.append(el('span','leadtag','lead'));
+      d.append(avatar(a.name),nm,
+        a.status==='busy'?el('small','doing',a.activity||'working'):  // thinking, compacting (Claude from the page) or working
+          el('small','',sub+(a.last_seen&&['offline','removed'].includes(a.status)?', seen '+ago(a.last_seen):'')));
       if(a.personality)d.append(el('span','pers',a.personality));
       const doing=(boardData?boardData.cards:[]).filter(c=>c.assignee===a.name&&c.column==='doing'&&c.kind!=='epic');
       if(doing.length){const w=el('span','doing','▶ '+doing.map(c=>'#'+c.id+' '+c.title).join(', '));  // its In progress cards
@@ -265,7 +277,9 @@ function agentItems(a){
   if(a.status==='offline'&&!a.spawn&&(a.kind==='claude'||a.kind==='codex'||a.kind==='opencode'))
     items.push(['Resume',async()=>{await api(agentPath(a,'resume'),{});return `Resuming ${a.name}…`;}]);
   if(a.starting)return items;
-  if(!a.starting&&a.status!=='removed')items.push(['Picture…',()=>openProfile(cur,a.name)]);
+  if(!a.starting&&a.status!=='removed')items.push(['Picture…',()=>openProfile(cur,a.name)],
+    [a.lead?'Stop being the lead':'Make the lead',async()=>{await api(agentPath(a,'lead'),{lead:!a.lead});refresh();
+      return a.lead?`No lead: your messages go to every agent again.`:`${a.name} leads: your messages without @names go to ${a.name} alone.`;}]);
   items.push(['Rename',async()=>{const n=await ask({title:'Rename '+a.name,label:'New name',value:a.name,
     help:"a-z, 0-9 and '-'. Its color, personality and board cards move along, and its running session keeps working."});
     if(n&&n.trim().toLowerCase()!==a.name){await api(agentPath(a,'rename'),{name:n.trim()});return `${a.name} is now ${n.trim().toLowerCase()}.`;}}]);
@@ -311,12 +325,15 @@ addEventListener('keydown',e=>{if(e.key==='Escape'){menu.hidden=true;ac.hidden=t
 const lead=text=>((text.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0].match(/@[\w-]+/g)||[]).map(x=>x.slice(1).toLowerCase());
 function addressees(){return lead(t.value);}
 function hint(){
-  const to=addressees(),live=agents.filter(a=>a.status!=='removed');
+  const to=addressees(),live=agents.filter(a=>a.status!=='removed'),leader=(live.find(a=>a.lead)||{}).name;
   const line=$('to');
+  t.placeholder=leader?`Message ${leader} (the lead), or start with @name`:'Message everyone, or start with @name';
   if(t.value.startsWith('/')&&!t.value.startsWith('//'))line.textContent='Command: Enter runs it. Press ? for the list.';
   else if(dmTo)line.textContent=`Private: only ${dmTo} reads it; the other agents never see it.`;
+  else if(to.includes('all'))line.textContent=`To everyone: ${live.map(a=>a.name).join(', ')} may answer.`;
   else if(to.length){line.replaceChildren('To ');to.forEach((n,i)=>line.append(i?', ':'',who(el('span','',n),n)));
-    line.append('. The others read it but do not answer.');}
+    line.append(leader?'. Only they wake for it.':'. The others read it but do not answer.');}
+  else if(leader){line.replaceChildren('To ',who(el('span','',leader),leader),', the lead: they answer or hand it on. @all reaches everyone.');}
   else line.textContent=live.length?`To everyone: ${live.map(a=>a.name).join(', ')} may answer.`:'';
   $('hint').textContent=agents.filter(a=>to.includes(a.name)&&a.status!=='waiting').map(a=>
     a.status==='busy'?`${a.name} is working and will see this when its current task ends.`:

@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import avatars, mcp, pins, profile, prs, reactions, removal, rules, spawn, talk, usage
+from . import avatars, mcp, pins, plan, profile, prs, reactions, removal, rules, spawn, talk, usage
 from .board import Board
 from .client import Client
 from .codex import Deliverer
@@ -195,6 +195,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 if project is None:
                     raise StoreError(404, "not in a registered project")
                 return 200, {"project": project}
+            if rest == ["plan"] and method == "GET":  # your Claude plan's windows (plan.py)
+                return 200, {"plan": plan.get(store.root)}
             if rest == ["folders"] and method == "GET":  # the Add a project browser: folder names only
                 return 200, folders(query.get("path") or os.path.expanduser("~"))
             if rest == ["profile"] and method == "GET":
@@ -358,15 +360,16 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         result = store.wait(pid, what[1], wait_seconds, alive=self.client_alive)
                         if result is None:
                             return 204, None
-                        role = store.agents(pid).get(what[1], {}).get("role")
-                        return 200, dict(result, personality=role, name=what[1],
-                                         rules=rules.standing(store, pid))
+                        told, role = rules.fresh(store, pid, what[1])
+                        return 200, dict(result, personality=role, name=what[1], rules=told)
                 if len(what) == 3 and what[0] == "agents" and method == "POST" and what[2] == "resume":
                     return 201, {"spawned": spawner.resume(pid, what[1])}
                 if len(what) == 3 and what[0] == "agents" and method == "POST" \
-                        and what[2] in ("remove", "readd", "role", "personality", "forget", "rename"):
+                        and what[2] in ("remove", "readd", "role", "personality", "forget", "rename", "lead"):
                     data = self.body()
-                    if what[2] in ("role", "personality"):
+                    if what[2] == "lead":
+                        store.set_lead(pid, what[1], data.get("lead"))
+                    elif what[2] in ("role", "personality"):
                         store.set_personality(pid, what[1], data.get(what[2]))
                     elif what[2] == "rename":
                         new = store.rename(pid, what[1], data.get("name"))

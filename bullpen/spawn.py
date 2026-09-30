@@ -6,6 +6,7 @@ project path or typed text cannot run anything.
 import json
 import re
 import secrets
+import shlex
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,10 @@ MAX_TEXT = 2000
 # half a second apart it submits (checked with Codex 0.157 and Claude Code 2.1).
 PASTE_PAUSE = 0.5
 SCREEN_LINES = 25
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+# Claude Code's spinner, just above its prompt box: "✶ Metamorphosing… (4s · ↓ 86 tokens · thinking)",
+# "✻ Compacting conversation… (3s)"; its verb is random, "…" and the glyph are not
+SPINNER = re.compile(r"^\s*[^\w\s\u276f\u2500\u2502]\s+([A-Z][^\u2026]*)\u2026(?:.*\((.*)\))?\s*$")
 JOIN_GRACE = 60   # seconds a start may take to join before it needs the user
 POLL_SECONDS = 2
 # A screen that asks something: menu footers and question lines from real
@@ -62,23 +67,20 @@ def available():
 
 def claude_session(path, name, home=None):
     """The id of the Claude Code session in this project that took the chat
-    name: the newest session log under ~/.claude/projects whose chat_join or
-    chat_rename set it. None if there is none."""
+    name: the newest session log under ~/.claude/projects where a chat_join or
+    chat_rename gave it that name (the reply, not the call: a join refused because
+    the name was taken tried it too). None if there is none."""
     # ponytail: a name set with `bullpen rename` from a shell is not found; the
     # MCP tools are what agents use.
     root = Path(home or Path.home()) / ".claude" / "projects"
     slug = re.sub(r"[^A-Za-z0-9]", "-", str(path))
-    # sessions from before the rename used the MCP server name agent-chat
-    needles = ['"name":"mcp__%s__chat_%s","input":{"name":%s' % (server, tool, json.dumps(name))
-               for server in ("bullpen", "agent-chat")
-               for tool in ("join", "rename")]
+    took = re.compile(r"Joined [^\n]{1,200}? as %s\. |You are now %s \(was " % (re.escape(name), re.escape(name)))
     best = None
     for d in root.glob(slug + "*"):  # the folder and its subfolders
         for f in d.glob("*.jsonl"):
             try:
                 mtime = f.stat().st_mtime
-                if (best is None or mtime > best[0]) and any(n in f.read_text(errors="replace")
-                                                              for n in needles):
+                if (best is None or mtime > best[0]) and took.search(f.read_text(errors="replace")):
                     best = (mtime, f.stem)
             except OSError:
                 continue
@@ -116,17 +118,26 @@ def start(tool, path, session, token, model=None, config_home=None, data_home=No
         prompt = PROMPT + (" with a name that fits your personality: %s" % personality
                            if personality else "")
         command = [tool, prompt if tool == "claude" else "%s (start %s)" % (prompt, token)]
+    if tool == "claude":  # its statusline keeps your plan's limits for the page (plan.py)
+        command[1:1] = ["--settings", claude_settings()]
     r = tmux("new-session", "-d", "-s", session, "-c", path, *env, "--", *command)
     if r.returncode:
         raise StoreError(503, "tmux could not start it: %s" % r.stderr.strip())
+
+
+def claude_settings():
+    """Settings added to a Claude started here: bullpen's statusline, which shows yours."""
+    chat = Path(__file__).resolve().parent.parent / "bin" / "bullpen"
+    cmd = "%s %s statusline" % (shlex.quote(sys.executable), shlex.quote(str(chat)))
+    return json.dumps({"statusLine": {"type": "command", "command": cmd, "refreshInterval": 60}})
 
 
 def alive(session):
     return tmux("has-session", "-t", exact(session)).returncode == 0
 
 
-def screen(session):
-    r = tmux("capture-pane", "-p", "-t", pane(session))
+def screen(session, colors=False):
+    r = tmux("capture-pane", "-p", *(["-e"] if colors else []), "-t", pane(session))
     if r.returncode:
         raise StoreError(404, "the agent's terminal has ended")
     return r.stdout
@@ -168,6 +179,41 @@ def opencode_state(text):
     if "enter confirm" in foot:
         return "question"
     return "idle" if "ctrl+p" in foot else "unknown"
+
+
+def claude_activity(text):
+    """What Claude is doing from the spinner above its prompt box: compacting,
+    thinking, working, or None when there is no spinner (idle, or not drawn yet)."""
+    lines = [ANSI.sub("", l) for l in text.rstrip().splitlines()[-SCREEN_LINES:]]
+    at = next((i for i in range(len(lines) - 1, -1, -1) if "\u276f" in lines[i]), None)
+    if at is None:
+        return None
+    above = [l for l in lines[max(0, at - 6):at] if l.strip() and not set(l.strip()) <= {"\u2500"}][-3:]
+    for line in reversed(above):
+        m = SPINNER.match(line)
+        if m:
+            if m.group(1).startswith("Compacting"):
+                return "compacting"
+            return "thinking" if "thinking" in (m.group(2) or "") else "working"
+    return None
+
+
+def claude_state(text):
+    """Claude Code's state from a screen captured with colors (capture-pane -e): idle
+    when its prompt line is empty or shows only the dim placeholder, never with a
+    draft typed in it. Working, question, idle, or unknown."""
+    lines = text.rstrip().splitlines()[-SCREEN_LINES:]
+    plain = "\n".join(ANSI.sub("", l) for l in lines)
+    if needs_you(plain):
+        return "question"
+    if "esc to interrupt" in plain.lower() or claude_activity(text):
+        return "working"
+    prompt = next((l for l in reversed(lines) if "\u276f" in l), None)  # ❯
+    if prompt is None:
+        return "unknown"
+    rest = prompt.split("\u276f", 1)[1].replace("\xa0", " ")
+    rest = re.sub(r"^(\x1b\[(?:0|39|49|22)?m|\s)+", "", rest)
+    return "idle" if not ANSI.sub("", rest).strip() or rest.startswith("\x1b[2m") else "unknown"
 
 
 def working(text):
@@ -321,7 +367,14 @@ class Spawner:
                         age = time.time() - datetime.fromisoformat(r["started"]).timestamp()
                         need = need or age > JOIN_GRACE
                     elif r["tool"] == "opencode":
-                        need = self._type_unread(pid, r, text)
+                        need = self._type_unread(pid, r, opencode_state(text))
+                    elif r["tool"] == "claude":  # no wait loop: messages are typed in when idle
+                        try:
+                            colored = screen(r["session"], colors=True)
+                        except StoreError:
+                            continue
+                        self._activity(pid, r["name"], claude_activity(colored))
+                        need = self._type_unread(pid, r, claude_state(colored))
                 self.store.set_needs(pid, token, need)
 
     def _rescue(self, pid, token, r):
@@ -356,23 +409,40 @@ class Spawner:
                       "[chat] %s (Your tool call came out as text; bullpen ran it for you.)" % note)
         return self.store.update_spawned(pid, token, **fields)
 
-    def _type_unread(self, pid, r, text):
-        """Type the oldest unread message that wakes this OpenCode agent, if its
-        screen is idle. Unread comes from its stored cursor, so nothing is lost
+    def _activity(self, pid, name, activity):
+        """Show what it is doing in the roster; after a compaction its summary may have
+        dropped the rules, so they ride along with its next message again."""
+        was = self.store.local.get((pid, name), {}).get("activity")
+        if was == "compacting" and activity != "compacting":
+            with self.store.changed:
+                if name in self.store.agents(pid):
+                    self.store._update(pid, name, told=None)
+        self.store.set_local(pid, name, activity=activity)
+
+    def _type_unread(self, pid, r, state):
+        """Type the oldest unread message that wakes this OpenCode or Claude agent, if
+        its screen is idle (state: from opencode_state or claude_state). Unread comes from its stored cursor, so nothing is lost
         on a restart and nothing it already read with chat_read is typed.
         Returns whether its screen asks the user something."""
-        name, state = r["name"], opencode_state(text)
+        name = r["name"]
         agent = self.store.agents(pid).get(name)
         if not agent or agent.get("removed") or agent.get("gone"):
             return state == "question"
-        unread = [m for m in self.store.messages(pid, agent["cursor"]) if wakes(m, name, self.store.away())]
+        unread = [m for m in self.store.messages(pid, agent["cursor"]) if wakes(m, name, self.store.away(), self.store.lead(pid))]
         if state == "idle" and unread:
             from . import rules
-            send_text(r["session"], format_message(unread[0], name, agent.get("role"),
-                                                   rules.standing(self.store, pid)))
-            self.store.delivered(pid, name, unread[0]["n"])
-            if name in addressed(unread[0]["text"]) or unread[0].get("dm"):  # a reply is owed
-                self.store.update_spawned(pid, r["token"], owed=unread[0]["n"])
+            told, personality = rules.fresh(self.store, pid, name)
+            line, batch = format_message(unread[0], name, personality, told), unread[:1]
+            for m in unread[1:]:  # all that waits, in one turn, as far as one line holds
+                more = format_message(m, name)
+                if len(line) + 4 + len(more) > MAX_TEXT:
+                    break
+                line, batch = line + " || " + more, batch + [m]
+            send_text(r["session"], line)
+            self.store.delivered(pid, name, batch[-1]["n"])
+            owed = [m["n"] for m in batch if name in addressed(m["text"]) or m.get("dm")]
+            if owed:  # a reply is owed
+                self.store.update_spawned(pid, r["token"], owed=owed[-1])
         elif state == "idle" and r.get("owed"):
             # it answered in its terminal only (gpt-oss does): one reminder, then let it be
             if not any(m["from"] == name for m in self.store.messages(pid, r["owed"])):

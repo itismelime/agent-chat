@@ -21,6 +21,7 @@ class UsageTest(unittest.TestCase):
         d.mkdir(parents=True)
         f = d / "s1.jsonl"
         f.write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"alice"}}\n'
+                     '{"content":"Joined proj as alice. Recent messages:"}\n'
                      + line(input_tokens=2, cache_read_input_tokens=1000, cache_creation_input_tokens=500,
                             output_tokens=40))
         self.assertEqual(usage.claude(proj, "alice", self.home), {"ctx": 1502, "out": 40, "model": "claude-x"})
