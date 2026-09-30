@@ -364,13 +364,13 @@ $('f').onsubmit=async e=>{e.preventDefault();
   grow();hint();refresh();};
 
 // dialogs: ask() for text, close buttons, the terminal
-function ask({title,label,value='',multiline=false,presets=[],help='',placeholder=''}){
+function ask({title,label,value='',multiline=false,presets=[],help='',placeholder='',extra=null}){
   const d=$('ask'),input=multiline?$('askarea'):$('askinput');
   $('asktitle').textContent=title;$('asklabel').textContent=label;$('asklabel').htmlFor=input.id;$('askhelp').textContent=help;
   $('askinput').hidden=multiline;$('askarea').hidden=!multiline;input.value=value;input.placeholder=placeholder;
   $('askpresets').replaceChildren(...presets.map(([n,text])=>{const b=btn(n,()=>{input.value=text;mark();input.focus();},'ghost');return b;}));
   const mark=()=>[...$('askpresets').children].forEach((b,i)=>b.classList.toggle('on',presets[i][1]===input.value));
-  input.oninput=mark;mark();
+  input.oninput=mark;mark();$('askextra').replaceChildren(...(extra?[extra(input)]:[]));
   d.returnValue='';d.showModal();input.focus();input.select();
   input.onkeydown=e=>{if(multiline&&e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();d.close('ok');}};
   return new Promise(res=>d.addEventListener('close',()=>res(d.returnValue==='ok'?input.value:null),{once:true}));}
@@ -396,9 +396,18 @@ $('term').addEventListener('close',()=>{termToken=null;clearInterval(termTimer);
 $('term').addEventListener('cancel',e=>{if(document.activeElement===$('ti')&&$('ti').value)e.preventDefault();});
 $('tf').onsubmit=e=>{e.preventDefault();const text=$('ti').value;if(!text)return;$('ti').value='';sendKeys({text});};
 
+function folderBrowser(input){  // Add a project: click through folders; the one open is the path
+  const box=el('div','folders'),at=el('div','fat'),list=el('div','flist');box.append(at,list);
+  const go=async path=>{try{const r=await api('api/folders'+(path?'?path='+encodeURIComponent(path):''));
+      if(path)input.value=r.path;at.textContent=r.path;
+      list.replaceChildren(...(r.parent?[btn('..',()=>go(r.parent),'ghost up')]:[]),
+        ...r.folders.map(f=>btn(f.name,()=>go(f.path),'ghost')));
+      if(!r.folders.length)list.append(el('p','fmute','No folders inside.'));}
+    catch(e){at.textContent=e.message;}};
+  go('');return box;}
 $('add').onclick=async()=>{
   const path=await ask({title:'Add a project',label:'Project folder',placeholder:'/home/you/code/project',
-    help:'An absolute path. Each project gets its own chat and board.'});
+    help:'Type an absolute path, or open folders below. Each project gets its own chat and board.',extra:folderBrowser});
   if(!path||!path.trim())return;
   try{const r=await api('api/projects',{path:path.trim()});select(r.project.id);
     say(r.existing?`${r.project.name} already exists; opened it.`:`Added ${r.project.name}.`);

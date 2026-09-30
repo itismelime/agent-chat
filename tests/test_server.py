@@ -59,6 +59,20 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.raw("POST", "/api/projects", big, JSON)[0], 413)
         self.assertEqual(self.raw("POST", "/api/projects", b"[1]", JSON)[0], 400)
 
+    def test_folders_lists_folders_only(self):
+        (self.dir / "Beta").mkdir()
+        (self.dir / ".hidden").mkdir()
+        (self.dir / "file.txt").write_text("x")
+        from urllib.parse import quote
+        body = self.c.call("GET", "/api/folders?path=" + quote(str(self.dir)))[1]
+        self.assertEqual([f["name"] for f in body["folders"]], ["Beta", "sub"])
+        self.assertEqual(body["folders"][0]["path"], str((self.dir / "Beta").resolve()))
+        self.assertEqual(body["parent"], str(self.dir.resolve().parent))
+        for bad in ("relative", str(self.dir / "file.txt")):
+            with self.assertRaises(ApiError) as e:
+                self.c.call("GET", "/api/folders?path=" + quote(bad))
+            self.assertEqual(e.exception.code, 400)
+
     def test_projects_existing_and_missing(self):
         status, body = self.c.call("POST", "/api/projects", {"path": str(self.dir)})
         self.assertEqual((status, body["existing"]), (201, False))

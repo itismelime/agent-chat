@@ -369,3 +369,7 @@ border-radius:0;background:var(--soft)}#profilebtn:hover{background:var(--line)}
 input[type=range]{accent-color:var(--proof)}
 #answercount.rise,#answerchip.rise{animation:rise .9s ease-out}
 @keyframes rise{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--attn) 70%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
+#askextra .folders{display:flex;flex-direction:column;gap:6px}
+#askextra .fat{font:12px var(--mono);color:var(--mute);overflow-wrap:anywhere}
+#askextra .flist{display:flex;flex-direction:column;max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:7px;padding:4px}
+#askextra .flist button{border:0;text-align:left;padding:5px 10px;font-weight:500}#askextra .flist .up{color:var(--mute)}
