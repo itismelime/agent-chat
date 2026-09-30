@@ -19,6 +19,8 @@ LINK_MS = 60_000  # a start's OpenCode session opens within this after the start
 # prompt: "<function=bullpen_chat_join>\n<parameter=name>\nx\n</parameter>\n</function>"
 CALL = re.compile(r"<function=(?:bullpen|agent-chat)_(chat_join|chat_post)>(.*?)</function>", re.S)
 PARAM = re.compile(r"<parameter=(\w+)>\n?(.*?)\n?</parameter>", re.S)
+# gpt-oss's way: a reply that ends in chat_post's arguments as JSON, {"text": "…"}
+POST_JSON = re.compile(r'(\{\s*"(?:text|private|ask)"\s*:.*\})\s*$', re.S)
 
 
 def tool_models(ollama, gpu_total):
@@ -105,9 +107,19 @@ def written_calls(root, session, after_ms):
             part = json.loads(data)
         except ValueError:
             continue
-        if part.get("type") == "text":
-            for m in CALL.finditer(part.get("text") or ""):
-                out.append((t, m[1], dict(PARAM.findall(m[2]))))
+        if part.get("type") != "text":
+            continue
+        text = part.get("text") or ""
+        for m in CALL.finditer(text):
+            out.append((t, m[1], dict(PARAM.findall(m[2]))))
+        m = POST_JSON.search(text)
+        if m:
+            try:
+                args = json.loads(m[1])
+            except ValueError:
+                continue
+            if isinstance(args, dict) and isinstance(args.get("text"), str) and set(args) <= {"text", "private", "ask"}:
+                out.append((t, "chat_post", args))
     return out
 
 

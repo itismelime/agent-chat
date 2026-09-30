@@ -104,7 +104,8 @@ def start(tool, path, session, token, model=None, config_home=None, data_home=No
         # config from a tmux server's environment
         env += ["-e", "OPENCODE_DISABLE_CLAUDE_CODE=1", "-e", "OPENCODE_CONFIG=",
                 "-e", "OPENCODE_CONFIG_DIR=", "-e", "OPENCODE_CONFIG_CONTENT="]
-        command = (["opencode", "-s", resume, "-m", "ac/" + model, "--prompt", BACK % name] if resume
+        # OpenCode drops --prompt when it continues a session: the poller types BACK once it is idle
+        command = (["opencode", "-s", resume, "-m", "ac/" + model] if resume
                    else ["opencode", "-m", "ac/" + model, "--prompt", PROMPT])
     elif resume:
         command = (["claude", "--resume", resume, BACK % name] if tool == "claude"
@@ -249,7 +250,7 @@ class Spawner:
             start("opencode", project["path"], session, token, model=model, config_home=home,
                   data_home=data, resume=sid, name=name)
             # its session is known; only calls written from now on are rescued
-            extra = dict(model=model, oc_session=sid, oc_seen=int(time.time() * 1000))
+            extra = dict(model=model, oc_session=sid, oc_seen=int(time.time() * 1000), greet=BACK % name)
         else:
             start(agent["kind"], project["path"], session, token, resume=sid, name=name)
         self.store.add_spawned(pid, token, agent["kind"], session)
@@ -308,6 +309,10 @@ class Spawner:
                         continue
                     need = needs_you(text)
                     if r["tool"] == "opencode" and opencode_state(text) == "idle":
+                        if r.get("greet"):  # a resumed OpenCode: tell it once it can take input
+                            send_text(r["session"], r["greet"])
+                            self.store.update_spawned(pid, token, greet=None)
+                            continue
                         seen, r = r.get("oc_seen"), self._rescue(pid, token, r)
                         if r.get("oc_seen") != seen:
                             continue  # it was just typed to: look again next poll
@@ -339,7 +344,8 @@ class Spawner:
                     self.linked(pid, token, name)
                     note = "You joined the chat as %s." % name
                 elif tool == "chat_post" and name:
-                    self.store.post(pid, name, args.get("text", ""))
+                    self.store.post(pid, name, args.get("text", ""), dm=name if args.get("private") is True else None,
+                                    ask=args.get("ask") is True)
                     note = "Your message was posted."
                 else:
                     continue

@@ -297,6 +297,14 @@ class SpawnerTest(unittest.TestCase):
         self.assertEqual([m["text"] for m in self.store.messages("proj") if m["from"] == "coder"],
                          ["@user hi\nthere"])
         self.assertEqual(sum("came out as text" in c for c in self.typed()), 2)
+        # gpt-oss's form: the reply ends in chat_post's arguments as JSON
+        db.execute("INSERT INTO part VALUES ('p3', 'ses_1', ?, ?)", (started + 3000, json.dumps(
+            {"type": "text", "text": 'Need to reply. {"private": true, "text": "done, see #4"}'})))
+        db.commit()
+        self.sp.poll()
+        self.sp.poll()
+        last = self.store.messages("proj")[-1]
+        self.assertEqual((last["from"], last["text"], last.get("dm")), ("coder", "done, see #4", "coder"))
 
     def test_nothing_is_typed_to_a_removed_agent(self):
         self.opencode_setup()
@@ -349,8 +357,14 @@ class SpawnerTest(unittest.TestCase):
         token = next(iter(self.store.spawned("proj")))
         self.sp.stop("proj", token)  # its terminal ended: kit is offline
         r = self.sp.resume("proj", "kit")
-        self.assertIn("-- opencode -s ses_9 -m ac/coder:30b --prompt You are back in the chat", calls(self.d)[-1])
+        self.assertTrue(calls(self.d)[-1].endswith("-- opencode -s ses_9 -m ac/coder:30b"))
         self.assertEqual((r["oc_session"], r["model"], r["resume"]), ("ses_9", "coder:30b", "kit"))
+        # OpenCode drops --prompt on a continued session: the line is typed once it is idle
+        (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text(encoding="utf-8"))
+        self.sp.poll()
+        self.sp.poll()
+        greets = [c for c in self.typed() if "You are back in the chat" in c]
+        self.assertEqual(len(greets), 1)
         self.store.join("proj", "kit", "opencode", spawn=r["token"])  # takes its name back
 
     def test_resume_an_offline_agent(self):
