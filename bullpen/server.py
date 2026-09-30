@@ -180,10 +180,24 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     raise StoreError(404, "not in a registered project")
                 return 200, {"project": project}
             if rest == ["profile"] and method == "GET":
-                return 200, dict(profile.get(store), for_agents=profile.for_agents(store))
+                return 200, dict(profile.get(store), for_agents=profile.for_agents(store),
+                                 avatar=avatars.version(store, None, "user"))
+            if rest[:2] == ["avatars", "user"] and len(rest) in (2, 3):  # your picture, the same in every project
+                if len(rest) == 2 and method == "GET":
+                    return (200, *avatars.load(store, None, "user"))
+                if len(rest) == 2 and method == "POST":
+                    data = self.body(limit=avatars.MAX_BYTES * 4 // 3 + 1000)
+                    avatars.save_base64(store, None, "user", data.get("data"))
+                elif rest[2:] == ["delete"] and method == "POST":
+                    avatars.remove(store, None, "user")
+                elif rest[2:] == ["crop"] and method == "POST":
+                    avatars.set_crop(store, None, "user", self.body())
+                else:
+                    raise StoreError(404, "not found")
+                return 200, {"avatar": avatars.version(store, None, "user")}
             if rest == ["profile"] and method == "POST":
                 data = self.body()
-                return 200, profile.save(store, data.get("name"), data.get("about"))
+                return 200, profile.save(store, data.get("name"), data.get("about"), data.get("away"))
             if rest == ["pr"] and method == "GET":  # a PR link's chip: state and checks, via gh
                 return 200, prs.state(query.get("repo"), query.get("n", ""))
             if rest == ["tools"] and method == "GET":

@@ -102,11 +102,13 @@ def rename(store, pid, old, new):
 def versions(store, pid):
     """{name: {"v": version, "crop": crop or None}} of the pictures the page shows
     in this project (you included)."""
-    out = {}
-    for name in ["user", *store.agents(pid)]:
-        f = _file(store, pid, name)
-        if f.is_file():
-            c = _crop_file(f)
-            out[name] = {"v": int(f.stat().st_mtime),
-                         "crop": json.loads(c.read_text()) if c.is_file() else None}
-    return out
+    return {name: v for name in ["user", *(store.agents(pid) if pid else [])] if (v := version(store, pid, name))}
+
+
+def version(store, pid, name):
+    """{"v": version, "crop": crop or None} of one picture, or None."""
+    f = _file(store, pid, name)
+    if not f.is_file():
+        return None
+    c = _crop_file(f)
+    return {"v": int(f.stat().st_mtime), "crop": json.loads(c.read_text()) if c.is_file() else None}

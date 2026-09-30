@@ -52,11 +52,12 @@ def sees(message, name):
     return message.get("dm") in (None, name)
 
 
-def wakes(message, name):
-    """User messages wake every agent; agent messages only those addressed."""
+def wakes(message, name, away=False):
+    """User messages wake every agent; agent messages only those addressed, and
+    none while the user is away (agents stay asleep: no tokens spent on each other)."""
     if message["from"] == name or not sees(message, name):
         return False
-    return message["from"] == "user" or name in addressed(message["text"])
+    return message["from"] == "user" or not away and name in addressed(message["text"])
 
 
 def write_json(path, data):
@@ -78,6 +79,13 @@ class Store:
         # talk(pid, name, message) wakes a local-model member (talk.Talker); must not block
         self.talk = None
         self.local = {}  # (project id, name) -> {"busy", "error"} of local-model members
+
+    def away(self):
+        """Whether the user set themselves away (Profile); agents then only wake for them."""
+        try:
+            return json.loads((self.root / "profile.json").read_text(encoding="utf-8")).get("away") is True
+        except (OSError, ValueError):
+            return False
 
     # projects
 
@@ -193,8 +201,9 @@ class Store:
             with open(self._dir(pid) / "messages.jsonl", "a") as f:
                 f.write(json.dumps(m) + "\n")
             self.changed.notify_all()
+            away = self.away()
             for name, a in self.agents(pid).items():
-                if a.get("removed") or a.get("gone") or not wakes(m, name):
+                if a.get("removed") or a.get("gone") or not wakes(m, name, away):
                     continue
                 if a.get("thread") and self.deliver:
                     self.deliver(pid, name, a["thread"], m)
@@ -461,7 +470,7 @@ class Store:
                         return {"notice": agent["notice"], "messages": []}
                     if not agent.get("removed"):
                         msgs = self.messages(pid, agent["cursor"])
-                        if any(wakes(m, name) for m in msgs):
+                        if any(wakes(m, name, self.away()) for m in msgs):
                             self._touch(pid, name, msgs[-1]["n"])
                             return {"notice": None, "messages": [m for m in msgs if sees(m, name)]}
                     left = deadline - time.monotonic()

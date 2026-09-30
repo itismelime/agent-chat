@@ -103,6 +103,7 @@ $('projects').ondrop=e=>{e.preventDefault();const d=e.target.closest('.p');if(!d
   const ids=projects.map(p=>p.id).filter(x=>x!==dragging),at=ids.indexOf(d.dataset.id)+(d.classList.contains('dropafter')?1:0);
   ids.splice(at,0,dragging);saveOrder(ids);};
 function render(){
+  if(typeof drawMe==='function')drawMe();
   $('projects').replaceChildren(...projects.map((p,i)=>{
     const d=el('div','p'+(p.id===cur?' on':'')+(p.missing?' missing':''));
     d.title=p.path+(p.missing?' (folder missing)':'');d.append(el('span','pn',p.name));

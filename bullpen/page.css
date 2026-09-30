@@ -348,3 +348,11 @@ background:transparent}
 #profile .av{position:static}#profile .av.big{width:120px;height:120px;border-radius:24px;font-size:48px}
 #profile .zoom{flex-direction:row!important;align-items:center}#profile .zoom input{flex:1}
 #profile .hint{margin:0;color:var(--mute);font-size:13px}
+/* you, Discord-like: a strip at the rail's foot, your square picture, your name over a quiet line */
+#profilebtn{display:flex;align-items:center;gap:10px;margin:4px -10px -10px;padding:10px 12px;border:0;border-top:1px solid var(--line);
+border-radius:0;background:var(--soft)}#profilebtn:hover{background:var(--line)}
+#profilebtn .av{width:36px;height:36px;font-size:15px;border-radius:9px;position:static;background:var(--ink);flex:none}
+#profilebtn .me{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+#profilebtn .me b{font:700 14px var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#profilebtn .me small{font-size:12px;color:var(--mute);font-weight:400}
+#profile .row{flex-wrap:wrap}#profile .row button{white-space:nowrap}
