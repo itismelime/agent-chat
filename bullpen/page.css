@@ -146,6 +146,7 @@ overflow-wrap:anywhere;max-width:84ch}
 .m .acts{position:absolute;right:6px;top:-14px;display:none;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:1px}
 .m:hover .acts,.m:focus-within .acts{display:flex}.m:hover .t{display:none}
 .acts button{background:none;color:var(--mute);font-size:12px;padding:2px 8px;font-weight:600}.acts button:hover{color:var(--ink);background:var(--soft)}
+.m.atme{background:var(--proof-bg);border-left-color:var(--proof)}  /* an agent @-ed you */
 .m.hit{background:color-mix(in srgb,var(--busy) 16%,transparent)}
 .m.flash{animation:flash 1.6s ease-out}@keyframes flash{from{background:color-mix(in srgb,var(--c) 30%,transparent)}}
 .mention{font-weight:700;color:var(--c)}.mention.me{background:var(--proof-bg);color:var(--proof);border-radius:4px;padding:0 3px}

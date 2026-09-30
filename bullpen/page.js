@@ -121,7 +121,7 @@ function render(){
   $('boardcount').textContent=String(open.filter(c=>c.kind!=='epic').length||'');
   $('epiccount').textContent=String(open.filter(c=>c.kind==='epic').length||'');
   drawNeeds();drawRoster();hint();
-  const key=cur+':'+lastN(cur)+':'+query+':'+agents.map(a=>a.name).join()+JSON.stringify(reactsBy[cur]||{})+(pinsBy[cur]||[]);if(key===drawn)return;
+  const key=cur+':'+lastN(cur)+':'+query+':'+agents.map(a=>a.name).join()+JSON.stringify(reactsBy[cur]||{})+(pinsBy[cur]||[])+(typeof myName==='function'?myName():'');if(key===drawn)return;  // your name: who @-ed you
   const switched=!drawn.startsWith(cur+':'),end=atEnd(),before=drawn;drawn=key;
   drawLog(p);
   if(end||switched||!before)log.scrollTop=log.scrollHeight;else $('jump').hidden=false;
@@ -159,9 +159,12 @@ function drawLog(p){
 const noProject=()=>empty('Add a project to start',  // chat, board and epics alike
   'Choose + next to Projects and give a folder, or run bullpen add <folder> in a terminal.');
 function empty(title,text){const d=el('div','empty');d.append(el('h2','',title),el('p','',text));return d;}
+const isMe=name=>['user','you',typeof myName==='function'?myName().toLowerCase():''].includes(name.toLowerCase());
+const atMe=text=>(text.match(/@[\w-]+/g)||[]).some(w=>isMe(w.slice(1)));  // @user, @you or your profile name
 function message(m,time,q){
   const d=el('div','m rich'+(q?' hit':''));d.id='m'+m.n;
   if(m.dm)d.classList.add('dm');
+  if(m.from!=='user'&&atMe(m.text))d.classList.add('atme');  // an agent calls on you
   if(m.reply)d.append(quote(m.reply));
   if(m.dm)d.append(el('span','dmtag','Private: you and '+m.dm));
   const body=renderText(m.text);if(typeof addPrChips==='function')addPrChips(body);
