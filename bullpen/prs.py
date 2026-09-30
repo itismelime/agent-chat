@@ -1,16 +1,19 @@
 """GitHub pull request state for the chips the page puts after PR links:
 state (open, draft, merged, closed) and checks, through the user's own `gh`.
-Cached for a minute so a busy chat does not hammer GitHub."""
+Merged and closed PRs are remembered for good (they do not change), open ones
+for TTL seconds, and at most GH_AT_ONCE `gh` run at a time."""
 import json
 import re
 import shutil
 import subprocess
+import threading
 import time
 
 from .store import StoreError
 
 REPO = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
-TTL = 60
+TTL = 120
+GH_AT_ONCE = threading.BoundedSemaphore(4)
 _cache = {}  # (repo, n) -> (time, result)
 
 
@@ -31,12 +34,13 @@ def state(repo, n, run=subprocess.run):
         raise StoreError(400, "repo must be owner/name and n a number")
     key = (repo, int(n))
     hit = _cache.get(key)
-    if hit and time.monotonic() - hit[0] < TTL:
+    if hit and (hit[1]["state"] in ("merged", "closed") or time.monotonic() - hit[0] < TTL):
         return hit[1]
     if not shutil.which("gh"):
         raise StoreError(503, "gh is not installed")
-    r = run(["gh", "pr", "view", str(int(n)), "-R", repo, "--json", "state,isDraft,title,statusCheckRollup"],
-            capture_output=True, text=True, timeout=20)
+    with GH_AT_ONCE:
+        r = run(["gh", "pr", "view", str(int(n)), "-R", repo, "--json", "state,isDraft,title,statusCheckRollup"],
+                capture_output=True, text=True, timeout=20)
     if r.returncode:
         raise StoreError(404, "no pull request %s#%s (%s)" % (repo, n, r.stderr.strip()[:200]))
     d = json.loads(r.stdout)
