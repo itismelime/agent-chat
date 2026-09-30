@@ -77,8 +77,8 @@ async function refresh(){
     needed=new Set(projects.flatMap(q=>spawnedBy[q.id]).filter(s=>s.state==='needs_you').map(s=>s.token));
     if(cur&&!away()&&atEnd())seen[cur]=lastN(cur);
     saved.set('seen',seen);if(down){say();down=false;}render();
-    if(typeof drawBoard==='function'&&!$('boardview').hidden&&boardData)drawBoard(boardData);
-    if(typeof drawEpics==='function'&&!$('epicview').hidden&&boardData)drawEpics(boardData);
+    if(typeof drawBoard==='function'&&!$('boardview').hidden&&(boardData||!cur))drawBoard(boardData);
+    if(typeof drawEpics==='function'&&!$('epicview').hidden&&(boardData||!cur))drawEpics(boardData);
   }catch(e){down=true;say('','Cannot reach the bullpen service: '+e.message+'. Is it running? systemctl --user status bullpen');}
   finally{busy=false;}
 }
@@ -129,8 +129,7 @@ function render(){
 // transcript: messages grouped by speaker, board notices as one line, a rule per day
 function drawLog(p){
   drawPins();
-  if(!p){log.replaceChildren(empty('Add a project to start',
-    'Choose + next to Projects and give a folder, or run bullpen add <folder> in a terminal.'));return;}
+  if(!p){log.replaceChildren(noProject());return;}
   const q=query.toLowerCase(),all=msgs[p.id]||[];
   const list=q?all.filter(m=>m.text.toLowerCase().includes(q)||m.from.includes(q)):all;
   if(!all.length){log.replaceChildren(empty('No messages yet',
@@ -156,6 +155,8 @@ function drawLog(p){
       g.node.append(avatar(from),h);out.push(g.node);}
     g.at=Date.parse(m.time);g.node.append(message(m,time,q));}
   log.replaceChildren(...out);}
+const noProject=()=>empty('Add a project to start',  // chat, board and epics alike
+  'Choose + next to Projects and give a folder, or run bullpen add <folder> in a terminal.');
 function empty(title,text){const d=el('div','empty');d.append(el('h2','',title),el('p','',text));return d;}
 function message(m,time,q){
   const d=el('div','m rich'+(q?' hit':''));d.id='m'+m.n;

@@ -8,7 +8,7 @@ function showView(v){  // true/false: board/chat (Alt+B), or 'chat', 'board', 'e
   for(const n of ['chat','board','epics'])$('view'+n).classList.toggle('on',n===v);
   $('chat').hidden=v!=='chat';bv.hidden=v!=='board';ev.hidden=v!=='epics';bdrawn=edrawn='';
   history.replaceState(null,'',v==='chat'?location.pathname:'#'+v);
-  if(v==='board'&&boardData)drawBoard(boardData);if(v==='epics'&&boardData)drawEpics(boardData);if(v==='chat')t.focus();}
+  if(v==='board'&&(boardData||!cur))drawBoard(boardData);if(v==='epics'&&(boardData||!cur))drawEpics(boardData);if(v==='chat')t.focus();}
 const epicsOf=b=>b.cards.filter(c=>c.kind==='epic'),itemsOf=b=>b.cards.filter(c=>c.kind!=='epic');
 function epicHue(e){return `oklch(var(--sl) .13 ${(e.id*67)%360})`;}
 function epicChip(b,id){const e=b.cards.find(c=>c.id===id);if(!e)return null;
@@ -18,6 +18,7 @@ async function boardCall(path,body){
   catch(e){say('',e.message);}
   refresh();}
 function drawBoard(b){
+  if(!cur){bdrawn='';bv.replaceChildren(noProject());return;}
   const key=cur+JSON.stringify(b)+adding+epicFilter+agents.map(a=>a.name);if(key===bdrawn||bv.contains(document.activeElement)&&adding)return;bdrawn=key;
   const epics=epicsOf(b);if(epicFilter&&epicFilter!=='none'&&!epics.some(e=>String(e.id)===epicFilter))epicFilter='';
   const shown=itemsOf(b).filter(c=>!epicFilter||(epicFilter==='none'?!c.epic:String(c.epic)===epicFilter));
@@ -92,6 +93,7 @@ function epicPanel(title,items,epic){  // one group; epic is null for items with
     p.append(body);}
   return p;}
 function drawEpics(b){
+  if(!cur){edrawn='';ev.replaceChildren(noProject());return;}
   const key=cur+JSON.stringify(b)+adding+JSON.stringify(closed[cur]||[])+agents.map(a=>a.name);
   if(key===edrawn||ev.contains(document.activeElement)&&adding)return;edrawn=key;
   const epics=epicsOf(b),items=itemsOf(b);
