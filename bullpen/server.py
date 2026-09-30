@@ -12,6 +12,7 @@ import os
 import re
 import select
 import socket
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -357,6 +358,20 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     if what[2] == "read":
                         return 200, {"messages": store.read(pid, what[1])}
                     if what[2] == "wait":
+                        if any(r.get("name") == what[1] and r["tool"] == "claude"
+                               for r in store.spawned(pid).values()):
+                            # a Claude started from the page gets its messages typed in (spawn.py); a
+                            # wait it still keeps (a habit, or a memory saying so) only costs turns.
+                            # It hears "stop" once an hour; a wait restarted anyway stays quiet to its
+                            # timeout, so an agent told to restart every exit cannot loop on it.
+                            key = (pid, what[1])
+                            if time.time() - store.local.get(key, {}).get("told_typed", 0) > 3600:
+                                store.set_local(pid, what[1], told_typed=time.time())
+                                return 200, {"notice": "typed", "messages": [], "name": what[1]}
+                            end = time.monotonic() + wait_seconds
+                            while time.monotonic() < end and self.client_alive():
+                                time.sleep(1)
+                            return 204, None
                         result = store.wait(pid, what[1], wait_seconds, alive=self.client_alive)
                         if result is None:
                             return 204, None

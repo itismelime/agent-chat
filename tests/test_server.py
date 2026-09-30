@@ -59,6 +59,22 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.raw("POST", "/api/projects", big, JSON)[0], 413)
         self.assertEqual(self.raw("POST", "/api/projects", b"[1]", JSON)[0], 400)
 
+    def test_a_claude_started_here_is_told_to_stop_waiting(self):
+        pid = self.add()
+        self.store.add_spawned(pid, "tok", "claude", "bullpen-proj-tok")
+        self.store.join(pid, "lead", "claude", spawn="tok")
+        self.store.join(pid, "solo", "claude")  # joined by hand: it keeps its wait
+        start = time.monotonic()
+        body = self.c.call("GET", "/api/projects/%s/agents/lead/wait" % pid)[1]
+        self.assertLess(time.monotonic() - start, 1)
+        self.assertEqual(body["notice"], "typed")
+        # started again anyway (a memory says to restart on every exit): quiet to its timeout, no loop
+        start = time.monotonic()
+        self.assertEqual(self.c.call("GET", "/api/projects/%s/agents/lead/wait" % pid)[0], 204)
+        self.assertGreaterEqual(time.monotonic() - start, 0.9)
+        self.store.post(pid, "user", "hi")
+        self.assertEqual(self.c.call("GET", "/api/projects/%s/agents/solo/wait" % pid)[1]["messages"][0]["text"], "hi")
+
     def test_folders_lists_folders_only(self):
         (self.dir / "Beta").mkdir()
         (self.dir / ".hidden").mkdir()
