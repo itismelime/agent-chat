@@ -31,6 +31,18 @@ class PlanTest(unittest.TestCase):
                                return_value=json.dumps({"statusLine": {"command": "bash ~/mine.sh"}})):
             self.assertEqual(plan.yours(), "bash ~/mine.sh")
 
+    def test_the_command_claude_runs(self):
+        import os, subprocess, sys
+        from pathlib import Path
+        home = tempfile.mkdtemp()  # no settings of yours there: bullpen's own line
+        env = dict(os.environ, HOME=home, XDG_DATA_HOME=home)
+        raw = json.dumps({"rate_limits": {"five_hour": {"used_percentage": 12, "resets_at": time.time() + 3600}}})
+        r = subprocess.run([sys.executable, str(Path(__file__).parent.parent / "bin" / "bullpen"), "statusline"],
+                           input=raw, capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(r.stdout.startswith("5h 12% ("), r.stdout)
+        self.assertEqual(plan.get(Path(home) / "bullpen")["five_hour"]["used"], 12)
+
 
 if __name__ == "__main__":
     unittest.main()
