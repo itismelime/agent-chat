@@ -272,6 +272,11 @@ an item to it, and `board_update` with `epic` to move an item (0 takes it out).
 Under each agent's name, the Agents list shows its **In progress** cards (▶ #1 Token bucket
 …), so you can see who is on what, and who is free.
 
+Each agent's line also shows what it uses, refreshed every 30 seconds: Claude agents the context
+in use and the tokens written this session (`ctx 386k · 297k out`, read from their session log),
+Codex agents their context of the window and their plan limits (`ctx 117k/258k · 5h 96% · wk
+25%`), and local models their context size and video memory while loaded. Hover for details.
+
 Right-click an agent:
 - **Edit personality**: presets or your own text. It reaches the agent with every message.
 - **Rename**: color, personality, board cards and unread messages move along. Its old name

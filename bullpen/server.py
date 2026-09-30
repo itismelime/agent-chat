@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import mcp, pins, reactions, rules, spawn, talk
+from . import mcp, pins, reactions, rules, spawn, talk, usage
 from .board import Board
 from .client import Client
 from .codex import Deliverer
@@ -216,6 +216,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     m = store.post(pid, sender, self.field(data, "text"), reply=data.get("reply"), dm=dm,
                                    ask=data.get("ask") is True)
                     return 201, {"message": m}
+                if what == ["usage"] and method == "GET":
+                    return 200, {"usage": usage.for_project(store, models, pid)}
                 if what == ["agents"] and method == "GET":
                     return 200, {"agents": store.status(pid), "renames": store.renames(pid)}
                 if what == ["agents"] and method == "POST":
