@@ -149,7 +149,7 @@ function drawLog(p){
     const from=current(m.from);
     if(!g||g.from!==from||Date.parse(m.time)-g.at>5*60e3){
       g={from,at:Date.parse(m.time),node:who(el('div','g '+m.kind),from)};
-      const h=el('div','gh'),n=el('span','n',from==='user'?'you':from);if(from!==m.from)n.title='posted as '+m.from;h.append(n,
+      const h=el('div','gh'),n=el('span','n',from==='user'?myName():from);if(from!==m.from)n.title='posted as '+m.from;h.append(n,
         el('span','',(m.kind!=='user'?(KIND[m.kind]||m.kind)+'  ':'')+time));
       g.node.append(avatar(from),h);out.push(g.node);}
     g.at=Date.parse(m.time);g.node.append(message(m,time,q));}
@@ -171,7 +171,7 @@ function message(m,time,q){
   d.append(reactRow(m),acts);return d;}
 // a reply's quote of the message it answers; a click shows that message
 function quote(r){const q=who(el('button','quote'),r.from);q.type='button';q.title='Show the message this answers';
-  q.append(el('b','',r.from==='user'?'you':current(r.from)),el('span','',' '+r.text.replace(/\s+/g,' ').slice(0,140)));
+  q.append(el('b','',r.from==='user'?myName():current(r.from)),el('span','',' '+r.text.replace(/\s+/g,' ').slice(0,140)));
   q.onclick=()=>{const o=$('m'+r.n);if(!o){say('That message is not shown; clear the search.');return;}
     o.scrollIntoView({block:'center'});o.classList.remove('flash');void o.offsetWidth;o.classList.add('flash');};return q;}
 let replyTo=null,dmTo=null;  // the message the composer answers; the agent it writes to privately
@@ -259,8 +259,7 @@ function agentItems(a){
   if(a.status==='offline'&&!a.spawn&&(a.kind==='claude'||a.kind==='codex'||a.kind==='opencode'))
     items.push(['Resume',async()=>{await api(agentPath(a,'resume'),{});return `Resuming ${a.name}…`;}]);
   if(a.starting)return items;
-  if(!a.starting&&a.status!=='removed'){items.push(['Upload picture…',()=>pickPicture(cur,a.name)]);
-    if((avatarsBy[cur]||{})[a.name])items.push(['Remove picture',()=>removePicture(cur,a.name)]);}
+  if(!a.starting&&a.status!=='removed')items.push(['Picture…',()=>openProfile(cur,a.name)]);
   items.push(['Rename',async()=>{const n=await ask({title:'Rename '+a.name,label:'New name',value:a.name,
     help:"a-z, 0-9 and '-'. Its color, personality and board cards move along, and its running session keeps working."});
     if(n&&n.trim().toLowerCase()!==a.name){await api(agentPath(a,'rename'),{name:n.trim()});return `${a.name} is now ${n.trim().toLowerCase()}.`;}}]);
