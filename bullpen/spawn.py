@@ -432,10 +432,17 @@ class Spawner:
         if state == "idle" and unread:
             from . import rules
             told, personality = rules.fresh(self.store, pid, name)
-            send_text(r["session"], format_message(unread[0], name, personality, told))
-            self.store.delivered(pid, name, unread[0]["n"])
-            if name in addressed(unread[0]["text"]) or unread[0].get("dm"):  # a reply is owed
-                self.store.update_spawned(pid, r["token"], owed=unread[0]["n"])
+            line, batch = format_message(unread[0], name, personality, told), unread[:1]
+            for m in unread[1:]:  # all that waits, in one turn, as far as one line holds
+                more = format_message(m, name)
+                if len(line) + 4 + len(more) > MAX_TEXT:
+                    break
+                line, batch = line + " || " + more, batch + [m]
+            send_text(r["session"], line)
+            self.store.delivered(pid, name, batch[-1]["n"])
+            owed = [m["n"] for m in batch if name in addressed(m["text"]) or m.get("dm")]
+            if owed:  # a reply is owed
+                self.store.update_spawned(pid, r["token"], owed=owed[-1])
         elif state == "idle" and r.get("owed"):
             # it answered in its terminal only (gpt-oss does): one reminder, then let it be
             if not any(m["from"] == name for m in self.store.messages(pid, r["owed"])):

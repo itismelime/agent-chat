@@ -284,9 +284,8 @@ class SpawnerTest(unittest.TestCase):
         self.sp.poll()
         self.sp.poll()
         typed = self.typed()
-        self.assertEqual(len(typed), 2)  # each once, oldest first
-        self.assertIn("[chat] user: first", typed[0])
-        self.assertIn("[chat] user: second", typed[1])
+        self.assertEqual(len(typed), 1)  # both in one turn, oldest first
+        self.assertLess(typed[0].index("[chat] user: first"), typed[0].index("[chat] user: second"))
         self.assertEqual(self.store.agents("proj")["kit"]["cursor"], self.store.messages("proj")[-1]["n"])
         self.assertEqual(next(a for a in self.store.status("proj") if a["name"] == "kit")["status"], "waiting")
 

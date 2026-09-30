@@ -92,7 +92,9 @@ def standing(store, pid):
     from . import pins
     lead = store.lead(pid)
     line = ("The lead is %s: the user's messages without @names go to %s alone, who answers or "
-            "hands the work on with @name; @all reaches everyone." % (lead, lead)) if lead else ""
+            "hands the work on: small things with @name, real work as board cards (board_add with "
+            "a description and an assignee wakes that agent with it; it moves the card to review "
+            "when done, which wakes %s). @all reaches everyone." % (lead, lead, lead)) if lead else ""
     return " ".join(x for x in (line, summary(get(store, pid)), pins.summary(store, pid)) if x)
 
 

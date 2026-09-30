@@ -77,7 +77,7 @@ class BoardTest(unittest.TestCase):
         self.assertEqual(self.notices()[1:], [
             '@kit you were assigned #1 "Fix login" by user',
             'kit moved #1 "Fix login" to Review',
-            '@kit user moved #1 "Fix login" to Done',
+            'user moved #1 "Fix login" to Done',  # finished: its assignee sleeps on
             '@kit user edited #1 "Fix login page"',
             '@kit user deleted #1 "Fix login page"'])
         self.assertEqual(self.board.get("proj")["cards"], [])
@@ -90,6 +90,22 @@ class BoardTest(unittest.TestCase):
         self.assertFalse(wakes(added, "kit"))
         self.assertTrue(wakes(assigned, "cody"))
         self.assertFalse(wakes(assigned, "kit"))
+
+    def test_the_lead_hands_work_out_and_hears_it_back(self):
+        from bullpen.store import wakes
+        c = self.board.add("proj", "kit", "Fix login", description="Cookie expires\nbefore refresh.", assignee="cody")
+        self.board.update("proj", c["id"], "cody", column="doing")  # its own move: nobody wakes
+        self.board.update("proj", c["id"], "cody", column="review")
+        got = self.notices()[1:]
+        self.assertEqual(got, ['@cody you were assigned #1 "Fix login" by kit: Cookie expires before refresh.',
+                               'cody moved #1 "Fix login" to In progress',
+                               '@kit cody moved #1 "Fix login" to Review'])
+        handed_in = self.store.messages("proj")[-1]
+        self.assertTrue(wakes(handed_in, "kit"))
+        self.assertFalse(wakes(handed_in, "cody"))
+        long = self.board.add("proj", "kit", "Big", description="x" * 900, assignee="cody")
+        self.assertTrue(self.notices()[-1].endswith("x\u2026"))
+        self.assertLess(len(self.notices()[-1]), 700)
 
     def test_validation(self):
         c = self.board.add("proj", "user", "x")
