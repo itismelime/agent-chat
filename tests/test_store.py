@@ -218,6 +218,25 @@ class StoreTest(unittest.TestCase):
         self.assertEqual([m["text"] for m in self.store.wait(self.pid, "alice", 1)["messages"]], ["still wakes"])
         self.assertTrue(profile.get(self.store)["away"])
 
+    def test_a_lead_alone_wakes_for_the_users_general_messages(self):
+        for n in ("alice", "bob", "carol"):
+            self.store.join(self.pid, n, "claude")
+        self.store.set_lead(self.pid, "alice", True)
+        self.store.post(self.pid, "user", "how is it going?")
+        self.assertIsNone(self.store.wait(self.pid, "bob", 0.2))
+        self.assertEqual(len(self.store.wait(self.pid, "alice", 1)["messages"]), 1)
+        self.store.post(self.pid, "user", "@bob only you")
+        self.assertIsNone(self.store.wait(self.pid, "alice", 0.2))
+        self.assertEqual(len(self.store.wait(self.pid, "bob", 1)["messages"]), 2)  # the one it slept through too
+        self.store.post(self.pid, "alice", "@all standup")
+        self.assertIsNotNone(self.store.wait(self.pid, "carol", 1))
+        self.assertIn("The lead is alice", __import__("bullpen.rules").rules.standing(self.store, self.pid))
+        self.store.set_lead(self.pid, "bob", True)  # one lead at a time
+        self.assertEqual(self.store.lead(self.pid), "bob")
+        self.store.set_lead(self.pid, "bob", False)
+        self.store.post(self.pid, "user", "everyone again")
+        self.assertIsNotNone(self.store.wait(self.pid, "carol", 1))
+
     def test_wait_for_a_gone_client_keeps_messages(self):
         self.store.join(self.pid, "alice", "claude")
         threading.Timer(0.2, self.store.post, args=(self.pid, "user", "@alice important")).start()

@@ -376,3 +376,4 @@ input[type=range]{accent-color:var(--proof)}
 .rosterhead .tools{display:flex;margin-left:auto;margin-right:6px}
 .rosterhead .tools .icon{padding:5px;display:grid;place-items:center}
 .rosterhead .tools svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.leadtag{font-size:11px;font-weight:700;color:var(--proof);border:1px solid var(--proof);border-radius:5px;padding:0 5px;margin-left:6px;align-self:center}

@@ -364,9 +364,11 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 if len(what) == 3 and what[0] == "agents" and method == "POST" and what[2] == "resume":
                     return 201, {"spawned": spawner.resume(pid, what[1])}
                 if len(what) == 3 and what[0] == "agents" and method == "POST" \
-                        and what[2] in ("remove", "readd", "role", "personality", "forget", "rename"):
+                        and what[2] in ("remove", "readd", "role", "personality", "forget", "rename", "lead"):
                     data = self.body()
-                    if what[2] in ("role", "personality"):
+                    if what[2] == "lead":
+                        store.set_lead(pid, what[1], data.get("lead"))
+                    elif what[2] in ("role", "personality"):
                         store.set_personality(pid, what[1], data.get(what[2]))
                     elif what[2] == "rename":
                         new = store.rename(pid, what[1], data.get("name"))

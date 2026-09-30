@@ -233,7 +233,8 @@ function drawRoster(){
     return [el('h3','',title+' ('+g.length+')'),...g.map(a=>{const d=who(el('div','a '+a.status),a.name);
       const sub=a.starting?'starting…':a.resuming?'resuming…':a.model?a.model:a.kind==='opencode'?'OpenCode '+((spawned.find(s=>s.token===a.spawn)||{}).model||''):KIND[a.kind]||a.kind;
       d.title=a.error?'Offline: '+a.error:'Click or right-click for options';
-      d.append(avatar(a.name),el('b','',a.starting?'new '+a.name:a.name),
+      const nm=el('b','',a.starting?'new '+a.name:a.name);if(a.lead)nm.append(el('span','leadtag','lead'));
+      d.append(avatar(a.name),nm,
         el('small','',sub+(a.last_seen&&['offline','removed'].includes(a.status)?', seen '+ago(a.last_seen):'')));
       if(a.personality)d.append(el('span','pers',a.personality));
       const doing=(boardData?boardData.cards:[]).filter(c=>c.assignee===a.name&&c.column==='doing'&&c.kind!=='epic');
@@ -265,7 +266,9 @@ function agentItems(a){
   if(a.status==='offline'&&!a.spawn&&(a.kind==='claude'||a.kind==='codex'||a.kind==='opencode'))
     items.push(['Resume',async()=>{await api(agentPath(a,'resume'),{});return `Resuming ${a.name}…`;}]);
   if(a.starting)return items;
-  if(!a.starting&&a.status!=='removed')items.push(['Picture…',()=>openProfile(cur,a.name)]);
+  if(!a.starting&&a.status!=='removed')items.push(['Picture…',()=>openProfile(cur,a.name)],
+    [a.lead?'Stop being the lead':'Make the lead',async()=>{await api(agentPath(a,'lead'),{lead:!a.lead});refresh();
+      return a.lead?`No lead: your messages go to every agent again.`:`${a.name} leads: your messages without @names go to ${a.name} alone.`;}]);
   items.push(['Rename',async()=>{const n=await ask({title:'Rename '+a.name,label:'New name',value:a.name,
     help:"a-z, 0-9 and '-'. Its color, personality and board cards move along, and its running session keeps working."});
     if(n&&n.trim().toLowerCase()!==a.name){await api(agentPath(a,'rename'),{name:n.trim()});return `${a.name} is now ${n.trim().toLowerCase()}.`;}}]);
@@ -311,12 +314,15 @@ addEventListener('keydown',e=>{if(e.key==='Escape'){menu.hidden=true;ac.hidden=t
 const lead=text=>((text.match(/^\s*(@[\w-]+[,:]?\s*)+/)||[''])[0].match(/@[\w-]+/g)||[]).map(x=>x.slice(1).toLowerCase());
 function addressees(){return lead(t.value);}
 function hint(){
-  const to=addressees(),live=agents.filter(a=>a.status!=='removed');
+  const to=addressees(),live=agents.filter(a=>a.status!=='removed'),leader=(live.find(a=>a.lead)||{}).name;
   const line=$('to');
+  t.placeholder=leader?`Message ${leader} (the lead), or start with @name`:'Message everyone, or start with @name';
   if(t.value.startsWith('/')&&!t.value.startsWith('//'))line.textContent='Command: Enter runs it. Press ? for the list.';
   else if(dmTo)line.textContent=`Private: only ${dmTo} reads it; the other agents never see it.`;
+  else if(to.includes('all'))line.textContent=`To everyone: ${live.map(a=>a.name).join(', ')} may answer.`;
   else if(to.length){line.replaceChildren('To ');to.forEach((n,i)=>line.append(i?', ':'',who(el('span','',n),n)));
-    line.append('. The others read it but do not answer.');}
+    line.append(leader?'. Only they wake for it.':'. The others read it but do not answer.');}
+  else if(leader){line.replaceChildren('To ',who(el('span','',leader),leader),', the lead: they answer or hand it on. @all reaches everyone.');}
   else line.textContent=live.length?`To everyone: ${live.map(a=>a.name).join(', ')} may answer.`:'';
   $('hint').textContent=agents.filter(a=>to.includes(a.name)&&a.status!=='waiting').map(a=>
     a.status==='busy'?`${a.name} is working and will see this when its current task ends.`:

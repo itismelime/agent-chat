@@ -90,4 +90,7 @@ def summary(rules):
 def standing(store, pid):
     """What agents get with every wake: the rules, then the pinned messages."""
     from . import pins
-    return " ".join(x for x in (summary(get(store, pid)), pins.summary(store, pid)) if x)
+    lead = store.lead(pid)
+    line = ("The lead is %s: the user's messages without @names go to %s alone, who answers or "
+            "hands the work on with @name; @all reaches everyone." % (lead, lead)) if lead else ""
+    return " ".join(x for x in (line, summary(get(store, pid)), pins.summary(store, pid)) if x)
