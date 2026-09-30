@@ -367,3 +367,5 @@ border-radius:0;background:var(--soft)}#profilebtn:hover{background:var(--line)}
 #profile .status .views{justify-self:start}#profile .status small{grid-column:2;font-size:12px}
 ::selection{background:var(--proof-bg)}
 input[type=range]{accent-color:var(--proof)}
+#answercount.rise,#answerchip.rise{animation:rise .9s ease-out}
+@keyframes rise{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--attn) 70%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
