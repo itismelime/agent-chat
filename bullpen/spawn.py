@@ -67,23 +67,20 @@ def available():
 
 def claude_session(path, name, home=None):
     """The id of the Claude Code session in this project that took the chat
-    name: the newest session log under ~/.claude/projects whose chat_join or
-    chat_rename set it. None if there is none."""
+    name: the newest session log under ~/.claude/projects where a chat_join or
+    chat_rename gave it that name (the reply, not the call: a join refused because
+    the name was taken tried it too). None if there is none."""
     # ponytail: a name set with `bullpen rename` from a shell is not found; the
     # MCP tools are what agents use.
     root = Path(home or Path.home()) / ".claude" / "projects"
     slug = re.sub(r"[^A-Za-z0-9]", "-", str(path))
-    # sessions from before the rename used the MCP server name agent-chat
-    needles = ['"name":"mcp__%s__chat_%s","input":{"name":%s' % (server, tool, json.dumps(name))
-               for server in ("bullpen", "agent-chat")
-               for tool in ("join", "rename")]
+    took = re.compile(r"Joined [^\n]{1,200}? as %s\. |You are now %s \(was " % (re.escape(name), re.escape(name)))
     best = None
     for d in root.glob(slug + "*"):  # the folder and its subfolders
         for f in d.glob("*.jsonl"):
             try:
                 mtime = f.stat().st_mtime
-                if (best is None or mtime > best[0]) and any(n in f.read_text(errors="replace")
-                                                              for n in needles):
+                if (best is None or mtime > best[0]) and took.search(f.read_text(errors="replace")):
                     best = (mtime, f.stem)
             except OSError:
                 continue

@@ -434,8 +434,14 @@ class SpawnerTest(unittest.TestCase):
         path = self.store.project("proj")["path"]
         logs = home / ".claude" / "projects" / re.sub(r"[^A-Za-z0-9]", "-", path)
         logs.mkdir(parents=True)
-        (logs / "s-alice.jsonl").write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"alice"}}\n')
-        (logs / "s-bob.jsonl").write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"bob"}}\n')
+        (logs / "s-alice.jsonl").write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"alice"}}\n'
+                                            '{"content":"Joined proj as alice. "}\n')
+        # bob tried alice first (taken, refused), then joined as bob: alice's session is still s-alice
+        (logs / "s-bob.jsonl").write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"alice"}}\n'
+                                          '{"content":"name alice is taken"}\n'
+                                          '{"name":"mcp__bullpen__chat_join","input":{"name":"bob"}}\n'
+                                          '{"content":"Joined proj as bob. "}\n')
+        os.utime(logs / "s-bob.jsonl", (time.time() + 60, time.time() + 60))  # the newer log
         self.store.join("proj", "alice", "claude")
         with self.assertRaises(StoreError) as e:  # just joined: not offline
             self.sp.resume("proj", "alice")
