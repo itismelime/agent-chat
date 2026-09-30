@@ -532,6 +532,7 @@ class Store:
                             "status": status, "spawn": token, "model": a.get("model"),
                             "last_seen": a["last_seen"],
                             "role": a.get("role"), "personality": a.get("role"), "lead": bool(a.get("lead")),
+                            "activity": self.local.get((pid, name), {}).get("activity") if status == "busy" else None,
                             "error": self.local.get((pid, name), {}).get("error")
                             if a.get("model") else None})
         return out

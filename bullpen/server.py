@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import avatars, mcp, pins, profile, prs, reactions, removal, rules, spawn, talk, usage
+from . import avatars, mcp, pins, plan, profile, prs, reactions, removal, rules, spawn, talk, usage
 from .board import Board
 from .client import Client
 from .codex import Deliverer
@@ -195,6 +195,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 if project is None:
                     raise StoreError(404, "not in a registered project")
                 return 200, {"project": project}
+            if rest == ["plan"] and method == "GET":  # your Claude plan's windows (plan.py)
+                return 200, {"plan": plan.get(store.root)}
             if rest == ["folders"] and method == "GET":  # the Add a project browser: folder names only
                 return 200, folders(query.get("path") or os.path.expanduser("~"))
             if rest == ["profile"] and method == "GET":

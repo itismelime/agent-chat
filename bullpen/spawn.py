@@ -6,6 +6,7 @@ project path or typed text cannot run anything.
 import json
 import re
 import secrets
+import shlex
 import shutil
 import subprocess
 import sys
@@ -27,6 +28,9 @@ MAX_TEXT = 2000
 PASTE_PAUSE = 0.5
 SCREEN_LINES = 25
 ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+# Claude Code's spinner, just above its prompt box: "✶ Metamorphosing… (4s · ↓ 86 tokens · thinking)",
+# "✻ Compacting conversation… (3s)"; its verb is random, "…" and the glyph are not
+SPINNER = re.compile(r"^\s*[^\w\s\u276f\u2500\u2502]\s+([A-Z][^\u2026]*)\u2026(?:.*\((.*)\))?\s*$")
 JOIN_GRACE = 60   # seconds a start may take to join before it needs the user
 POLL_SECONDS = 2
 # A screen that asks something: menu footers and question lines from real
@@ -117,9 +121,18 @@ def start(tool, path, session, token, model=None, config_home=None, data_home=No
         prompt = PROMPT + (" with a name that fits your personality: %s" % personality
                            if personality else "")
         command = [tool, prompt if tool == "claude" else "%s (start %s)" % (prompt, token)]
+    if tool == "claude":  # its statusline keeps your plan's limits for the page (plan.py)
+        command[1:1] = ["--settings", claude_settings()]
     r = tmux("new-session", "-d", "-s", session, "-c", path, *env, "--", *command)
     if r.returncode:
         raise StoreError(503, "tmux could not start it: %s" % r.stderr.strip())
+
+
+def claude_settings():
+    """Settings added to a Claude started here: bullpen's statusline, which shows yours."""
+    chat = Path(__file__).resolve().parent.parent / "bin" / "bullpen"
+    cmd = "%s %s statusline" % (shlex.quote(sys.executable), shlex.quote(str(chat)))
+    return json.dumps({"statusLine": {"type": "command", "command": cmd, "refreshInterval": 60}})
 
 
 def alive(session):
@@ -171,6 +184,23 @@ def opencode_state(text):
     return "idle" if "ctrl+p" in foot else "unknown"
 
 
+def claude_activity(text):
+    """What Claude is doing from the spinner above its prompt box: compacting,
+    thinking, working, or None when there is no spinner (idle, or not drawn yet)."""
+    lines = [ANSI.sub("", l) for l in text.rstrip().splitlines()[-SCREEN_LINES:]]
+    at = next((i for i in range(len(lines) - 1, -1, -1) if "\u276f" in lines[i]), None)
+    if at is None:
+        return None
+    above = [l for l in lines[max(0, at - 6):at] if l.strip() and not set(l.strip()) <= {"\u2500"}][-3:]
+    for line in reversed(above):
+        m = SPINNER.match(line)
+        if m:
+            if m.group(1).startswith("Compacting"):
+                return "compacting"
+            return "thinking" if "thinking" in (m.group(2) or "") else "working"
+    return None
+
+
 def claude_state(text):
     """Claude Code's state from a screen captured with colors (capture-pane -e): idle
     when its prompt line is empty or shows only the dim placeholder, never with a
@@ -179,7 +209,7 @@ def claude_state(text):
     plain = "\n".join(ANSI.sub("", l) for l in lines)
     if needs_you(plain):
         return "question"
-    if "esc to interrupt" in plain.lower():
+    if "esc to interrupt" in plain.lower() or claude_activity(text):
         return "working"
     prompt = next((l for l in reversed(lines) if "\u276f" in l), None)  # ❯
     if prompt is None:
@@ -343,9 +373,11 @@ class Spawner:
                         need = self._type_unread(pid, r, opencode_state(text))
                     elif r["tool"] == "claude":  # no wait loop: messages are typed in when idle
                         try:
-                            need = self._type_unread(pid, r, claude_state(screen(r["session"], colors=True)))
+                            colored = screen(r["session"], colors=True)
                         except StoreError:
                             continue
+                        self._activity(pid, r["name"], claude_activity(colored))
+                        need = self._type_unread(pid, r, claude_state(colored))
                 self.store.set_needs(pid, token, need)
 
     def _rescue(self, pid, token, r):
@@ -379,6 +411,16 @@ class Spawner:
             send_text(self.store.spawned(pid)[token]["session"],
                       "[chat] %s (Your tool call came out as text; bullpen ran it for you.)" % note)
         return self.store.update_spawned(pid, token, **fields)
+
+    def _activity(self, pid, name, activity):
+        """Show what it is doing in the roster; after a compaction its summary may have
+        dropped the rules, so they ride along with its next message again."""
+        was = self.store.local.get((pid, name), {}).get("activity")
+        if was == "compacting" and activity != "compacting":
+            with self.store.changed:
+                if name in self.store.agents(pid):
+                    self.store._update(pid, name, told=None)
+        self.store.set_local(pid, name, activity=activity)
 
     def _type_unread(self, pid, r, state):
         """Type the oldest unread message that wakes this OpenCode or Claude agent, if
