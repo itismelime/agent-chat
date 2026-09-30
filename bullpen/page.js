@@ -13,7 +13,8 @@ function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className
 function btn(text,fn,cls){const b=el('button',cls||'',text);b.type='button';b.onclick=fn;return b;}
 // a name's own color and avatar, the same in chat, Agents and Needs an answer: per project, agents get
 // distinct hues in join order (other names hash to one), and a renamed agent's old name shows as its new one
-const HUES=[250,25,145,300,75,195,345,110,225,50,170,275];let huesBy={},renamesBy={},agentsBy={};
+const HUES=[250,145,300,75,195,320,110,225,165,275,90,205];  // no reds: red means an agent needs you
+let huesBy={},renamesBy={},agentsBy={};
 function hash(name){let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return h;}
 function current(name,pid=cur){const r=renamesBy[pid]||{},seen=new Set();
   while(name in r&&!seen.has(name)){seen.add(name);name=r[name];}return name;}
@@ -103,6 +104,7 @@ $('projects').ondrop=e=>{e.preventDefault();const d=e.target.closest('.p');if(!d
   const ids=projects.map(p=>p.id).filter(x=>x!==dragging),at=ids.indexOf(d.dataset.id)+(d.classList.contains('dropafter')?1:0);
   ids.splice(at,0,dragging);saveOrder(ids);};
 function render(){
+  if(typeof drawMe==='function')drawMe();
   $('projects').replaceChildren(...projects.map((p,i)=>{
     const d=el('div','p'+(p.id===cur?' on':'')+(p.missing?' missing':''));
     d.title=p.path+(p.missing?' (folder missing)':'');d.append(el('span','pn',p.name));
@@ -362,13 +364,13 @@ $('f').onsubmit=async e=>{e.preventDefault();
   grow();hint();refresh();};
 
 // dialogs: ask() for text, close buttons, the terminal
-function ask({title,label,value='',multiline=false,presets=[],help='',placeholder=''}){
+function ask({title,label,value='',multiline=false,presets=[],help='',placeholder='',extra=null}){
   const d=$('ask'),input=multiline?$('askarea'):$('askinput');
   $('asktitle').textContent=title;$('asklabel').textContent=label;$('asklabel').htmlFor=input.id;$('askhelp').textContent=help;
   $('askinput').hidden=multiline;$('askarea').hidden=!multiline;input.value=value;input.placeholder=placeholder;
   $('askpresets').replaceChildren(...presets.map(([n,text])=>{const b=btn(n,()=>{input.value=text;mark();input.focus();},'ghost');return b;}));
   const mark=()=>[...$('askpresets').children].forEach((b,i)=>b.classList.toggle('on',presets[i][1]===input.value));
-  input.oninput=mark;mark();
+  input.oninput=mark;mark();$('askextra').replaceChildren(...(extra?[extra(input)]:[]));
   d.returnValue='';d.showModal();input.focus();input.select();
   input.onkeydown=e=>{if(multiline&&e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();d.close('ok');}};
   return new Promise(res=>d.addEventListener('close',()=>res(d.returnValue==='ok'?input.value:null),{once:true}));}
@@ -394,9 +396,18 @@ $('term').addEventListener('close',()=>{termToken=null;clearInterval(termTimer);
 $('term').addEventListener('cancel',e=>{if(document.activeElement===$('ti')&&$('ti').value)e.preventDefault();});
 $('tf').onsubmit=e=>{e.preventDefault();const text=$('ti').value;if(!text)return;$('ti').value='';sendKeys({text});};
 
+function folderBrowser(input){  // Add a project: click through folders; the one open is the path
+  const box=el('div','folders'),at=el('div','fat'),list=el('div','flist');box.append(at,list);
+  const go=async path=>{try{const r=await api('api/folders'+(path?'?path='+encodeURIComponent(path):''));
+      if(path)input.value=r.path;at.textContent=r.path;
+      list.replaceChildren(...(r.parent?[btn('..',()=>go(r.parent),'ghost up')]:[]),
+        ...r.folders.map(f=>btn(f.name,()=>go(f.path),'ghost')));
+      if(!r.folders.length)list.append(el('p','fmute','No folders inside.'));}
+    catch(e){at.textContent=e.message;}};
+  go('');return box;}
 $('add').onclick=async()=>{
   const path=await ask({title:'Add a project',label:'Project folder',placeholder:'/home/you/code/project',
-    help:'An absolute path. Each project gets its own chat and board.'});
+    help:'Type an absolute path, or open folders below. Each project gets its own chat and board.',extra:folderBrowser});
   if(!path||!path.trim())return;
   try{const r=await api('api/projects',{path:path.trim()});select(r.project.id);
     say(r.existing?`${r.project.name} already exists; opened it.`:`Added ${r.project.name}.`);

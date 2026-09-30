@@ -34,8 +34,24 @@ ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "te
           "reactions.js": "text/javascript", "emoji-data.js": "text/javascript",
           "emoji.js": "text/javascript", "pins.js": "text/javascript",
           "removal.js": "text/javascript", "avatars.js": "text/javascript", "profile.js": "text/javascript",
-          "away.js": "text/javascript", "prchips.js": "text/javascript"}
+          "away.js": "text/javascript", "prchips.js": "text/javascript",
+          "schibsted-grotesk.woff2": "font/woff2"}
 TCP_TABLE = "/proc/net/tcp"
+MAX_FOLDERS = 500
+
+
+def folders(path):
+    """A folder's own folders (hidden ones left out), for picking a project folder."""
+    p = Path(path).expanduser()
+    if not p.is_absolute() or not p.is_dir():
+        raise StoreError(400, "not an existing absolute folder: %s" % path)
+    p = p.resolve()
+    try:
+        names = sorted((e.name for e in os.scandir(p) if not e.name.startswith(".") and e.is_dir()), key=str.lower)
+    except PermissionError:
+        raise StoreError(403, "no permission to list %s" % p) from None
+    return {"path": str(p), "parent": str(p.parent) if p.parent != p else None,
+            "folders": [{"name": n, "path": str(p / n)} for n in names[:MAX_FOLDERS]]}
 MAX_BODY = 20000
 MAX_FILE = 5_000_000
 # raw images for the file viewer; never SVG: the page shows them from blob: URLs of its own origin,
@@ -159,7 +175,7 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
             if method == "GET" and parts == ["favicon.svg"]:
                 return 200, FAVICON.read_bytes(), "image/svg+xml"
             if method == "GET" and len(parts) == 1 and parts[0] in ASSETS:
-                return 200, PAGE.with_name(parts[0]).read_bytes(), ASSETS[parts[0]] + "; charset=utf-8"
+                return 200, PAGE.with_name(parts[0]).read_bytes(), ASSETS[parts[0]] + ("" if parts[0].endswith(".woff2") else "; charset=utf-8")
             if parts[:1] != ["api"]:
                 raise StoreError(404, "not found")
             rest = parts[1:]
@@ -179,11 +195,27 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 if project is None:
                     raise StoreError(404, "not in a registered project")
                 return 200, {"project": project}
+            if rest == ["folders"] and method == "GET":  # the Add a project browser: folder names only
+                return 200, folders(query.get("path") or os.path.expanduser("~"))
             if rest == ["profile"] and method == "GET":
-                return 200, dict(profile.get(store), for_agents=profile.for_agents(store))
+                return 200, dict(profile.get(store), for_agents=profile.for_agents(store),
+                                 avatar=avatars.version(store, None, "user"))
+            if rest[:2] == ["avatars", "user"] and len(rest) in (2, 3):  # your picture, the same in every project
+                if len(rest) == 2 and method == "GET":
+                    return (200, *avatars.load(store, None, "user"))
+                if len(rest) == 2 and method == "POST":
+                    data = self.body(limit=avatars.MAX_BYTES * 4 // 3 + 1000)
+                    avatars.save_base64(store, None, "user", data.get("data"))
+                elif rest[2:] == ["delete"] and method == "POST":
+                    avatars.remove(store, None, "user")
+                elif rest[2:] == ["crop"] and method == "POST":
+                    avatars.set_crop(store, None, "user", self.body())
+                else:
+                    raise StoreError(404, "not found")
+                return 200, {"avatar": avatars.version(store, None, "user")}
             if rest == ["profile"] and method == "POST":
                 data = self.body()
-                return 200, profile.save(store, data.get("name"), data.get("about"))
+                return 200, profile.save(store, data.get("name"), data.get("about"), data.get("away"))
             if rest == ["pr"] and method == "GET":  # a PR link's chip: state and checks, via gh
                 return 200, prs.state(query.get("repo"), query.get("n", ""))
             if rest == ["tools"] and method == "GET":

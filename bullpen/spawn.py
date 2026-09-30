@@ -365,7 +365,7 @@ class Spawner:
         agent = self.store.agents(pid).get(name)
         if not agent or agent.get("removed") or agent.get("gone"):
             return state == "question"
-        unread = [m for m in self.store.messages(pid, agent["cursor"]) if wakes(m, name)]
+        unread = [m for m in self.store.messages(pid, agent["cursor"]) if wakes(m, name, self.store.away())]
         if state == "idle" and unread:
             from . import rules
             send_text(r["session"], format_message(unread[0], name, agent.get("role"),

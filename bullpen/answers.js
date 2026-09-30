@@ -3,6 +3,7 @@
 // project, oldest first, until you post to that agent or to everyone after it, or answer or dismiss them
 // here. Answers to a private message stay private. When a
 // question lists options (A) B) C), Option 1: …) they become choices: ↑/↓ and Enter, or the letter.
+let answersSeen=null;  // how many questions the last draw showed
 let dismissed=saved.get('dismissed',{}),answerKey='',answersMin=saved.get('answersMin',false);
 const answerNodes=new Map();
 function pending(){const out=[];
@@ -31,6 +32,8 @@ function drawAnswers(){
   if(list.length>answerCount&&answerCount>=0&&key!==answerKey&&answerKey!==''){answersMin=false;saved.set('answersMin',false);}
   answerCount=list.length;
   $('answers').hidden=!list.length||answersMin;$('answercount').textContent=String(list.length);
+  if(answersSeen!==null&&list.length>answersSeen)for(const b of [$('answercount'),$('answerchip')]){b.classList.remove('rise');void b.offsetWidth;b.classList.add('rise');}
+  answersSeen=list.length;  // a new question: one red pulse, the only motion that is not yours
   $('answerchip').hidden=!list.length||!answersMin;
   $('answerchip').textContent=list.length+(list.length===1?' needs an answer':' need an answer');
   if(key===answerKey)return;answerKey=key;

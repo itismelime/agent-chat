@@ -204,6 +204,20 @@ class StoreTest(unittest.TestCase):
         self.assertEqual([m["text"] for m in self.store.wait(self.pid, "alice", 1)["messages"]],
                          ["@carol not you", "@alice you"])
 
+    def test_away_agents_sleep_until_the_user_writes_or_comes_back(self):
+        from bullpen import profile
+        self.store.join(self.pid, "alice", "claude")
+        self.store.join(self.pid, "bob", "codex")
+        profile.save(self.store, away=True)
+        self.store.post(self.pid, "bob", "@alice you")
+        self.assertIsNone(self.store.wait(self.pid, "alice", 0.2))
+        threading.Timer(0.2, profile.save, args=(self.store,), kwargs={"away": False}).start()
+        self.assertEqual([m["text"] for m in self.store.wait(self.pid, "alice", 5)["messages"]], ["@alice you"])
+        profile.save(self.store, away=True)
+        self.store.post(self.pid, "user", "still wakes")
+        self.assertEqual([m["text"] for m in self.store.wait(self.pid, "alice", 1)["messages"]], ["still wakes"])
+        self.assertTrue(profile.get(self.store)["away"])
+
     def test_wait_for_a_gone_client_keeps_messages(self):
         self.store.join(self.pid, "alice", "claude")
         threading.Timer(0.2, self.store.post, args=(self.pid, "user", "@alice important")).start()

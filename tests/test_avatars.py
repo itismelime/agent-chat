@@ -36,6 +36,16 @@ class AvatarsTest(unittest.TestCase):
         self.c.call("POST", self.base + "ally/delete", {})
         self.assertEqual(set(self.c.call("GET", "/api/projects/proj/agents")[1]["avatars"]), {"user"})
 
+    def test_your_picture_needs_no_project(self):
+        data = base64.b64encode(png()).decode()
+        self.assertIsNone(self.c.call("GET", "/api/profile")[1]["avatar"])
+        self.assertIsNone(self.c.call("POST", "/api/avatars/user", {"data": data})[1]["avatar"]["crop"])
+        got = self.c.call("POST", "/api/avatars/user/crop", {"x": 0, "y": 0, "w": 1, "h": 1})[1]["avatar"]
+        self.assertEqual(got["crop"]["w"], 1.0)
+        self.assertEqual(self.c.call("GET", "/api/profile")[1]["avatar"], got)
+        self.assertIn("user", self.c.call("GET", "/api/projects/proj/agents")[1]["avatars"])  # the same picture
+        self.assertIsNone(self.c.call("POST", "/api/avatars/user/delete", {})[1]["avatar"])
+
     def test_crop_and_profile(self):
         data = base64.b64encode(png()).decode()
         self.c.call("POST", self.base + "user", {"data": data})
