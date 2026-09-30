@@ -1,5 +1,4 @@
 import json
-import os
 import re
 import tempfile
 import unittest
@@ -15,8 +14,6 @@ def line(**usage_):
 class UsageTest(unittest.TestCase):
     def setUp(self):
         self.home = Path(tempfile.mkdtemp())
-        old, os.environ["HOME"] = os.environ["HOME"], str(self.home)
-        self.addCleanup(os.environ.__setitem__, "HOME", old)
 
     def test_claude_log_read_incrementally(self):
         proj = "/work/proj"
@@ -26,11 +23,11 @@ class UsageTest(unittest.TestCase):
         f.write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"alice"}}\n'
                      + line(input_tokens=2, cache_read_input_tokens=1000, cache_creation_input_tokens=500,
                             output_tokens=40))
-        self.assertEqual(usage.claude(proj, "alice"), {"ctx": 1502, "out": 40, "model": "claude-x"})
+        self.assertEqual(usage.claude(proj, "alice", self.home), {"ctx": 1502, "out": 40, "model": "claude-x"})
         with open(f, "a") as fh:  # a new turn, and half a line still being written
             fh.write(line(input_tokens=3, cache_read_input_tokens=2000, output_tokens=60) + '{"type": "assis')
-        self.assertEqual(usage.claude(proj, "alice"), {"ctx": 2003, "out": 100, "model": "claude-x"})
-        self.assertIsNone(usage.claude(proj, "bob"))
+        self.assertEqual(usage.claude(proj, "alice", self.home), {"ctx": 2003, "out": 100, "model": "claude-x"})
+        self.assertIsNone(usage.claude(proj, "bob", self.home))
 
     def test_codex_rollout(self):
         d = self.home / ".codex" / "sessions" / "2026" / "09" / "30"
@@ -40,9 +37,9 @@ class UsageTest(unittest.TestCase):
             "model_context_window": 258400},
             "rate_limits": {"primary": {"used_percent": 96.0}, "secondary": {"used_percent": 25.0}}}}
         (d / "rollout-2026-09-30T08-00-00-t-1.jsonl").write_text('{"type":"x"}\n' + json.dumps(ev) + "\n")
-        self.assertEqual(usage.codex("t-1"), {"ctx": 117000, "window": 258400, "total": 900000,
+        self.assertEqual(usage.codex("t-1", self.home), {"ctx": 117000, "window": 258400, "total": 900000,
                                              "limits": {"primary": 96.0, "secondary": 25.0}})
-        self.assertIsNone(usage.codex("nope"))
+        self.assertIsNone(usage.codex("nope", self.home))
 
     def test_local_model(self):
         class Ollama:
