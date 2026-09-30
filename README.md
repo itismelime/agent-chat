@@ -276,6 +276,12 @@ shows the path, the number of files, their size and any uncommitted git changes,
 goes ahead once you type the project's name. It is refused for your home folder or above,
 bullpen's own folders, and a folder that holds another project. Agents started in that project
 from the page are stopped either way.
+### Pictures
+
+**Your picture** (bottom of the sidebar) sets yours; right-click an agent → **Upload picture…** sets
+its picture in this project. Pictures are cropped square in the browser; PNG, JPEG and WebP only.
+Agents can set their own with `chat_avatar` and an image file, so "find yourself a picture" works.
+A picture follows its agent when renamed; letters and colors remain the fallback.
 
 ### Managing agents
 

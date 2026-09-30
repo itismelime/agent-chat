@@ -62,6 +62,10 @@ TOOLS = [
                      "properties": {"n": {"type": "integer"},
                                     "emoji": {"type": "string",
                                               "enum": ["👍", "✅", "👀", "❤️", "🎉", "🙏", "😄", "👎"]}}}},
+    {"name": "chat_avatar",
+     "description": "Set your picture in the chat from an image file (PNG, JPEG or WebP, at most "
+                    "1 MB; a square one looks best). path: absolute, or relative to the project folder.",
+     "inputSchema": {"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}}}},
     {"name": "chat_read",
      "description": "Chat messages you have not seen yet.",
      "inputSchema": {"type": "object", "properties": {}}},
@@ -260,7 +264,7 @@ class Session:
                 if body["agent"].get("personality"):
                     joined += "Your personality: %s. " % body["agent"]["personality"].rstrip(".")
                 return "%s%s\n\nRecent messages:\n%s" % (joined, how, recent), False
-            if tool not in ("chat_post", "chat_read", "chat_rename", "chat_react") + BOARD_TOOLS:
+            if tool not in ("chat_post", "chat_read", "chat_rename", "chat_react", "chat_avatar") + BOARD_TOOLS:
                 return "unknown tool: %s" % tool, True
             if not self.name:
                 return "call chat_join first", True
@@ -275,6 +279,18 @@ class Session:
                     text += (" A bullpen wait still running as %s keeps working; start the next one "
                              "as:\n%s" % (old, self.wait_command()))
                 return text, False
+            if tool == "chat_avatar":
+                import base64
+                f = Path(self.project["path"]) / str(args.get("path", ""))  # an absolute path stays as it is
+                try:
+                    data = f.read_bytes() if f.is_file() and f.stat().st_size <= 1_000_000 else None
+                except OSError:
+                    data = None
+                if data is None:
+                    return "no image file of at most 1 MB at %s" % f, True
+                self.client.call("POST", "/api/projects/%s/avatars/%s" % (pid, self.name),
+                                 {"data": base64.b64encode(data).decode()})
+                return "your picture is set", False
             if tool == "chat_react":
                 n = args.get("n")
                 if not isinstance(n, int) or isinstance(n, bool):

@@ -18,6 +18,8 @@ from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
 from . import mcp, pins, reactions, removal, rules, spawn, talk, usage
+from . import mcp, pins, reactions, rules, spawn, talk, usage
+from . import avatars, mcp, pins, reactions, rules, spawn, talk
 from .board import Board
 from .client import Client
 from .codex import Deliverer
@@ -34,6 +36,7 @@ ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "te
           "reactions.js": "text/javascript", "emoji-data.js": "text/javascript",
           "emoji.js": "text/javascript", "pins.js": "text/javascript",
           "removal.js": "text/javascript"}
+          "avatars.js": "text/javascript"}
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 MAX_FILE = 5_000_000
@@ -93,12 +96,12 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
             except (BrokenPipeError, ConnectionResetError):
                 pass  # the client went away, e.g. a killed bullpen wait
 
-        def body(self):
+        def body(self, limit=MAX_BODY):
             if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
                 raise StoreError(415, "the body must be application/json")
             length = int(self.headers.get("Content-Length") or 0)
-            if not 0 < length <= MAX_BODY:
-                raise StoreError(413, "the body must be 1-%d bytes" % MAX_BODY)
+            if not 0 < length <= limit:
+                raise StoreError(413, "the body must be 1-%d bytes" % limit)
             try:
                 data = json.loads(self.rfile.read(length))
             except ValueError:
@@ -231,7 +234,17 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         removal.forget(store, pid)
                     return 200, {"projects": store.projects()}
                 if what == ["agents"] and method == "GET":
-                    return 200, {"agents": store.status(pid), "renames": store.renames(pid)}
+                    return 200, {"agents": store.status(pid), "renames": store.renames(pid),
+                                 "avatars": avatars.versions(store, pid)}
+                if what[:1] == ["avatars"] and len(what) in (2, 3):  # pictures: you ("user") and agents
+                    name = "user" if what[1] == "user" else store.resolve(pid, what[1])
+                    if len(what) == 2 and method == "GET":
+                        return (200, *avatars.load(store, pid, name))
+                    if len(what) == 2 and method == "POST":
+                        data = self.body(limit=avatars.MAX_BYTES * 4 // 3 + 1000)
+                        return 200, {"avatars": avatars.save_base64(store, pid, name, data.get("data"))}
+                    if what[2:] == ["delete"] and method == "POST":
+                        return 200, {"avatars": avatars.remove(store, pid, name)}
                 if what == ["agents"] and method == "POST":
                     data = self.body()
                     agent = store.join(pid, self.field(data, "name"), self.field(data, "kind"),
@@ -317,7 +330,9 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     if what[2] in ("role", "personality"):
                         store.set_personality(pid, what[1], data.get(what[2]))
                     elif what[2] == "rename":
-                        board.rename(pid, what[1], store.rename(pid, what[1], data.get("name")))
+                        new = store.rename(pid, what[1], data.get("name"))
+                        board.rename(pid, what[1], new)
+                        avatars.rename(store, pid, what[1], new)
                     elif what[2] == "forget":
                         store.forget(pid, what[1])
                         board.unassign(pid, what[1])

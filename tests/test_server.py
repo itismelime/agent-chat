@@ -425,6 +425,7 @@ class ModelRoutesTest(unittest.TestCase):
                                     ("emoji-data.js", "🚀".encode(), "text/javascript"),
                                     ("pins.js", b"function drawPins", "text/javascript"),
                                     ("removal.js", b"function projectMenu", "text/javascript")]:
+                                    ("avatars.js", b"function decorateAvatar", "text/javascript")]:
             conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
             conn.request("GET", "/" + name)
             r = conn.getresponse()
