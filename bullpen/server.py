@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import mcp, pins, reactions, rules, spawn, talk, usage
+from . import mcp, pins, reactions, removal, rules, spawn, talk, usage
 from .board import Board
 from .client import Client
 from .codex import Deliverer
@@ -32,7 +32,8 @@ ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "te
           "markdown.js": "text/javascript", "answers.js": "text/javascript",
           "format.js": "text/javascript", "rules.js": "text/javascript",
           "reactions.js": "text/javascript", "emoji-data.js": "text/javascript",
-          "emoji.js": "text/javascript", "pins.js": "text/javascript"}
+          "emoji.js": "text/javascript", "pins.js": "text/javascript",
+          "removal.js": "text/javascript"}
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 MAX_FILE = 5_000_000
@@ -218,6 +219,17 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                     return 201, {"message": m}
                 if what == ["usage"] and method == "GET":
                     return 200, {"usage": usage.for_project(store, models, pid)}
+                if what == ["removal"] and method == "GET":  # for the warning before the Trash
+                    return 200, removal.info(store, pid)
+                if what == ["remove"] and method == "POST":
+                    data = self.body()
+                    for token in list(store.spawned(pid)):  # its agents started from the page end with it
+                        spawner.stop(pid, token)
+                    if data.get("trash") is True:
+                        removal.trash(store, pid, data.get("confirm"))
+                    else:
+                        removal.forget(store, pid)
+                    return 200, {"projects": store.projects()}
                 if what == ["agents"] and method == "GET":
                     return 200, {"agents": store.status(pid), "renames": store.renames(pid)}
                 if what == ["agents"] and method == "POST":

@@ -423,7 +423,8 @@ class ModelRoutesTest(unittest.TestCase):
                                     ("favicon.svg", b"<svg", "image/svg+xml"),
                                     ("emoji.js", b"function openPicker", "text/javascript"),
                                     ("emoji-data.js", "🚀".encode(), "text/javascript"),
-                                    ("pins.js", b"function drawPins", "text/javascript")]:
+                                    ("pins.js", b"function drawPins", "text/javascript"),
+                                    ("removal.js", b"function projectMenu", "text/javascript")]:
             conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
             conn.request("GET", "/" + name)
             r = conn.getresponse()

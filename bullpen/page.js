@@ -108,7 +108,7 @@ function render(){
     const n=unread(p),ask=(spawnedBy[p.id]||[]).filter(s=>s.state==='needs_you').length;
     if(ask){const b=el('span','badge need','!');b.title=ask+' agent'+(ask>1?'s':'')+' waiting for you in the terminal';d.append(b);}
     if(n)d.append(el('span','badge',String(n)));else if(i<9&&!ask)d.append(el('kbd','','Alt+'+(i+1)));
-    d.onclick=()=>select(p.id);d.draggable=true;d.dataset.id=p.id;return d;}));
+    d.onclick=()=>select(p.id);d.oncontextmenu=e=>projectMenu(e,p);d.draggable=true;d.dataset.id=p.id;return d;}));
   if(typeof drawAnswers==='function')drawAnswers();const total=projects.reduce((s,p)=>s+unread(p),0);
   document.title=(needed.size||answerCount?'● ':'')+(total?`(${total}) `:'')+'bullpen';
   const p=projects.find(p=>p.id===cur);
