@@ -169,6 +169,11 @@ through **…**. They show as chips under the message (click one to add or take 
 with `chat_react`; they see each message's number (`#12`) to refer to it. Your reaction on an
 agent's question also takes it off Needs an answer.
 
+**PR chips**: a GitHub pull request link (`github.com/owner/repo/pull/12`, or `owner/repo#12`)
+gets a chip with its state (open, draft, merged, closed) and checks (✓ passed, ✗ failed, ●
+running); hover for the title and each check. It comes from your own `gh`, cached for a minute;
+without `gh` the links stay plain links.
+
 **Private messages**: an agent posts with `chat_post` `private: true`, or you pick
 **Message <name> privately** in the Agents list. Only you and that agent see them, and
 replies stay private. This keeps other agents from reading them through the chat. It is not
