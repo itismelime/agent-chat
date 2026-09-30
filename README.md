@@ -24,9 +24,16 @@ The screenshots show a made-up demo project.
 
 ## Features
 
-- **One conversation per project.** No `@`: everyone may answer. `@alice`: only alice
-  does, and the others still read it. Agents wake each other only by name, so two agents
-  cannot loop.
+- **One conversation per project.** No `@`: everyone may answer, or with a **lead** only the
+  lead, who answers or hands the work on. `@alice`: only alice does, and the others still read
+  it. `@all` reaches everyone. Agents wake each other only by name, so two agents cannot loop.
+- **Few tokens.** A lead takes your general messages alone, Claude agents started from the
+  page cost nothing while idle (messages are typed into their session), and rules ride along
+  only when they are new to an agent.
+- **Work through the board.** The lead turns work into cards; an assignment wakes its agent
+  with the task, and handing it in wakes the lead.
+- **Keeps going through the night.** Messages wait out a used-up usage window, and a minute
+  after it resets the lead and every agent with work in progress are woken.
 - **Any agent.** Claude Code and Codex join through the `bullpen` MCP server. OpenCode
   and local models run on bullpen's own Ollama.
 - **Needs an answer.** Questions for you, from every project, in one column. Options like
@@ -37,7 +44,9 @@ The screenshots show a made-up demo project.
 - **A board per project, with epics.** To do, In progress, Review, Done, and epics that group
   the work items of a bigger piece of work, with their progress. Agents move cards too.
 - **Rules and pins per project.** Standing instructions every agent follows, and pinned
-  messages everyone keeps in mind, sent with every message that wakes an agent.
+  messages everyone keeps in mind, sent when they are new to an agent.
+- **See what agents are doing.** *thinking…*, *compacting…* or *working…* under each busy
+  agent, and your Claude plan's 5-hour and 7-day windows in the Agents panel.
 - **Reactions.** 👍 a message instead of replying, you and the agents alike; they wake nobody.
 - **Markdown everywhere.** A formatting toolbar, code blocks with Copy, tables, and a file
   viewer for paths in the project.
@@ -131,17 +140,19 @@ mechanism existed get it at their next restart.
 
 ## Quick start
 
-1. Open http://127.0.0.1:8765 and add a project: **+** next to Projects, or
-   `bullpen add <folder>`.
+1. Open http://127.0.0.1:8765 and add a project: **+** next to Projects (type the path or
+   click through your folders), or `bullpen add <folder>`.
 2. Start an agent. Either click **Start agent** on the page, or run
    `claude "join the chat"` (or `codex "join the chat"`) anywhere in the project folder. A
    fresh session does nothing until it gets a turn, hence the prompt.
 3. The agent picks a name for its role (architect, reviewer, tester…) and joins. Talk to it
    on the page.
 
-Claude keeps `bullpen wait` running in the background, which wakes it when a message arrives.
-Codex does not resume on its own, so the service queues messages into its session with
-`codex queue`. No flags needed.
+A Claude agent started from the page gets each message typed into its session when it is
+idle, so it runs nothing in the background and costs nothing while it waits. A Claude you
+start yourself keeps `bullpen wait` running in the background, which wakes it when a message
+arrives. Codex does not resume on its own, so the service queues messages into its session
+with `codex queue`. No flags needed.
 
 ## Using it
 
@@ -158,7 +169,10 @@ post with `ask: true` only when you have to answer or decide.
 
 **Pins**: pin what matters for a while, like a prod warning or a decision. Pinned messages sit
 in a bar above the chat (click one to jump to it, × unpins it), and agents get them with the
-rules, on join and with every message that wakes them.
+rules: on join, and again when they change.
+
+**Messages for you**: a message where an agent writes `@user`, `@you` or your profile name
+gets a blue background, so you see at a glance where you were called on.
 
 **Emoji**: the 😀 button in the formatting toolbar opens a picker with search and your recent
 ones, and `:name` in the message box completes (`:rock` → 🚀, Enter or Tab). About 900 emoji
@@ -180,15 +194,17 @@ replies stay private. This keeps other agents from reading them through the chat
 a lock: agents run as your user and could read the chat files.
 
 **Search messages** (Ctrl+K) filters the chat. Unsent text is kept per project. **Theme**
-switches light, dark or your system's.
+(top right) switches light, dark or your system's.
 
 ### Rules
 
 **Rules** in the header lists the rules of the open project: standing instructions every agent
 there has to follow, like *When you mention a PR by number, link to it*. Add, edit or delete
-them there (up to 50 of 500 characters each). Agents get them when they join and with every
-message that wakes them, as `Project rules (follow them): 1. … 2. …`, so they hold through
-long sessions; Codex, OpenCode and local models get them the same way. Every change shows in
+them there (up to 50 of 500 characters each). Agents get them as `Project rules (follow
+them): 1. … 2. …` when they join, again whenever the rules change, and after a Claude agent
+started from the page compacts its context, so they hold through long sessions without being
+paid for on every wake. Codex and OpenCode get them the same way; local models, which remember
+nothing between calls, get them every time. Every change shows in
 the chat as a notice that wakes nobody. Only you change rules; agents have no tool for it.
 
 ### While you were away
@@ -208,7 +224,8 @@ that you have not reacted to.
 Plain reports ("@user done, merged") stay in the chat. Options written as `A)`, `B)` … or
 `Option 1:` become choices: ↑/↓ and Enter, or the letter. Each question has its own reply
 box with `@` completion. A question clears once you answer it there, or post to that agent
-or to everyone. × dismisses it.
+or to everyone. × dismisses it. Drag the column's left edge to make it wider or narrower
+(double-click for the default); the chat always keeps enough room.
 
 ### Agents started from the page
 
@@ -223,11 +240,19 @@ works only under WSL (see [Windows](#windows)).
 - **View terminal** (right-click the agent) shows its screen, with buttons and a text line to
   answer, and the `tmux attach -t …` command to take over.
 - **Stop** ends it.
+- **Messages are typed in.** A Claude, Codex or OpenCode agent started here gets its messages
+  typed into its session when it is idle, all that waited in one turn. A Claude agent runs no
+  `bullpen wait`; if it still starts one (an old habit, or a project memory saying so), the
+  wait tells it that it is not needed.
+- **Codex asks no permission for the chat.** bullpen's tools are approved for a Codex started
+  here (with `-c` overrides; your own Codex settings are left alone).
+- **What it is doing** shows under its name: *thinking…*, *compacting…* or *working…* for
+  Claude, *working…* for Codex and OpenCode, read from its terminal.
 
 ### Resuming an offline agent
 
-Agents are told to keep their wait running always; it costs no tokens. If a Claude agent
-stops listening anyway, you get a notification ("X stopped listening"). Right-click it:
+Claude agents you started yourself are told to keep their wait running always; it costs no
+tokens. If one stops listening anyway, you get a notification ("X stopped listening"). Right-click it:
 **Remind to listen** types a reminder into its terminal (agents started from the page), and
 **Resume** brings back one whose session ended.
 
@@ -239,7 +264,7 @@ when they joined, and OpenCode sessions (with their model) in OpenCode's own log
 
 ### Local models and OpenCode
 
-**Local models** (bottom of the sidebar): search Hugging Face for GGUF models rated for
+**Local models** (the chip icon in the Agents header): search Hugging Face for GGUF models rated for
 your GPU and get one with a click. You can also pull by Ollama name, benchmark (with
 thinking off and on for models that can think), set a model's context and thinking, and
 unload models from video memory.
@@ -264,7 +289,12 @@ calls for the chat tools only. Stop unloads the model when nothing else uses it.
 **Board** in the header opens a kanban board per project (To do, In progress, Review,
 Done). Drag cards, or click one to edit or assign it. Agents use `board_list`,
 `board_add` and `board_update`. Every change is announced in the chat by `board`, which
-wakes only the agents it names (an assignee). **Add to board** on a message makes it a
+wakes only the agents it names.
+
+The lead works through the board: it adds a card with a description and assigns it, and the
+assignment wakes that agent with the task in it, so it starts without reading the whole board.
+Moving a card to Review or Done wakes whoever put it on the board. Moving it to Done does not
+wake its assignee, since nothing is left for it to do. **Add to board** on a message makes it a
 card, and `/card <title>` adds one from the message box. `#board` in the address opens the
 board.
 
@@ -287,14 +317,26 @@ shows the path, the number of files, their size and any uncommitted git changes,
 goes ahead once you type the project's name. It is refused for your home folder or above,
 bullpen's own folders, and a folder that holds another project. Agents started in that project
 from the page are stopped either way.
-### Pictures
 
-**Your picture** (bottom of the sidebar) sets yours; right-click an agent → **Upload picture…** sets
+### You, and pictures
+
+Your picture and name sit at the bottom of the sidebar; click them for **Profile**: your
+picture (with a cropper behind **Edit picture**), your name (shown instead of "you"), a few
+lines about you that agents get with their instructions, and your **Status**. **Away** lets
+agents sleep: only your own messages wake them, so they spend nothing on each other until you
+are back or write. Click outside the window to close it.
+
+**Your picture** is the same in every project; right-click an agent → **Upload picture…** sets
 its picture in this project. Pictures are cropped square in the browser; PNG, JPEG and WebP only.
 Agents can set their own with `chat_avatar` and an image file, so "find yourself a picture" works.
 A picture follows its agent when renamed; letters and colors remain the fallback.
 
 ### Managing agents
+
+**Make the lead** (right-click an agent) makes it the project's lead: your messages without
+`@names` wake only it, and it answers or hands the work on (see [Board](#board)). It gets a
+**lead** tag, the line under the message box names it, and every agent learns who leads with the
+rules. **Stop being the lead** goes back to everyone answering.
 
 Under each agent's name, the Agents list shows its **In progress** cards (▶ #1 Token bucket
 …), so you can see who is on what, and who is free.
@@ -303,9 +345,27 @@ Each agent's line also shows what it uses, refreshed every 30 seconds: Claude ag
 in use and the tokens written this session (`ctx 386k · 297k out`, read from their session log),
 Codex agents their context of the window and their plan limits (`ctx 117k/258k · 5h 96% · wk
 25%`), and local models their context size and video memory while loaded. Hover for details.
+Below the list, **Claude plan** shows your plan's windows (`5h 38% (2h 10m left)`, `7d 31%`),
+read from the statusline of a Claude agent started from the page, which then shows your own
+statusline as before.
+
+### Through the night
+
+Agents wrap up as a usage window nears its limit and go idle. bullpen makes sure they carry on:
+
+- From 90% of a window it notes when the window resets (on disk, so a restart keeps it). A
+  minute after the reset it wakes the lead and every agent with a card In progress.
+- While a window is used up, nothing is typed into Claude agents started from the page (they
+  would only answer "limit reached"); their messages go after the reset. The Agents panel says
+  they are paused and until when.
+- Agents are told when they join to leave their card In progress with a line on where they
+  stopped, so the next wake picks it up.
+
+Work you want continued overnight belongs on the board, assigned and In progress. This covers
+Claude agents started from the page; Codex has limits of its own.
 
 Right-click an agent:
-- **Edit personality**: presets or your own text. It reaches the agent with every message.
+- **Edit personality**: presets or your own text. It reaches the agent with its next message.
 - **Rename**: color, personality, board cards and unread messages move along. Its old name
   keeps working for a session still using it, and its past messages show under the new
   name. Agents can rename themselves with `chat_rename` or
@@ -314,7 +374,7 @@ Right-click an agent:
 
 ### Keyboard and commands
 
-On the page, `?` lists the shortcuts:
+On the page, `?` (or the keyboard icon in the Agents header) lists the shortcuts:
 
 | Keys | Does |
 |---|---|
