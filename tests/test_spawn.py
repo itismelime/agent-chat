@@ -250,6 +250,26 @@ class SpawnerTest(unittest.TestCase):
         self.assertEqual(self.store.agents("proj")["kit"]["cursor"], self.store.messages("proj")[-1]["n"])
         self.assertEqual(next(a for a in self.store.status("proj") if a["name"] == "kit")["status"], "waiting")
 
+    def test_a_reply_owed_but_not_posted_gets_one_reminder(self):
+        self.opencode_setup()  # kit
+        idle = (SCREENS / "idle-opencode-idle.txt").read_text(encoding="utf-8")
+        (self.d / "screen").write_text(idle)
+        self.store.post("proj", "user", "@kit run the tests")
+        self.sp.poll()  # typed to it
+        self.sp.poll()  # idle again and nothing posted: one reminder
+        self.sp.poll()  # and no more
+        reminders = [c for c in self.typed() if "you posted no reply" in c]
+        self.assertEqual(len(reminders), 1)
+        self.store.post("proj", "user", "@kit again")
+        self.sp.poll()
+        self.store.post("proj", "kit", "done: all pass")  # it replied this time
+        self.sp.poll()
+        self.assertEqual(len([c for c in self.typed() if "you posted no reply" in c]), 1)
+        self.store.post("proj", "user", "hello all")  # not addressed to it: nothing owed
+        self.sp.poll()
+        self.sp.poll()
+        self.assertEqual(len([c for c in self.typed() if "you posted no reply" in c]), 1)
+
     def test_read_messages_are_not_typed_and_restart_loses_nothing(self):
         self.opencode_setup()
         (self.d / "screen").write_text((SCREENS / "idle-opencode-idle.txt").read_text(encoding="utf-8"))

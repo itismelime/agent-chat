@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from .store import StoreError, wakes
+from .store import StoreError, addressed, wakes
 
 TOOLS = ("claude", "codex", "opencode")
 PROMPT = "join the chat"
@@ -297,6 +297,7 @@ class Spawner:
                     r = self.store.spawned(pid).get(token)
                     if r is None:
                         continue
+                    r = dict(r, token=token)
                     if not alive(r["session"]):
                         self.store.drop_spawned(pid, token, session=r["session"])
                         continue
@@ -370,6 +371,15 @@ class Spawner:
             send_text(r["session"], format_message(unread[0], name, agent.get("role"),
                                                    rules.standing(self.store, pid)))
             self.store.delivered(pid, name, unread[0]["n"])
+            if name in addressed(unread[0]["text"]) or unread[0].get("dm"):  # a reply is owed
+                self.store.update_spawned(pid, r["token"], owed=unread[0]["n"])
+        elif state == "idle" and r.get("owed"):
+            # it answered in its terminal only (gpt-oss does): one reminder, then let it be
+            if not any(m["from"] == name for m in self.store.messages(pid, r["owed"])):
+                send_text(r["session"], "[bullpen] #%d was addressed to you and you posted no reply. "
+                                        "If one is needed, post it now with the chat_post tool." % r["owed"])
+                unread = [None]  # it is at work again
+            self.store.update_spawned(pid, r["token"], owed=None)
         self.store.set_local(pid, name, busy=state != "idle" or bool(unread))
         return state == "question"
 
