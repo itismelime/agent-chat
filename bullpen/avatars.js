@@ -1,14 +1,16 @@
 // Avatar pictures (bullpen/avatars.js): yours and each agent's, over the letter and color. Uses the page's
 // $, el, api, cur, current, say and refresh. The API needs its header, so pictures come as blob: URLs.
 let avatarsBy={};const picUrls={};
+// inline, so no avatar rule's background shorthand (the user's dark one) resets the size to auto
+const showPic=(d,url)=>{d.style.background=`center / cover no-repeat url(${url})`;d.classList.add('pic');};
 function decorateAvatar(div,name,pid){
   const v=(avatarsBy[pid]||{})[name];if(!v)return;
   const key=pid+'/'+name+'/'+v;div.dataset.pic=key;
-  if(picUrls[key]){if(picUrls[key]!=='loading')div.style.backgroundImage=`url(${picUrls[key]})`,div.classList.add('pic');return;}
+  if(picUrls[key]){if(picUrls[key]!=='loading')showPic(div,picUrls[key]);return;}
   picUrls[key]='loading';
   fetch(`api/projects/${pid}/avatars/${encodeURIComponent(name)}`,{headers:{'X-Bullpen':'1'}}).then(r=>r.ok?r.blob():null)
     .then(b=>{if(!b)return;picUrls[key]=URL.createObjectURL(b);
-      for(const d of document.querySelectorAll('.av')) if(d.dataset.pic===key){d.style.backgroundImage=`url(${picUrls[key]})`;d.classList.add('pic');}});}
+      for(const d of document.querySelectorAll('.av')) if(d.dataset.pic===key)showPic(d,picUrls[key]);});}
 function pickPicture(pid,name){  // the file as it is when it can be; the page crops it square on show
   const f=el('input');f.type='file';f.accept='image/png,image/jpeg,image/webp,image/gif';
   f.onchange=async()=>{const file=f.files[0];if(!file)return;
