@@ -27,7 +27,7 @@ code,pre,kbd{font-family:var(--mono)}
 
 /* projects rail */
 #rail{width:232px;flex:none;background:var(--rail);display:flex;flex-direction:column;padding:14px 10px 10px}
-.brand{font:700 17px/1 var(--display);display:flex;align-items:center;gap:9px;padding:4px 8px 18px}
+.brand{font:800 18px/1 var(--display);letter-spacing:-.02em;display:flex;align-items:center;gap:9px;padding:4px 8px 18px}
 .mark{width:18px;height:18px;border-radius:5px;background:conic-gradient(from 90deg,oklch(var(--sl) .15 25),
 oklch(var(--sl) .15 145),oklch(var(--sl) .15 250),oklch(var(--sl) .15 320),oklch(var(--sl) .15 25))}
 .railhead{display:flex;justify-content:space-between;align-items:center;padding:0 2px 4px 8px;color:var(--mute);font-size:13px;font-weight:600}
@@ -61,7 +61,7 @@ h1{font:800 22px/1.2 var(--display);margin:0;white-space:nowrap;letter-spacing:-
 #answers{width:380px;flex:none;display:flex;flex-direction:column;min-height:0;background:var(--rail);border-left:1px solid var(--line)}
 #answers[hidden]{display:none}
 #answers .top{padding:12px 10px 8px 16px}
-#answers h2{font:700 15px/1.2 var(--display);margin:0;display:flex;align-items:center;gap:8px}
+#answers h2{font:800 15px/1.2 var(--display);letter-spacing:-.01em;margin:0;display:flex;align-items:center;gap:8px}
 #answercount{background:var(--attn);color:var(--paper);border-radius:10px;padding:0 7px;font:700 12px/1.5 var(--text)}
 #answerlist{flex:1;overflow:auto;padding:2px 12px 16px;display:flex;flex-direction:column;gap:10px}
 .ans{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--attn);border-radius:10px;
@@ -212,7 +212,7 @@ dialog[open]{display:flex;flex-direction:column;gap:10px}dialog::backdrop{backgr
 dialog form[method=dialog]{display:flex;flex-direction:column;gap:10px}
 #ask,#cardpanel{width:min(560px,96vw)}
 .top{display:flex;justify-content:space-between;align-items:center}
-dialog h2{font:700 18px var(--display);margin:0}
+dialog h2{font:800 19px var(--display);margin:0;letter-spacing:-.015em}
 dialog h3{margin:8px 0 2px;font-size:13px;color:var(--mute)}
 .row{display:flex;gap:8px;align-items:center}.row span{flex:1}.row label{color:var(--mute);font-size:13px}
 #help dl{display:grid;grid-template-columns:max-content 1fr;gap:5px 18px;margin:0;font-size:14px}
@@ -259,13 +259,13 @@ font-size:11px;font-weight:600;color:var(--ec);border:1px solid var(--ec);border
 .epic{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ec,var(--line));border-radius:10px}
 .ehead{display:flex;align-items:center;gap:6px 8px;padding:10px 12px;flex-wrap:wrap}
 .etog{background:none;color:var(--mute);padding:2px 6px;min-width:26px}
-.ename{font:700 15px var(--display);background:none;color:var(--ink);padding:0;text-align:left;cursor:pointer}
+.ename{font:800 15px var(--display);letter-spacing:-.01em;background:none;color:var(--ink);padding:0;text-align:left;cursor:pointer}
 span.ename{cursor:default;color:var(--mute)}.ename:hover{text-decoration:underline}span.ename:hover{text-decoration:none}
 .epic .num{color:var(--mute);font-size:12px}.estate{font-size:12px;font-weight:600;white-space:nowrap}
 .epic .av,.eitem .av{width:22px;height:22px;font-size:11px;border-radius:6px;position:static;flex:none}
 .eprog{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute);white-space:nowrap}
 .ebar{width:120px;height:6px;border-radius:3px;background:var(--soft);overflow:hidden}
-.ebar span{display:block;height:100%;background:var(--ok)}
+.ebar span{display:block;height:100%;background:var(--ok)}.ebar{height:4px}
 .ebody{border-top:1px solid var(--line);padding:6px 8px 8px}
 .eitem{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:7px;cursor:pointer}
 .eitem:hover,.eitem:focus-visible{background:var(--soft)}.eitem .ct{flex:1}.eitem .num{color:var(--mute);font-size:12px}

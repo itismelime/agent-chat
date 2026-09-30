@@ -4,7 +4,7 @@
 // Uses the page's $, el, btn, api, cur, say, refresh, avatarsBy, picUrl, cropStyle and pickPicture.
 let profileData={name:'',about:''};
 const myName=()=>profileData.name||'you';
-function showName(p){profileData=p;if('avatar' in p){myAv=p.avatar;redecorate(null,'user');}$('profilebtn').querySelector('.me b').textContent=p.name||'Profile';
+function showName(p){profileData=p;if('avatar' in p){myAv=p.avatar;redecorate(null,'user');drawMe();}$('profilebtn').querySelector('.me b').textContent=p.name||'Profile';
   $('profilebtn').querySelector('.me small').textContent=p.away?'Away · agents paused':'Online';
   for(const n of document.querySelectorAll('.g.user .gh .n'))n.textContent=myName();}  // messages already shown
 api('api/profile').then(showName).catch(()=>{});
