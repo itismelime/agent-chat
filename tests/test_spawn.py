@@ -60,6 +60,9 @@ class TmuxTest(unittest.TestCase):
         stub = mock.patch.object(spawn, "claude_settings", return_value="S")  # its real JSON: PlanTest
         stub.start()
         self.addCleanup(stub.stop)
+        stub = mock.patch.object(spawn, "codex_approvals", return_value=["-c", "A"])
+        stub.start()
+        self.addCleanup(stub.stop)
         self.d = stub_tools(self)
 
     def test_available(self):
@@ -77,7 +80,7 @@ class TmuxTest(unittest.TestCase):
         spawn.start("codex", "/p", "bullpen-p-abc123", "tok")
         self.assertEqual(calls(self.d), [
             "new-session -d -s bullpen-p-abc123 -c /p -e BULLPEN_SPAWN=tok "
-            "-- codex join the chat (start tok)"])
+            "-- codex -c A join the chat (start tok)"])
 
     def test_start_opencode(self):
         (self.d / "opencode").write_text("#!/bin/sh\nexit 0\n")
@@ -205,6 +208,23 @@ class ClaudeStateTest(unittest.TestCase):
                                             % (self.RULE, self.RULE, self.FOOT)), "working")  # no "esc to interrupt" any more
 
 
+class CodexApprovalsTest(unittest.TestCase):
+    def test_every_bullpen_tool_is_approved(self):
+        from bullpen.mcp import TOOLS
+        flags = spawn.codex_approvals()
+        self.assertEqual(flags[::2], ["-c"] * len(TOOLS))
+        self.assertEqual(flags[1::2], ['mcp_servers.bullpen.tools.%s.approval_mode="approve"' % t["name"] for t in TOOLS])
+
+
+class CodexActivityTest(unittest.TestCase):
+    def test_working_from_its_status_line(self):
+        """Lines as Codex 0.157 draws them (2026-09): it shows working, never thinking."""
+        prompt = "\u203a Ask Codex to do anything\n  ? for shortcuts\n"
+        self.assertEqual(spawn.codex_activity("\u2022 Working (15s \u2022 esc to interrupt)\n" + prompt), "working")
+        self.assertIsNone(spawn.codex_activity("\u2022 Answered in the chat.\n" + prompt))
+        self.assertIsNone(spawn.codex_activity("esc to interrupt is a phrase in a reply\n" + prompt))
+
+
 class OpenCodeStateTest(unittest.TestCase):
     def test_states_from_the_footer(self):
         read = lambda n: (SCREENS / n).read_text(encoding="utf-8")
@@ -235,6 +255,9 @@ class NeedsYouTest(unittest.TestCase):
 class SpawnerTest(unittest.TestCase):
     def setUp(self):
         stub = mock.patch.object(spawn, "claude_settings", return_value="S")  # its real JSON: PlanTest
+        stub.start()
+        self.addCleanup(stub.stop)
+        stub = mock.patch.object(spawn, "codex_approvals", return_value=["-c", "A"])
         stub.start()
         self.addCleanup(stub.stop)
         from bullpen.store import Store
@@ -463,7 +486,7 @@ class SpawnerTest(unittest.TestCase):
         self.store.join("proj", "cody", "codex", thread="t-1")
         self.store._update("proj", "cody", gone=True)
         r = self.sp.resume("proj", "cody")
-        self.assertIn("-- codex resume t-1 You are back", calls(self.d)[-1])
+        self.assertIn("-- codex -c A resume t-1 You are back", calls(self.d)[-1])
         self.assertIn("(start %s)" % r["token"], calls(self.d)[-1])
         self.assertEqual(self.store.join("proj", "cody", "codex", spawn=r["token"])["thread"], "t-1")
         self.store.join("proj", "dora", "claude")  # no session log names her

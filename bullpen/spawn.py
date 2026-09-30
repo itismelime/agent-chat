@@ -120,6 +120,8 @@ def start(tool, path, session, token, model=None, config_home=None, data_home=No
         command = [tool, prompt if tool == "claude" else "%s (start %s)" % (prompt, token)]
     if tool == "claude":  # its statusline keeps your plan's limits for the page (plan.py)
         command[1:1] = ["--settings", claude_settings()]
+    elif tool == "codex":  # joins and chats without asking you each time: bullpen's tools are approved
+        command[1:1] = codex_approvals()
     r = tmux("new-session", "-d", "-s", session, "-c", path, *env, "--", *command)
     if r.returncode:
         raise StoreError(503, "tmux could not start it: %s" % r.stderr.strip())
@@ -130,6 +132,14 @@ def claude_settings():
     chat = Path(__file__).resolve().parent.parent / "bin" / "bullpen"
     cmd = "%s %s statusline" % (shlex.quote(sys.executable), shlex.quote(str(chat)))
     return json.dumps({"statusLine": {"type": "command", "command": cmd, "refreshInterval": 60}})
+
+
+def codex_approvals():
+    """Codex -c overrides that approve every bullpen tool for a Codex started here, so it
+    never stops at "Allow the bullpen MCP server to run tool ...?"; your own Codex
+    sessions and ~/.codex/config.toml are left as they are."""
+    from .mcp import TOOLS
+    return [x for t in TOOLS for x in ("-c", 'mcp_servers.bullpen.tools.%s.approval_mode="approve"' % t["name"])]
 
 
 def alive(session):
@@ -196,6 +206,13 @@ def claude_activity(text):
                 return "compacting"
             return "thinking" if "thinking" in (m.group(2) or "") else "working"
     return None
+
+
+def codex_activity(text):
+    """Codex shows one state while at work, "• Working (15s • esc to interrupt)", no
+    thinking of its own: working, or None."""
+    bottom = "\n".join(text.rstrip().splitlines()[-SCREEN_LINES:])
+    return "working" if re.search(r"^\s*\u2022 \w[^\n]*\(\d+[smh][^\n]*esc to interrupt\)", bottom, re.M) else None
 
 
 def claude_state(text):
@@ -368,6 +385,8 @@ class Spawner:
                         need = need or age > JOIN_GRACE
                     elif r["tool"] == "opencode":
                         need = self._type_unread(pid, r, opencode_state(text))
+                    elif r["tool"] == "codex":  # its messages come by its thread; the screen says if it works
+                        self._activity(pid, r["name"], codex_activity(text))
                     elif r["tool"] == "claude":  # no wait loop: messages are typed in when idle
                         try:
                             colored = screen(r["session"], colors=True)

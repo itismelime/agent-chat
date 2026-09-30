@@ -519,6 +519,8 @@ class Store:
                     status = "offline" if state.get("error") else "busy" if state.get("busy") else "waiting"
                 elif token and (pid, token) in self.needs:
                     status = "needs_you"
+                elif a["kind"] == "codex" and token and self.local.get((pid, name), {}).get("activity"):
+                    status = "busy"  # its terminal shows it at work (Spawner._activity)
                 elif self.waiting.get((pid, name)) or a.get("thread"):
                     status = "waiting"
                 elif a["kind"] == "opencode" or (a["kind"] == "claude" and token and (pid, name) in self.local):
