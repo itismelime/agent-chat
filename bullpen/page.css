@@ -332,3 +332,8 @@ display:flex;flex-direction:column;gap:4px}#awaycard[hidden]{display:none}
 .awayrow{display:flex;gap:10px;align-items:baseline;font-size:14px}.awayrow span{color:var(--mute)}
 .awayrow.ask span{color:var(--attn)}.awayp{background:none;border:0;padding:0;font-weight:700;color:var(--ink);cursor:pointer}
 .awayp:hover{text-decoration:underline}
+/* PR chips */
+.prchip{display:inline-block;margin:0 2px 0 5px;padding:0 7px;border-radius:9px;font-size:11px;font-weight:600;line-height:18px;
+vertical-align:1px;background:var(--soft);color:var(--mute);border:1px solid var(--line)}
+.prchip.open{color:var(--ok);border-color:var(--ok)}.prchip.merged{color:#8250df;border-color:#8250df}
+.prchip.closed{color:var(--bad);border-color:var(--bad)}.prchip.failed{background:var(--attn-bg)}

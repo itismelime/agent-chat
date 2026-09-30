@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import avatars, mcp, pins, reactions, removal, rules, spawn, talk, usage
+from . import avatars, mcp, pins, prs, reactions, removal, rules, spawn, talk, usage
 from .board import Board
 from .client import Client
 from .codex import Deliverer
@@ -35,6 +35,7 @@ ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "te
           "emoji.js": "text/javascript", "pins.js": "text/javascript",
           "removal.js": "text/javascript", "avatars.js": "text/javascript",
           "away.js": "text/javascript"}
+          "prchips.js": "text/javascript"}
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 MAX_FILE = 5_000_000
@@ -179,6 +180,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 if project is None:
                     raise StoreError(404, "not in a registered project")
                 return 200, {"project": project}
+            if rest == ["pr"] and method == "GET":  # a PR link's chip: state and checks, via gh
+                return 200, prs.state(query.get("repo"), query.get("n", ""))
             if rest == ["tools"] and method == "GET":
                 return 200, spawn.available()
             if rest == ["mcp", "version"] and method == "GET":

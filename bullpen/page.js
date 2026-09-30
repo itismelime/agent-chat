@@ -160,7 +160,8 @@ function message(m,time,q){
   if(m.dm)d.classList.add('dm');
   if(m.reply)d.append(quote(m.reply));
   if(m.dm)d.append(el('span','dmtag','Private: you and '+m.dm));
-  d.append(renderText(m.text),el('span','t',time));
+  const body=renderText(m.text);if(typeof addPrChips==='function')addPrChips(body);
+  d.append(body,el('span','t',time));
   d.title=new Date(m.time).toLocaleString();
   const acts=el('div','acts');
   acts.append(btn('Reply',()=>{const from=current(m.from);replyTo={n:m.n,from,text:m.text};dmTo=m.dm?current(m.dm):null;drawReply();
