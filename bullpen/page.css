@@ -324,3 +324,11 @@ color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;curso
 .a .usage{grid-column:2;font-size:11px;color:var(--mute);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ask.danger #askhelp{color:var(--bad);font-weight:600}#ask.danger h2{color:var(--bad)}
 .av.pic{background-size:cover;background-position:center;color:transparent}
+
+/* while you were away */
+#awaycard{margin:10px 20px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);
+display:flex;flex-direction:column;gap:4px}#awaycard[hidden]{display:none}
+.awayhead{display:flex;align-items:center;justify-content:space-between}.awayhead .icon{padding:0 6px}
+.awayrow{display:flex;gap:10px;align-items:baseline;font-size:14px}.awayrow span{color:var(--mute)}
+.awayrow.ask span{color:var(--attn)}.awayp{background:none;border:0;padding:0;font-weight:700;color:var(--ink);cursor:pointer}
+.awayp:hover{text-decoration:underline}

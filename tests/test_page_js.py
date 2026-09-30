@@ -76,6 +76,31 @@ class EmojiTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+AWAY = Path(__file__).parent.parent / "bullpen" / "away.js"
+AWAY_CHECK = r"""
+// awaySummary from away.js over stand-in messages
+const src=require('fs').readFileSync(process.argv[1],'utf8'),assert=require('assert');
+eval(src.match(/function awaySummary[\s\S]*?\n  return out;\}/)[0]+';globalThis.awaySummary=awaySummary');
+const t=m=>new Date(Date.UTC(2026,8,30,m)).toISOString();
+globalThis.projects=[{id:'a',name:'A'},{id:'b',name:'B'}];
+globalThis.msgs={a:[{n:1,from:'x',kind:'claude',text:'old',time:t(0)},
+  {n:2,from:'x',kind:'claude',text:'see https://github.com/o/r/pull/7 and o/r#8',time:t(30)},
+  {n:3,from:'board',kind:'board',text:'#1 moved',time:t(31)},{n:4,from:'user',kind:'user',text:'mine',time:t(32)}],
+  b:[{n:1,from:'y',kind:'claude',text:'old',time:t(1)}]};
+globalThis.pending=()=>[{p:{id:'a'},m:msgs.a[1]}];
+const r=awaySummary(Date.UTC(2026,8,30,10));
+assert.strictEqual(r.length,1);  // B has nothing new
+assert.deepStrictEqual([r[0].messages,r[0].board,r[0].questions,r[0].prs],[1,1,1,['#7','#8']]);
+"""
+
+
+@unittest.skipUnless(shutil.which("node"), "node is not installed")
+class AwayTest(unittest.TestCase):
+    def test_summary(self):
+        r = subprocess.run(["node", "-e", AWAY_CHECK, str(AWAY)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+
 @unittest.skipUnless(shutil.which("node"), "node is not installed")
 class FormatTest(unittest.TestCase):
     def test_buttons(self):

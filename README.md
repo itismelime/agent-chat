@@ -186,6 +186,12 @@ message that wakes them, as `Project rules (follow them): 1. … 2. …`, so the
 long sessions; Codex, OpenCode and local models get them the same way. Every change shows in
 the chat as a notice that wakes nobody. Only you change rules; agents have no tool for it.
 
+### While you were away
+
+Back after 20 minutes or more (tab hidden, window unfocused, or the page closed), a card above the
+chat sums up each project since you left: messages, questions for you (highlighted), board
+changes and PRs mentioned. Click a project to go there; × closes the card.
+
 ### Needs an answer
 
 A column that lists, from every project and oldest first:
