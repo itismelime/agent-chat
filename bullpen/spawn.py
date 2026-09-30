@@ -353,6 +353,9 @@ class Spawner:
 
     def poll(self):
         """Drop starts whose session ended; flag those whose terminal asks."""
+        from . import plan
+        held = plan.held_until(self.store.root)  # a window used up: type nothing to Claude now
+        self._night()
         for project in self.store.projects():
             pid = project["id"]
             for token in list(self.store.spawned(pid)):
@@ -393,7 +396,10 @@ class Spawner:
                         except StoreError:
                             continue
                         self._activity(pid, r["name"], claude_activity(colored))
-                        need = self._type_unread(pid, r, claude_state(colored))
+                        if held:  # it would only get "limit reached": the message waits for the reset
+                            need = claude_state(colored) == "question"
+                        else:
+                            need = self._type_unread(pid, r, claude_state(colored))
                 self.store.set_needs(pid, token, need)
 
     def _rescue(self, pid, token, r):
@@ -427,6 +433,29 @@ class Spawner:
             send_text(self.store.spawned(pid)[token]["session"],
                       "[chat] %s (Your tool call came out as text; bullpen ran it for you.)" % note)
         return self.store.update_spawned(pid, token, **fields)
+
+    def _night(self):
+        """A minute after a usage window resets (one that neared its limit, when agents
+        wrap up and go idle), wake the lead and whoever has a card in progress: no one
+        else would until the user writes in the morning."""
+        from . import plan
+        from .board import Board
+        plan.arm(self.store.root)
+        at = plan.due(self.store.root)
+        if at is None:
+            return
+        when = datetime.fromtimestamp(at).strftime("%H:%M")
+        for project in self.store.projects():
+            pid = project["id"]
+            live = {n for n, a in self.store.agents(pid).items() if not a.get("removed") and not a.get("gone")}
+            names = [n for n in [self.store.lead(pid)] if n in live]
+            for c in Board(self.store).get(pid)["cards"]:
+                if c["column"] == "doing" and c.get("assignee") in live and c["assignee"] not in names:
+                    names.append(c["assignee"])
+            if names:
+                self.store.notice(pid, "%s The usage window reset at %s: carry on with your work in "
+                                       "progress (board_list shows your cards)."
+                                  % (" ".join("@" + n for n in names), when))
 
     def _activity(self, pid, name, activity):
         """Show what it is doing in the roster; after a compaction its summary may have

@@ -449,6 +449,23 @@ class SpawnerTest(unittest.TestCase):
         self.assertEqual(len(greets), 1)
         self.store.join("proj", "kit", "opencode", spawn=r["token"])  # takes its name back
 
+    def test_after_a_reset_the_lead_and_work_in_progress_wake(self):
+        import json as _json
+        from bullpen.board import Board
+        for n in ("lead", "kit", "idle"):
+            self.store.join("proj", n, "claude")
+        self.store.set_lead("proj", "lead", True)
+        b = Board(self.store)
+        c = b.add("proj", "lead", "Build it", assignee="kit")
+        b.update("proj", c["id"], "kit", column="doing")
+        (self.store.root / "wake.json").write_text(_json.dumps({"at": time.time() - 120}))
+        self.sp._night()
+        woke = self.store.messages("proj")[-1]
+        self.assertTrue(woke["text"].startswith("@lead @kit The usage window reset at"))
+        self.assertFalse((self.store.root / "wake.json").exists())
+        self.sp._night()  # once
+        self.assertEqual(self.store.messages("proj")[-1]["n"], woke["n"])
+
     def test_resume_an_offline_agent(self):
         home = Path(tempfile.mkdtemp())
         old, os.environ["HOME"] = os.environ["HOME"], str(home)

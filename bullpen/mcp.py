@@ -277,6 +277,9 @@ class Session:
                     joined += standing + " "
                 if body["agent"].get("personality"):
                     joined += "Your personality: %s. " % body["agent"]["personality"].rstrip(".")
+                # told once here, not with every wake: bullpen.plan wakes it after the reset
+                joined += ("Near a usage limit, leave your card In progress with a line in its description "
+                           "on where you stopped; bullpen wakes you when the window resets. ")
                 return "%s%s\n\nRecent messages:\n%s" % (joined, how, recent), False
             if tool not in ("chat_post", "chat_read", "chat_rename", "chat_react", "chat_avatar") + BOARD_TOOLS:
                 return "unknown tool: %s" % tool, True

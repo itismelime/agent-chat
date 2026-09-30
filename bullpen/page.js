@@ -216,14 +216,19 @@ function drawNeeds(){
 const GROUPS=[['needs_you','Needs you'],['starting','Starting'],['waiting','Available'],
   ['busy','Working'],['offline','Offline'],['removed','Removed']];
 const kfmt=n=>n==null?'?':n>=1e6?(n/1e6).toFixed(n>=1e7?0:1)+'M':n>=1e3?Math.round(n/1e3)+'k':String(n);
+let heldUntil=0;  // a Claude plan window used up: Claude agents started here are paused until it resets
+const hhmm=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 function drawPlan(p){  // your Claude plan: 5h 6% (4h 39m left) · 7d 31%, from a Claude started here
   const left=ts=>{const s=Math.max(0,ts-Date.now()/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
     return d?`${d}d ${h}h`:`${h}h ${m}m`;};
   const w=(k,l)=>p&&p[k]?`${l} ${p[k].used}% (${left(p[k].resets_at)} left)`:'';
+  const full=['five_hour','seven_day'].map(k=>p&&p[k]).filter(x=>x&&x.used>=100&&x.resets_at>Date.now()/1000);
+  const was=heldUntil;heldUntil=full.length?Math.max(...full.map(x=>x.resets_at)):0;if(was!==heldUntil)drawRoster();
   const lines=[w('five_hour','5h'),w('seven_day','7d')].filter(Boolean);$('plan').hidden=!lines.length;
   if(!lines.length)return;const age=Date.now()/1000-p.captured_at;
   $('plan').replaceChildren(el('b','','Claude plan'+(age>900?`, as of ${ago(new Date(p.captured_at*1000).toISOString())}`:'')),
-    ...lines.map(l=>el('span','',l)));
+    ...lines.map(l=>el('span','',l)),
+    ...(heldUntil?[el('span','held',`Used up: Claude agents started here pause until ${hhmm(heldUntil)}, then carry on`)]:[]));
   $('plan').title='Your plan’s usage windows, read from the statusline of a Claude agent started here';}
 function usageLine(u){  // Claude: context and tokens out; Codex: context of its window and plan limits; local: memory
   let text,title;
@@ -248,6 +253,7 @@ function drawRoster(){
       d.title=a.error?'Offline: '+a.error:'Click or right-click for options';
       const nm=el('b','',a.starting?'new '+a.name:a.name);if(a.lead)nm.append(el('span','leadtag','lead'));
       d.append(avatar(a.name),nm,
+        heldUntil&&a.kind==='claude'&&a.spawn&&!a.starting?el('small','',`paused until ${hhmm(heldUntil)}`):
         a.status==='busy'?el('small','doing',a.activity||'working'):  // thinking, compacting (Claude from the page) or working
           el('small','',sub+(a.last_seen&&['offline','removed'].includes(a.status)?', seen '+ago(a.last_seen):'')));
       if(a.personality)d.append(el('span','pers',a.personality));

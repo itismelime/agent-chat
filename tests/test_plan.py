@@ -44,5 +44,23 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(plan.get(Path(home) / "bullpen")["five_hour"]["used"], 12)
 
 
+    def test_through_the_night(self):
+        root, now = tempfile.mkdtemp(), 1000000.0
+        keep = lambda five, seven: plan.capture(json.dumps({"rate_limits": {
+            "five_hour": {"used_percentage": five, "resets_at": now + 3600},
+            "seven_day": {"used_percentage": seven, "resets_at": now + 86400}}}), root)
+        keep(50, 30)
+        self.assertIsNone(plan.held_until(root, now))
+        self.assertIsNone(plan.arm(root, now))  # far from a limit: nothing to wake for
+        keep(92, 30)  # agents wrap up from here
+        self.assertEqual(plan.arm(root, now), now + 3600)
+        self.assertIsNone(plan.held_until(root, now))  # not used up: messages still go
+        keep(100, 30)
+        self.assertEqual(plan.held_until(root, now), now + 3600)
+        self.assertIsNone(plan.held_until(root, now + 3601))  # reset: it goes again
+        self.assertIsNone(plan.due(root, now + 3600))  # a minute's grace
+        self.assertEqual(plan.due(root, now + 3700), now + 3600)
+        self.assertIsNone(plan.due(root, now + 3800))  # once
+
 if __name__ == "__main__":
     unittest.main()

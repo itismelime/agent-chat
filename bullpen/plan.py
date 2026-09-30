@@ -89,3 +89,62 @@ def main():
         except (OSError, subprocess.SubprocessError):
             pass
     print(line(limits))
+
+
+# Through the night: agents wrap up as a window nears its limit (usage-guard says so at
+# 90%) and go idle; nothing would wake them after the reset. The Spawner holds typed
+# messages while a window is used up and wakes the lead and whoever has work in progress
+# a minute after the reset.
+NEAR, FULL, GRACE = 90, 100, 60
+
+
+def _windows(root=None):
+    try:
+        limits = json.loads(_file(root).read_text()).get("rate_limits") or {}
+    except (OSError, ValueError, AttributeError):
+        return []
+    return [w for w in (limits.get("five_hour"), limits.get("seven_day"))
+            if isinstance(w, dict) and isinstance(w.get("used_percentage"), (int, float))
+            and isinstance(w.get("resets_at"), (int, float))]
+
+
+def held_until(root=None, now=None):
+    """While a window is used up: when it resets (the latest, if both are); else None."""
+    now = time.time() if now is None else now
+    ends = [w["resets_at"] for w in _windows(root) if w["used_percentage"] >= FULL and w["resets_at"] > now]
+    return max(ends) if ends else None
+
+
+def _wake_file(root=None):
+    return Path(root or data_dir()) / "wake.json"
+
+
+def arm(root=None, now=None):
+    """A window near its limit: remember its reset, to wake the agents then (kept on
+    disk, so a restart in the night does not lose it)."""
+    now = time.time() if now is None else now
+    ends = [w["resets_at"] for w in _windows(root) if w["used_percentage"] >= NEAR and w["resets_at"] > now]
+    if not ends:
+        return None
+    f = _wake_file(root)
+    try:
+        at = json.loads(f.read_text()).get("at", 0)
+    except (OSError, ValueError, AttributeError):
+        at = 0
+    if max(ends) > at:
+        f.write_text(json.dumps({"at": max(ends)}))
+    return max(max(ends), at)
+
+
+def due(root=None, now=None):
+    """The reset to wake the agents for, once it is GRACE seconds past (then forgotten); else None."""
+    now = time.time() if now is None else now
+    f = _wake_file(root)
+    try:
+        at = json.loads(f.read_text()).get("at")
+    except (OSError, ValueError, AttributeError):
+        return None
+    if not isinstance(at, (int, float)) or now < at + GRACE:
+        return None
+    f.unlink(missing_ok=True)
+    return at
