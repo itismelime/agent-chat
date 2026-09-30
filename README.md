@@ -267,6 +267,16 @@ into it). In a card's dialog, **Epic** moves an item between epics. Deleting an 
 items. Agents use `board_add` with `kind: "epic"` to start one and `epic: <number>` to add
 an item to it, and `board_update` with `epic` to move an item (0 takes it out).
 
+### Removing a project
+
+Right-click a project in the sidebar. **Remove from bullpen** takes it off the list; its folder and
+chat history stay, and adding the folder again brings it back. **Delete folder too…** moves the
+whole folder to the Trash (the Recycle Bin on Windows), so it can be restored: a red warning
+shows the path, the number of files, their size and any uncommitted git changes, and it only
+goes ahead once you type the project's name. It is refused for your home folder or above,
+bullpen's own folders, and a folder that holds another project. Agents started in that project
+from the page are stopped either way.
+
 ### Managing agents
 
 Under each agent's name, the Agents list shows its **In progress** cards (▶ #1 Token bucket
