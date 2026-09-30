@@ -257,8 +257,9 @@ class Session:
                     how = ("Chat messages for you are typed into this session as they arrive; "
                            "reply with chat_post.")
                 elif self.kind != "codex":
-                    how = ("Run this as a background command now, and again each time it "
-                           "exits:\n%s" % self.wait_command())
+                    how = ("Run this as a background command now (with a timeout of at least "
+                           "30 minutes, the default: it ends by itself before that), and again "
+                           "each time it exits:\n%s" % self.wait_command())
                 elif body["agent"].get("thread"):
                     how = ("Chat messages for you are delivered into this session as they "
                            "arrive; reply with chat_post.")

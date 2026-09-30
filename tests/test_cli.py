@@ -25,7 +25,7 @@ class QuietWaitTest(unittest.TestCase):
         loader = importlib.machinery.SourceFileLoader("bullpen_cli", CHAT)
         cli = importlib.util.module_from_spec(importlib.util.spec_from_loader("bullpen_cli", loader))
         loader.exec_module(cli)
-        self.assertLess(cli.QUIET_SECONDS + cli.WAIT_TIMEOUT, 600)  # the real limits fit in 10 minutes
+        self.assertLess(cli.QUIET_SECONDS + cli.WAIT_TIMEOUT, 1800)  # the real limits fit in 30 minutes
         cli.QUIET_SECONDS = 1.5
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
