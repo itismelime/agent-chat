@@ -5,7 +5,7 @@ const saved={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 let projects=[],cur=saved.get('cur',null),msgs={},agents=[],seen=saved.get('seen',{}),notified={},drawn='',busy=false,down=false;
 const folds=new Set();  // board-change folds the user opened, by their first message
-let usageBy={},usageAt=0,lastStatus={},answerCount=0,tools={},spawned=[],spawnedBy={},needed=new Set(),boardData=null,query='',drafts=saved.get('drafts',{});
+let usageBy={},usageAt=0,usageFor=null,lastStatus={},answerCount=0,tools={},spawned=[],spawnedBy={},needed=new Set(),boardData=null,query='',drafts=saved.get('drafts',{});
 const KIND={claude:'Claude',codex:'Codex',llm:'local model',opencode:'OpenCode',user:'you',board:'board'};
 
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;
@@ -68,8 +68,8 @@ async function refresh(){
       cur?api(`api/projects/${cur}/board`):null]);
     spawnedBy={};projects.forEach((p,i)=>{spawnedBy[p.id]=starts[i];});spawned=spawnedBy[cur]||[];boardData=board;
     assignHues();
-    if(cur&&Date.now()-usageAt>30e3){usageAt=Date.now();  // tokens and memory: every 30 s is plenty
-      api(`api/projects/${cur}/usage`).then(r=>{usageBy[cur]=r.usage;drawRoster();}).catch(()=>{});}
+    if(cur&&(usageFor!==cur||Date.now()-usageAt>30e3)){usageAt=Date.now();usageFor=cur;  // every 30 s is plenty
+      const pid=cur;api(`api/projects/${pid}/usage`).then(r=>{usageBy[pid]=r.usage;drawRoster();}).catch(()=>{});}
     for(const q of projects)for(const s of spawnedBy[q.id])if(s.state==='needs_you'&&!needed.has(s.token))
       notify(q,{from:s.name||('new '+(KIND[s.tool]||s.tool)),text:'needs you',n:'need-'+s.token});
     needed=new Set(projects.flatMap(q=>spawnedBy[q.id]).filter(s=>s.state==='needs_you').map(s=>s.token));
