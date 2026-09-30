@@ -26,9 +26,11 @@ from bullpen.client import ApiError, Client, ServiceDown, fmt, label  # noqa: E4
 CHAT = HERE / "bin" / "bullpen"
 WAIT_TIMEOUT = 330  # longer than the service's 300 s long-poll
 RETRY_SECONDS = 180  # a service restart (an update) takes a moment
-# Claude Code stops a background command after 10 minutes, so a wait with no message
-# ends by itself before that (no new long-poll after QUIET_SECONDS) and says to restart
-QUIET_SECONDS = 240
+# Claude Code stops a background command after 30 minutes by default, so a wait with no
+# message ends by itself before that (no new long-poll after QUIET_SECONDS) and says to
+# restart. Every restart is a model turn that re-reads the agent's whole context, which
+# is what an idle agent pays for, so the wait is as long as the limit allows.
+QUIET_SECONDS = 1440
 
 
 def project_id(client, given):
@@ -58,7 +60,7 @@ def wait(client, pid, name):
     down_since, started = None, time.monotonic()
     while True:
         if time.monotonic() - started > QUIET_SECONDS:
-            print("No message yet (a wait ends before 10 minutes, the limit of background commands).")
+            print("No message yet (a wait ends before 30 minutes, the default limit of background commands).")
             print("Restart the wait in the background: %s wait --as %s --project %s" % (CHAT, name, pid))
             return
         try:
