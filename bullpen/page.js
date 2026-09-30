@@ -13,7 +13,8 @@ function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className
 function btn(text,fn,cls){const b=el('button',cls||'',text);b.type='button';b.onclick=fn;return b;}
 // a name's own color and avatar, the same in chat, Agents and Needs an answer: per project, agents get
 // distinct hues in join order (other names hash to one), and a renamed agent's old name shows as its new one
-const HUES=[250,25,145,300,75,195,345,110,225,50,170,275];let huesBy={},renamesBy={},agentsBy={};
+const HUES=[250,145,300,75,195,320,110,225,165,275,90,205];  // no reds: red means an agent needs you
+let huesBy={},renamesBy={},agentsBy={};
 function hash(name){let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return h;}
 function current(name,pid=cur){const r=renamesBy[pid]||{},seen=new Set();
   while(name in r&&!seen.has(name)){seen.add(name);name=r[name];}return name;}

@@ -34,7 +34,8 @@ ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "te
           "reactions.js": "text/javascript", "emoji-data.js": "text/javascript",
           "emoji.js": "text/javascript", "pins.js": "text/javascript",
           "removal.js": "text/javascript", "avatars.js": "text/javascript", "profile.js": "text/javascript",
-          "away.js": "text/javascript", "prchips.js": "text/javascript"}
+          "away.js": "text/javascript", "prchips.js": "text/javascript",
+          "schibsted-grotesk.woff2": "font/woff2"}
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 MAX_FILE = 5_000_000
@@ -159,7 +160,7 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
             if method == "GET" and parts == ["favicon.svg"]:
                 return 200, FAVICON.read_bytes(), "image/svg+xml"
             if method == "GET" and len(parts) == 1 and parts[0] in ASSETS:
-                return 200, PAGE.with_name(parts[0]).read_bytes(), ASSETS[parts[0]] + "; charset=utf-8"
+                return 200, PAGE.with_name(parts[0]).read_bytes(), ASSETS[parts[0]] + ("" if parts[0].endswith(".woff2") else "; charset=utf-8")
             if parts[:1] != ["api"]:
                 raise StoreError(404, "not found")
             rest = parts[1:]
