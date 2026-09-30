@@ -21,7 +21,8 @@ function hue(name,pid=cur){name=current(name,pid);const h=huesBy[pid]||{};return
 function assignHues(){huesBy={};for(const [pid,list] of Object.entries(agentsBy)){const h=huesBy[pid]={};
   [...list].sort((x,y)=>x.joined<y.joined?-1:1).forEach((a,i)=>{h[a.name]=HUES[i%HUES.length];});}}
 function who(node,name,pid=cur){node.classList.add('who');node.style.setProperty('--h',hue(name||'?',pid));return node;}
-function avatar(name,pid=cur){name=current(name||'?',pid);return who(el('div','av',name==='user'?'Y':name[0]),name,pid);}
+function avatar(name,pid=cur){name=current(name||'?',pid);const d=who(el('div','av',name==='user'?'Y':name[0]),name,pid);
+  if(typeof decorateAvatar==='function')decorateAvatar(d,name,pid);return d;}
 function ago(iso){const s=(Date.now()-Date.parse(iso))/1000;
   return s<60?'just now':s<3600?Math.floor(s/60)+'m ago':s<86400?Math.floor(s/3600)+'h ago':Math.floor(s/86400)+'d ago';}
 function day(iso){const d=new Date(iso),today=new Date(),y=new Date(today-864e5);
@@ -56,7 +57,7 @@ async function refresh(){
     }
     const p=projects.find(p=>p.id===cur);
     const lists=await Promise.all(projects.map(p=>api(`api/projects/${p.id}/agents`)));  // every project's, for colors
-    agentsBy={};renamesBy={};projects.forEach((p,i)=>{agentsBy[p.id]=lists[i].agents;renamesBy[p.id]=lists[i].renames||{};});
+    agentsBy={};renamesBy={};projects.forEach((p,i)=>{agentsBy[p.id]=lists[i].agents;renamesBy[p.id]=lists[i].renames||{};avatarsBy[p.id]=lists[i].avatars||{};});
     for(const q of projects)for(const a of agentsBy[q.id]){  // a Claude agent that was listening and no longer is
       const k=q.id+'/'+a.name,was=lastStatus[k];lastStatus[k]=a.status;
       if(a.kind==='claude'&&a.status==='offline'&&(was==='waiting'||was==='busy')){
@@ -257,6 +258,8 @@ function agentItems(a){
   if(a.status==='offline'&&!a.spawn&&(a.kind==='claude'||a.kind==='codex'||a.kind==='opencode'))
     items.push(['Resume',async()=>{await api(agentPath(a,'resume'),{});return `Resuming ${a.name}…`;}]);
   if(a.starting)return items;
+  if(!a.starting&&a.status!=='removed'){items.push(['Upload picture…',()=>pickPicture(cur,a.name)]);
+    if((avatarsBy[cur]||{})[a.name])items.push(['Remove picture',()=>removePicture(cur,a.name)]);}
   items.push(['Rename',async()=>{const n=await ask({title:'Rename '+a.name,label:'New name',value:a.name,
     help:"a-z, 0-9 and '-'. Its color, personality and board cards move along, and its running session keeps working."});
     if(n&&n.trim().toLowerCase()!==a.name){await api(agentPath(a,'rename'),{name:n.trim()});return `${a.name} is now ${n.trim().toLowerCase()}.`;}}]);
