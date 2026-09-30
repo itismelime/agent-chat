@@ -20,6 +20,7 @@ from . import models as models_mod
 from . import mcp, pins, reactions, removal, rules, spawn, talk, usage
 from . import mcp, pins, reactions, rules, spawn, talk, usage
 from . import avatars, mcp, pins, reactions, rules, spawn, talk
+from . import avatars, mcp, pins, reactions, rules, spawn, talk, usage
 from .board import Board
 from .client import Client
 from .codex import Deliverer
