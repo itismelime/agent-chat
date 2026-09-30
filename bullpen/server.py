@@ -17,10 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import mcp, pins, reactions, removal, rules, spawn, talk, usage
-from . import mcp, pins, reactions, rules, spawn, talk, usage
-from . import avatars, mcp, pins, reactions, rules, spawn, talk
-from . import avatars, mcp, pins, reactions, rules, spawn, talk, usage
+from . import avatars, mcp, pins, reactions, removal, rules, spawn, talk, usage
 from .board import Board
 from .client import Client
 from .codex import Deliverer
@@ -36,8 +33,7 @@ ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "te
           "format.js": "text/javascript", "rules.js": "text/javascript",
           "reactions.js": "text/javascript", "emoji-data.js": "text/javascript",
           "emoji.js": "text/javascript", "pins.js": "text/javascript",
-          "removal.js": "text/javascript"}
-          "avatars.js": "text/javascript"}
+          "removal.js": "text/javascript", "avatars.js": "text/javascript"}
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
 MAX_FILE = 5_000_000
