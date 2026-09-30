@@ -168,6 +168,28 @@ class TmuxTest(unittest.TestCase):
         spawn.stop("s")  # already gone: no error
 
 
+class ClaudeStateTest(unittest.TestCase):
+    """Screens as capture-pane -e gives them (from a real Claude Code, 2026-09)."""
+    RULE = "\u2500" * 40
+    FOOT = "\n  Opus 5.5\n  \u23f5\u23f5 auto mode on (shift+tab to cycle)\n"
+
+    def screen(self, prompt, status=""):
+        return "welcome\n%s\n%s\n%s%s%s" % (self.RULE, prompt, self.RULE, self.FOOT, status)
+
+    def test_idle_only_with_an_empty_prompt(self):
+        placeholder = '\x1b[39m\u276f\xa0\x1b[2mTry "create a util logging.py that..."\x1b[0m'
+        self.assertEqual(spawn.claude_state(self.screen(placeholder)), "idle")
+        self.assertEqual(spawn.claude_state(self.screen("\x1b[39m\u276f\xa0")), "idle")
+        # a draft someone is typing in its terminal: never typed over
+        self.assertEqual(spawn.claude_state(self.screen("\x1b[39m\u276f\xa0hello draft")), "unknown")
+
+    def test_working_question_and_no_prompt(self):
+        prompt = "\x1b[39m\u276f\xa0"
+        self.assertEqual(spawn.claude_state(self.screen(prompt, "  \u273b Thinking\u2026 (esc to interrupt)")), "working")
+        self.assertEqual(spawn.claude_state(self.screen(prompt, " Do you want to proceed?")), "question")
+        self.assertEqual(spawn.claude_state("starting up\n"), "unknown")
+
+
 class OpenCodeStateTest(unittest.TestCase):
     def test_states_from_the_footer(self):
         read = lambda n: (SCREENS / n).read_text(encoding="utf-8")

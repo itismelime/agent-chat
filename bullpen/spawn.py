@@ -26,6 +26,7 @@ MAX_TEXT = 2000
 # half a second apart it submits (checked with Codex 0.157 and Claude Code 2.1).
 PASTE_PAUSE = 0.5
 SCREEN_LINES = 25
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 JOIN_GRACE = 60   # seconds a start may take to join before it needs the user
 POLL_SECONDS = 2
 # A screen that asks something: menu footers and question lines from real
@@ -125,8 +126,8 @@ def alive(session):
     return tmux("has-session", "-t", exact(session)).returncode == 0
 
 
-def screen(session):
-    r = tmux("capture-pane", "-p", "-t", pane(session))
+def screen(session, colors=False):
+    r = tmux("capture-pane", "-p", *(["-e"] if colors else []), "-t", pane(session))
     if r.returncode:
         raise StoreError(404, "the agent's terminal has ended")
     return r.stdout
@@ -168,6 +169,24 @@ def opencode_state(text):
     if "enter confirm" in foot:
         return "question"
     return "idle" if "ctrl+p" in foot else "unknown"
+
+
+def claude_state(text):
+    """Claude Code's state from a screen captured with colors (capture-pane -e): idle
+    when its prompt line is empty or shows only the dim placeholder, never with a
+    draft typed in it. Working, question, idle, or unknown."""
+    lines = text.rstrip().splitlines()[-SCREEN_LINES:]
+    plain = "\n".join(ANSI.sub("", l) for l in lines)
+    if needs_you(plain):
+        return "question"
+    if "esc to interrupt" in plain.lower():
+        return "working"
+    prompt = next((l for l in reversed(lines) if "\u276f" in l), None)  # ❯
+    if prompt is None:
+        return "unknown"
+    rest = prompt.split("\u276f", 1)[1].replace("\xa0", " ")
+    rest = re.sub(r"^(\x1b\[(?:0|39|49|22)?m|\s)+", "", rest)
+    return "idle" if not ANSI.sub("", rest).strip() or rest.startswith("\x1b[2m") else "unknown"
 
 
 def working(text):
@@ -321,7 +340,12 @@ class Spawner:
                         age = time.time() - datetime.fromisoformat(r["started"]).timestamp()
                         need = need or age > JOIN_GRACE
                     elif r["tool"] == "opencode":
-                        need = self._type_unread(pid, r, text)
+                        need = self._type_unread(pid, r, opencode_state(text))
+                    elif r["tool"] == "claude":  # no wait loop: messages are typed in when idle
+                        try:
+                            need = self._type_unread(pid, r, claude_state(screen(r["session"], colors=True)))
+                        except StoreError:
+                            continue
                 self.store.set_needs(pid, token, need)
 
     def _rescue(self, pid, token, r):
@@ -356,12 +380,12 @@ class Spawner:
                       "[chat] %s (Your tool call came out as text; bullpen ran it for you.)" % note)
         return self.store.update_spawned(pid, token, **fields)
 
-    def _type_unread(self, pid, r, text):
-        """Type the oldest unread message that wakes this OpenCode agent, if its
-        screen is idle. Unread comes from its stored cursor, so nothing is lost
+    def _type_unread(self, pid, r, state):
+        """Type the oldest unread message that wakes this OpenCode or Claude agent, if
+        its screen is idle (state: from opencode_state or claude_state). Unread comes from its stored cursor, so nothing is lost
         on a restart and nothing it already read with chat_read is typed.
         Returns whether its screen asks the user something."""
-        name, state = r["name"], opencode_state(text)
+        name = r["name"]
         agent = self.store.agents(pid).get(name)
         if not agent or agent.get("removed") or agent.get("gone"):
             return state == "question"

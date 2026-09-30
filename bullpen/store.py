@@ -519,10 +519,11 @@ class Store:
                     status = "offline" if state.get("error") else "busy" if state.get("busy") else "waiting"
                 elif token and (pid, token) in self.needs:
                     status = "needs_you"
-                elif a["kind"] == "opencode":
-                    status = "busy" if self.local.get((pid, name), {}).get("busy") else "waiting"
                 elif self.waiting.get((pid, name)) or a.get("thread"):
                     status = "waiting"
+                elif a["kind"] == "opencode" or (a["kind"] == "claude" and token and (pid, name) in self.local):
+                    # typed to by the page (Spawner._type_unread), which knows whether it is at work
+                    status = "busy" if self.local.get((pid, name), {}).get("busy") else "waiting"
                 elif time.time() - seen < BUSY_SECONDS:
                     status = "busy"
                 else:
