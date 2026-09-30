@@ -318,3 +318,6 @@ max-height:30vh;overflow:auto}#pinbar[hidden]{display:none}
 .pin{display:flex;align-items:center;gap:6px}.pin .ptext{flex:1;min-width:0;text-align:left;background:none;border:0;padding:3px 0;
 color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-size:14px}
 .pin .ptext b{color:var(--attn)}.pin .ptext:hover span{text-decoration:underline}.pin .icon{padding:0 6px}
+
+/* what an agent is doing: its In progress cards */
+.a .doing{grid-column:2;font-size:12px;color:var(--busy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

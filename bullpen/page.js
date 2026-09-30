@@ -218,6 +218,9 @@ function drawRoster(){
       d.append(avatar(a.name),el('b','',a.starting?'new '+a.name:a.name),
         el('small','',sub+(a.last_seen&&['offline','removed'].includes(a.status)?', seen '+ago(a.last_seen):'')));
       if(a.personality)d.append(el('span','pers',a.personality));
+      const doing=(boardData?boardData.cards:[]).filter(c=>c.assignee===a.name&&c.column==='doing'&&c.kind!=='epic');
+      if(doing.length){const w=el('span','doing','▶ '+doing.map(c=>'#'+c.id+' '+c.title).join(', '));  // its In progress cards
+        w.title='In progress: '+doing.map(c=>'#'+c.id+' '+c.title).join('; ');d.append(w);}
       d.onclick=d.oncontextmenu=e=>{e.stopPropagation();openMenu(e,agentItems(a));};return d;})];}));}
 const menu=$('menu');
 function openMenu(e,items){
