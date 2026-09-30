@@ -94,3 +94,20 @@ def standing(store, pid):
     line = ("The lead is %s: the user's messages without @names go to %s alone, who answers or "
             "hands the work on with @name; @all reaches everyone." % (lead, lead)) if lead else ""
     return " ".join(x for x in (line, summary(get(store, pid)), pins.summary(store, pid)) if x)
+
+
+def fresh(store, pid, name):
+    """(rules, personality) to send with a wake: the first time and after either
+    changed, else ("", None). An agent keeps what it was told, so every wake does
+    not pay for it again. Local models are stateless and take standing() each time."""
+    import hashlib
+    rules = standing(store, pid)
+    with store.changed:
+        agent = store.agents(pid).get(name)
+        if agent is None:
+            return rules, None
+        seen = hashlib.sha1(("%s\0%s" % (rules, agent.get("role") or "")).encode()).hexdigest()[:16]
+        if agent.get("told") == seen:
+            return "", None
+        store._update(pid, name, told=seen)
+        return rules, agent.get("role")

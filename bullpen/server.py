@@ -358,9 +358,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         result = store.wait(pid, what[1], wait_seconds, alive=self.client_alive)
                         if result is None:
                             return 204, None
-                        role = store.agents(pid).get(what[1], {}).get("role")
-                        return 200, dict(result, personality=role, name=what[1],
-                                         rules=rules.standing(store, pid))
+                        told, role = rules.fresh(store, pid, what[1])
+                        return 200, dict(result, personality=role, name=what[1], rules=told)
                 if len(what) == 3 and what[0] == "agents" and method == "POST" and what[2] == "resume":
                     return 201, {"spawned": spawner.resume(pid, what[1])}
                 if len(what) == 3 and what[0] == "agents" and method == "POST" \

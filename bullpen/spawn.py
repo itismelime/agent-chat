@@ -392,8 +392,8 @@ class Spawner:
         unread = [m for m in self.store.messages(pid, agent["cursor"]) if wakes(m, name, self.store.away(), self.store.lead(pid))]
         if state == "idle" and unread:
             from . import rules
-            send_text(r["session"], format_message(unread[0], name, agent.get("role"),
-                                                   rules.standing(self.store, pid)))
+            told, personality = rules.fresh(self.store, pid, name)
+            send_text(r["session"], format_message(unread[0], name, personality, told))
             self.store.delivered(pid, name, unread[0]["n"])
             if name in addressed(unread[0]["text"]) or unread[0].get("dm"):  # a reply is owed
                 self.store.update_spawned(pid, r["token"], owed=unread[0]["n"])

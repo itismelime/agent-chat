@@ -65,5 +65,17 @@ class RulesTest(unittest.TestCase):
         self.assertIn(want, system_prompt("scout", "proj", [], None, want))
 
 
+    def test_a_wake_carries_them_only_when_new(self):
+        rules.add(self.store, "proj", "Link every PR")
+        self.store.join("proj", "alice", "claude")
+        wait = lambda: self.c.call("GET", "/api/projects/proj/agents/alice/wait")[1]
+        self.store.post("proj", "user", "one")
+        self.assertIn("Link every PR", wait()["rules"])
+        self.store.post("proj", "user", "two")
+        self.assertEqual(wait()["rules"], "")  # it was told already
+        rules.add(self.store, "proj", "Keep replies short")
+        self.store.post("proj", "user", "three")
+        self.assertIn("Keep replies short", wait()["rules"])
+
 if __name__ == "__main__":
     unittest.main()
