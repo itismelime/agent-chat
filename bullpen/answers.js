@@ -3,7 +3,7 @@
 // project, oldest first, until you post to that agent or to everyone after it, or answer or dismiss them
 // here. Answers to a private message stay private. When a
 // question lists options (A) B) C), Option 1: …) they become choices: ↑/↓ and Enter, or the letter.
-let answersSeen=null;  // how many questions the last draw showed
+let answersSeen=null,fitAnswers=()=>{};  // how many questions the last draw showed
 let dismissed=saved.get('dismissed',{}),answerKey='',answersMin=saved.get('answersMin',false);
 const answerNodes=new Map();
 function pending(){const out=[];
@@ -31,7 +31,7 @@ function drawAnswers(){
   const list=pending(),keys=list.map(x=>x.p.id+':'+x.m.n),key=keys.join();
   if(list.length>answerCount&&answerCount>=0&&key!==answerKey&&answerKey!==''){answersMin=false;saved.set('answersMin',false);}
   answerCount=list.length;
-  $('answers').hidden=!list.length||answersMin;$('answercount').textContent=String(list.length);
+  $('answers').hidden=!list.length||answersMin;fitAnswers();$('answercount').textContent=String(list.length);
   if(answersSeen!==null&&list.length>answersSeen)for(const b of [$('answercount'),$('answerchip')]){b.classList.remove('rise');void b.offsetWidth;b.classList.add('rise');}
   answersSeen=list.length;  // a new question: one red pulse, the only motion that is not yours
   $('answerchip').hidden=!list.length||!answersMin;
@@ -86,3 +86,20 @@ function focusAnswer(){  // Alt+N: the first question's choices, else its reply 
   if(answersMin)showAnswers(false);(first.querySelector('.choices')||first.querySelector('textarea')).focus();return true;}
 $('answertoggle').onclick=()=>showAnswers(true);
 $('answerchip').onclick=()=>{showAnswers(false);focusAnswer();};
+
+{  // its left edge resizes it: drag, arrow keys, double-click for the default; the width is remembered
+  const box=$('answers'),grip=el('div','grip'),MIN=260,DEF=380;
+  // never so wide that the chat beside it drops below CHAT px (it would wrap a word per line)
+  const CHAT=360,max=()=>Math.max(MIN,Math.min(900,box.offsetWidth+$('chat').offsetWidth-CHAT));
+  const set=w=>{w=Math.round(Math.max(MIN,Math.min(max(),w)));box.style.setProperty('--answersw',w+'px');grip.setAttribute('aria-valuenow',w);return w;};
+  grip.tabIndex=0;grip.setAttribute('role','separator');grip.setAttribute('aria-orientation','vertical');
+  grip.setAttribute('aria-label','Resize Needs an answer');grip.title='Drag to resize; double-click for the default width';
+  // your width stays saved; what shows is as much of it as the room allows, checked when it opens too
+  fitAnswers=()=>{if(!box.hidden)set(saved.get('answersW',DEF));};
+  set(saved.get('answersW',DEF));box.prepend(grip);addEventListener('resize',fitAnswers);
+  grip.onpointerdown=e=>{e.preventDefault();try{grip.setPointerCapture(e.pointerId);}catch{}const x0=e.clientX,w0=box.offsetWidth;
+    grip.classList.add('on');grip.onpointermove=ev=>set(w0+x0-ev.clientX);
+    grip.onpointerup=()=>{grip.onpointermove=null;grip.classList.remove('on');saved.set('answersW',box.offsetWidth);};};
+  grip.ondblclick=()=>saved.set('answersW',set(DEF));
+  grip.onkeydown=e=>{const d={ArrowLeft:20,ArrowRight:-20}[e.key];if(!d)return;e.preventDefault();saved.set('answersW',set(box.offsetWidth+d));};
+}

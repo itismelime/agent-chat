@@ -58,8 +58,10 @@ h1{font:800 22px/1.2 var(--display);margin:0;white-space:nowrap;letter-spacing:-
 #chat{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
 
 /* needs an answer: a column beside chat and board, one card per question */
-#answers{width:380px;flex:none;display:flex;flex-direction:column;min-height:0;background:var(--rail);border-left:1px solid var(--line)}
+#answers{width:var(--answersw,380px);flex:none;display:flex;flex-direction:column;min-height:0;background:var(--rail);border-left:1px solid var(--line)}
 #answers[hidden]{display:none}
+#answers{position:relative}#answers .grip{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:2;touch-action:none}
+#answers .grip:hover,#answers .grip.on,#answers .grip:focus-visible{background:linear-gradient(90deg,transparent 3px,var(--proof) 3px 5px,transparent 5px);outline:none}
 #answers .top{padding:12px 10px 8px 16px}
 #answers h2{font:800 15px/1.2 var(--display);letter-spacing:-.01em;margin:0;display:flex;align-items:center;gap:8px}
 #answercount{background:var(--attn);color:var(--paper);border-radius:10px;padding:0 7px;font:700 12px/1.5 var(--text)}
@@ -146,6 +148,7 @@ overflow-wrap:anywhere;max-width:84ch}
 .m .acts{position:absolute;right:6px;top:-14px;display:none;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:1px}
 .m:hover .acts,.m:focus-within .acts{display:flex}.m:hover .t{display:none}
 .acts button{background:none;color:var(--mute);font-size:12px;padding:2px 8px;font-weight:600}.acts button:hover{color:var(--ink);background:var(--soft)}
+.m.atme{background:var(--proof-bg);border-left-color:var(--proof)}  /* an agent @-ed you */
 .m.hit{background:color-mix(in srgb,var(--busy) 16%,transparent)}
 .m.flash{animation:flash 1.6s ease-out}@keyframes flash{from{background:color-mix(in srgb,var(--c) 30%,transparent)}}
 .mention{font-weight:700;color:var(--c)}.mention.me{background:var(--proof-bg);color:var(--proof);border-radius:4px;padding:0 3px}
@@ -274,7 +277,7 @@ span.ename{cursor:default;color:var(--mute)}.ename:hover{text-decoration:underli
 .addcard button{width:100%;background:none;color:var(--mute);text-align:left;font-weight:500}
 .addcard button:hover{background:var(--soft);color:var(--ink)}
 
-@media (max-width:1000px){#answers{position:fixed;inset:0 0 0 auto;width:min(420px,100vw);z-index:14;box-shadow:0 0 40px #0005}
+@media (max-width:1000px){#answers{position:fixed;inset:0 0 0 auto;width:min(var(--answersw,420px),100vw);z-index:14;box-shadow:0 0 40px #0005}
 aside{display:none}#search{width:140px}#rosterbtn{display:block}
 body.roster aside{display:block;position:fixed;inset:0 0 0 auto;z-index:15;background:var(--paper);box-shadow:0 0 40px #0005}}
 @media (max-width:720px){#rail{position:fixed;inset:0 auto 0 0;z-index:15;box-shadow:0 0 40px #0005;transform:translateX(-100%);
@@ -373,3 +376,12 @@ input[type=range]{accent-color:var(--proof)}
 #askextra .fat{font:12px var(--mono);color:var(--mute);overflow-wrap:anywhere}
 #askextra .flist{display:flex;flex-direction:column;max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:7px;padding:4px}
 #askextra .flist button{border:0;text-align:left;padding:5px 10px;font-weight:500}#askextra .flist .up{color:var(--mute)}
+.rosterhead .tools{display:flex;margin-left:auto;margin-right:6px}
+.rosterhead .tools .icon{padding:5px;display:grid;place-items:center}
+.rosterhead .tools svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.leadtag{font-size:11px;font-weight:700;color:var(--proof);border:1px solid var(--proof);border-radius:5px;padding:0 5px;margin-left:6px;align-self:center}
+.a small.doing{color:var(--busy)}.a small.doing::after{content:"...";display:inline-block;width:1.2em;text-align:left;
+animation:dots 1.2s steps(1) infinite}  /* static "..." when motion is reduced */
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+#plan{margin:14px 4px 0;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--mute);display:flex;flex-direction:column;gap:2px}
+#plan b{font-weight:600;color:var(--ink)}#plan[hidden]{display:none}

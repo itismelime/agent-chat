@@ -143,12 +143,17 @@ class Session:
         standing = body.get("standing", summary(body["rules"]))  # rules, then pins
         return lead + standing if standing else ""
 
+    def typed(self):
+        """A Claude started from the page: bullpen types its messages into its terminal
+        when it is idle (spawn.Spawner), so it needs no wait loop and costs nothing idle."""
+        return self.kind == "claude" and bool(self.spawn_token)
+
     def instructions(self):
         if self.down:
             return DOWN
         if not self.project:
             return None
-        if self.kind == "opencode":
+        if self.kind == "opencode" or self.typed():
             return ("This project (%s) has a shared chat with the user and other agents. "
                     "Call chat_join with a short name for your role or persona (architect, reviewer, tester…; not your model or tool); chat messages "
                     "for you are then typed into this session as they arrive. Reply with "
@@ -253,9 +258,9 @@ class Session:
                 self.name = body["agent"]["name"]
                 recent = "\n".join(fmt(m) for m in body["recent"]) or "(no messages yet)"
                 joined = "Joined %s as %s. " % (self.project["name"], self.name)
-                if self.kind == "opencode":
+                if self.kind == "opencode" or self.typed():
                     how = ("Chat messages for you are typed into this session as they arrive; "
-                           "reply with chat_post.")
+                           "reply with chat_post. Run no wait command: there is nothing to keep running.")
                 elif self.kind != "codex":
                     how = ("Run this as a background command now (with a timeout of at least "
                            "30 minutes, the default: it ends by itself before that), and again "

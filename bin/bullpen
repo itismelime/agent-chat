@@ -112,6 +112,7 @@ def main():
             p.add_argument("new")
     sub.add_parser("serve")
     sub.add_parser("mcp")
+    sub.add_parser("statusline")  # for Claude agents started from the page (bullpen/plan.py)
     cfg = sub.add_parser("config")
     cfg.add_argument("key", choices=["ollama-url"])
     cfg.add_argument("value", nargs="?")
@@ -120,6 +121,9 @@ def main():
     if args.cmd == "serve":
         from bullpen.server import main as serve
         return serve()
+    if args.cmd == "statusline":
+        from bullpen.plan import main as statusline
+        return statusline()
     if args.cmd == "mcp":
         from bullpen.mcp import main as mcp
         return mcp()

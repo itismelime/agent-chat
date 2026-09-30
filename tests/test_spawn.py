@@ -3,6 +3,7 @@ import re
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from bullpen import spawn
@@ -56,6 +57,9 @@ class NoTmuxTest(unittest.TestCase):
 
 class TmuxTest(unittest.TestCase):
     def setUp(self):
+        stub = mock.patch.object(spawn, "claude_settings", return_value="S")  # its real JSON: PlanTest
+        stub.start()
+        self.addCleanup(stub.stop)
         self.d = stub_tools(self)
 
     def test_available(self):
@@ -67,7 +71,7 @@ class TmuxTest(unittest.TestCase):
         spawn.start("claude", "/proj dir", "bullpen-p-abc123", "tok")
         self.assertEqual(calls(self.d), [
             "new-session -d -s bullpen-p-abc123 -c /proj dir -e BULLPEN_SPAWN=tok "
-            "-- claude join the chat"])
+            "-- claude --settings S join the chat"])
 
     def test_codex_gets_its_start_token_in_the_prompt(self):
         spawn.start("codex", "/p", "bullpen-p-abc123", "tok")
@@ -168,6 +172,39 @@ class TmuxTest(unittest.TestCase):
         spawn.stop("s")  # already gone: no error
 
 
+class ClaudeStateTest(unittest.TestCase):
+    """Screens as capture-pane -e gives them (from a real Claude Code, 2026-09)."""
+    RULE = "\u2500" * 40
+    FOOT = "\n  Opus 5.5\n  \u23f5\u23f5 auto mode on (shift+tab to cycle)\n"
+
+    def screen(self, prompt, status=""):
+        return "welcome\n%s\n%s\n%s%s%s" % (self.RULE, prompt, self.RULE, self.FOOT, status)
+
+    def test_idle_only_with_an_empty_prompt(self):
+        placeholder = '\x1b[39m\u276f\xa0\x1b[2mTry "create a util logging.py that..."\x1b[0m'
+        self.assertEqual(spawn.claude_state(self.screen(placeholder)), "idle")
+        self.assertEqual(spawn.claude_state(self.screen("\x1b[39m\u276f\xa0")), "idle")
+        # a draft someone is typing in its terminal: never typed over
+        self.assertEqual(spawn.claude_state(self.screen("\x1b[39m\u276f\xa0hello draft")), "unknown")
+
+    def test_working_question_and_no_prompt(self):
+        prompt = "\x1b[39m\u276f\xa0"
+        self.assertEqual(spawn.claude_state(self.screen(prompt, "  \u273b Thinking\u2026 (esc to interrupt)")), "working")
+        self.assertEqual(spawn.claude_state(self.screen(prompt, " Do you want to proceed?")), "question")
+        self.assertEqual(spawn.claude_state("starting up\n"), "unknown")
+
+    def test_activity_from_the_spinner(self):
+        """Spinner lines as Claude Code 2.1 draws them above the prompt box."""
+        at = lambda spinner: spawn.claude_activity("hi\n%s\n%s\n\x1b[39m\u276f\xa0\n%s%s" % (spinner, self.RULE, self.RULE, self.FOOT))
+        self.assertEqual(at("\u2736 Metamorphosing\u2026 (4s \u00b7 \u2193 86 tokens)"), "working")
+        self.assertEqual(at("\u00b7 Metamorphosing\u2026 (6s \u00b7 \u2193 91 tokens \u00b7 thinking)"), "thinking")
+        self.assertEqual(at("\u273b Compacting conversation\u2026 (3s)"), "compacting")
+        self.assertEqual(at("\u25cf Listing 1 directory\u2026"), "working")
+        self.assertIsNone(at("\u273b Cooked for 6s \u00b7 done 20:31"))  # finished: idle
+        self.assertEqual(spawn.claude_state("hi\n\u2736 Baking\u2026 (2s)\n%s\n\x1b[39m\u276f\xa0\n%s%s"
+                                            % (self.RULE, self.RULE, self.FOOT)), "working")  # no "esc to interrupt" any more
+
+
 class OpenCodeStateTest(unittest.TestCase):
     def test_states_from_the_footer(self):
         read = lambda n: (SCREENS / n).read_text(encoding="utf-8")
@@ -197,6 +234,9 @@ class NeedsYouTest(unittest.TestCase):
 
 class SpawnerTest(unittest.TestCase):
     def setUp(self):
+        stub = mock.patch.object(spawn, "claude_settings", return_value="S")  # its real JSON: PlanTest
+        stub.start()
+        self.addCleanup(stub.stop)
         from bullpen.store import Store
         self.d = stub_tools(self)
         tmp = Path(tempfile.mkdtemp())
@@ -244,9 +284,8 @@ class SpawnerTest(unittest.TestCase):
         self.sp.poll()
         self.sp.poll()
         typed = self.typed()
-        self.assertEqual(len(typed), 2)  # each once, oldest first
-        self.assertIn("[chat] user: first", typed[0])
-        self.assertIn("[chat] user: second", typed[1])
+        self.assertEqual(len(typed), 1)  # both in one turn, oldest first
+        self.assertLess(typed[0].index("[chat] user: first"), typed[0].index("[chat] user: second"))
         self.assertEqual(self.store.agents("proj")["kit"]["cursor"], self.store.messages("proj")[-1]["n"])
         self.assertEqual(next(a for a in self.store.status("proj") if a["name"] == "kit")["status"], "waiting")
 
@@ -394,15 +433,21 @@ class SpawnerTest(unittest.TestCase):
         path = self.store.project("proj")["path"]
         logs = home / ".claude" / "projects" / re.sub(r"[^A-Za-z0-9]", "-", path)
         logs.mkdir(parents=True)
-        (logs / "s-alice.jsonl").write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"alice"}}\n')
-        (logs / "s-bob.jsonl").write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"bob"}}\n')
+        (logs / "s-alice.jsonl").write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"alice"}}\n'
+                                            '{"content":"Joined proj as alice. "}\n')
+        # bob tried alice first (taken, refused), then joined as bob: alice's session is still s-alice
+        (logs / "s-bob.jsonl").write_text('{"name":"mcp__bullpen__chat_join","input":{"name":"alice"}}\n'
+                                          '{"content":"name alice is taken"}\n'
+                                          '{"name":"mcp__bullpen__chat_join","input":{"name":"bob"}}\n'
+                                          '{"content":"Joined proj as bob. "}\n')
+        os.utime(logs / "s-bob.jsonl", (time.time() + 60, time.time() + 60))  # the newer log
         self.store.join("proj", "alice", "claude")
         with self.assertRaises(StoreError) as e:  # just joined: not offline
             self.sp.resume("proj", "alice")
         self.assertEqual(e.exception.code, 409)
         self.store._update("proj", "alice", gone=True)
         r = self.sp.resume("proj", "alice")
-        self.assertIn("-- claude --resume s-alice You are back in the chat: call chat_join with "
+        self.assertIn("-- claude --settings S --resume s-alice You are back in the chat: call chat_join with "
                       "the name alice", calls(self.d)[-1])
         with self.assertRaises(StoreError) as e:  # its resumed terminal is there
             self.sp.resume("proj", "alice")
@@ -430,7 +475,7 @@ class SpawnerTest(unittest.TestCase):
     def test_a_personality_asks_for_a_fitting_name(self):
         self.sp.start("proj", "claude", personality="finds bugs")
         self.assertTrue(calls(self.d)[-1].endswith(
-            "-- claude join the chat with a name that fits your personality: finds bugs"))
+            "-- claude --settings S join the chat with a name that fits your personality: finds bugs"))
 
     def test_stop_even_when_already_gone(self):
         r = self.sp.start("proj", "claude")
@@ -501,7 +546,7 @@ class RealTmuxTest(unittest.TestCase):
         (tmp / "bin").mkdir()
         (tmp / "proj").mkdir()
         fake = tmp / "bin" / "claude"
-        fake.write_text('#!/bin/sh\necho "fake agent: $1"\necho "Do you want to proceed?"\n'
+        fake.write_text('#!/bin/sh\nfor a; do last=$a; done\necho "fake agent: $last"\necho "Do you want to proceed?"\n'
                         'read line\necho "got: $line"\nsleep 30\n')
         fake.chmod(0o755)
         env = {"PATH": "%s:/usr/bin:/bin" % (tmp / "bin"), "TMUX_TMPDIR": str(tmp)}

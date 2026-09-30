@@ -9,6 +9,17 @@ from .store import StoreError, now, write_json
 
 COLUMNS = {"todo": "To do", "doing": "In progress", "review": "Review", "done": "Done"}
 MAX_TITLE, MAX_DESCRIPTION = 200, 4000
+ABOUT = 600  # of a description in an assignment notice; board_list has it all
+
+
+def assigned(n, card, by):
+    """The notice that wakes an assignee, with the card's description: what to do,
+    without reading the whole board for it."""
+    text = '@%s you were assigned #%s "%s" by %s' % (card["assignee"], n, card["title"], by)
+    about = " ".join(card.get("description", "").split())
+    if about:
+        text += ": " + (about if len(about) <= ABOUT else about[:ABOUT - 1] + "\u2026")
+    return text
 
 
 class Board:
@@ -116,8 +127,7 @@ class Board:
                 "Epic " if kind == "epic" else "", n, card["title"], by, COLUMNS[card["column"]],
                 self._in(b, card)))
             if card["assignee"] and card["assignee"] not in ("user", by):
-                self.store.notice(pid, '@%s you were assigned #%d "%s" by %s'
-                                  % (card["assignee"], n, card["title"], by))
+                self.store.notice(pid, assigned(n, card, by))
         return dict(card, id=n)
 
     def update(self, pid, n, by, title=None, description=None, column=None, assignee=False,
@@ -146,11 +156,17 @@ class Board:
             write_json(self._path(pid), b)
             to = card["assignee"]
             at = "@%s " % to if to and to not in ("user", by) else ""
+            if card["column"] == "done" and old["column"] != "done":
+                at = ""  # finished: nothing left for its assignee to do, so it sleeps on
             if card["assignee"] != old["assignee"] and at:
-                self.store.notice(pid, '@%s you were assigned #%s "%s" by %s' % (to, n, old["title"], by))
+                self.store.notice(pid, assigned(n, dict(card, title=old["title"]), by))
             if card["column"] != old["column"]:
-                self.store.notice(pid, '%s%s moved #%s "%s" to %s'
-                                  % (at, by, n, old["title"], COLUMNS[card["column"]]))
+                # work handed in (Review, Done) wakes whoever put it on the board too: the lead
+                maker = card.get("created_by")
+                back = ("@%s " % maker if card["column"] in ("review", "done") and maker not in ("user", by, to, None)
+                        else "")
+                self.store.notice(pid, '%s%s%s moved #%s "%s" to %s'
+                                  % (at, back, by, n, old["title"], COLUMNS[card["column"]]))
             if card.get("epic") != old.get("epic"):
                 self.store.notice(pid, '%s%s moved #%s "%s" %s' % (
                     at, by, n, card["title"], self._in(b, card).strip() or "out of its epic"))

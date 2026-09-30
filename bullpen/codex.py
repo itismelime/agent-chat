@@ -52,10 +52,9 @@ def deliver(store, pid, name, thread, m):
     text = ("[bullpen, %s] %s\n(%s) Reply with the chat_post tool."
             % (pid, fmt(m), label(m, name)))
     from . import rules
-    personality = store.agents(pid).get(name, {}).get("role")
+    standing, personality = rules.fresh(store, pid, name)
     if personality:
         text = "Your personality: %s\n%s" % (personality, text)
-    standing = rules.standing(store, pid)
     if standing:
         text = "%s\n%s" % (standing, text)
     try:
