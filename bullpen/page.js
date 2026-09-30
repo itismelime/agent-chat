@@ -220,15 +220,18 @@ function usageLine(u){  // Claude: context and tokens out; Codex: context of its
   else{text=u.loaded?`ctx ${kfmt(u.ctx)} · ${(u.vram/2**30).toFixed(1)} GB`:'not loaded';title=`${u.model}: `+(u.loaded?`context ${u.ctx} tokens, ${u.vram} bytes of video memory`:'not in memory now');}
   const s=el('span','usage',text);s.title=title;return s;}
 function drawRoster(){
-  const starting=spawned.filter(s=>!s.name).map(s=>({name:KIND[s.tool]||s.tool,kind:s.tool,starting:true,
-    spawn:s.token,status:s.state==='needs_you'?'needs_you':'starting'}));
-  const members=[...starting,...agents];
+  const phase=s=>s.state==='needs_you'?'needs_you':'starting';
+  const starting=spawned.filter(s=>!s.name&&!s.resume).map(s=>({name:KIND[s.tool]||s.tool,kind:s.tool,starting:true,
+    spawn:s.token,status:phase(s)}));
+  // a resumed agent comes back in its own row, not as a new one, until it has rejoined
+  const resuming=new Map(spawned.filter(s=>!s.name&&s.resume).map(s=>[s.resume,s]));
+  const members=[...starting,...agents.map(a=>resuming.has(a.name)?{...a,status:phase(resuming.get(a.name)),resuming:true}:a)];
   if(!members.length){$('members').replaceChildren(el('p','rosterempty',cur?
     'Nobody here yet. Start Claude, Codex or a local model with Start agent.':'Add a project first.'));return;}
   $('members').replaceChildren(...GROUPS.flatMap(([st,title])=>{
     const g=members.filter(a=>a.status===st);if(!g.length)return [];
     return [el('h3','',title+' ('+g.length+')'),...g.map(a=>{const d=who(el('div','a '+a.status),a.name);
-      const sub=a.starting?'starting…':a.model?a.model:a.kind==='opencode'?'OpenCode '+((spawned.find(s=>s.token===a.spawn)||{}).model||''):KIND[a.kind]||a.kind;
+      const sub=a.starting?'starting…':a.resuming?'resuming…':a.model?a.model:a.kind==='opencode'?'OpenCode '+((spawned.find(s=>s.token===a.spawn)||{}).model||''):KIND[a.kind]||a.kind;
       d.title=a.error?'Offline: '+a.error:'Click or right-click for options';
       d.append(avatar(a.name),el('b','',a.starting?'new '+a.name:a.name),
         el('small','',sub+(a.last_seen&&['offline','removed'].includes(a.status)?', seen '+ago(a.last_seen):'')));
