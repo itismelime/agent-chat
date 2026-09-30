@@ -36,6 +36,27 @@ class AvatarsTest(unittest.TestCase):
         self.c.call("POST", self.base + "ally/delete", {})
         self.assertEqual(set(self.c.call("GET", "/api/projects/proj/agents")[1]["avatars"]), {"user"})
 
+    def test_crop_and_profile(self):
+        data = base64.b64encode(png()).decode()
+        self.c.call("POST", self.base + "user", {"data": data})
+        got = self.c.call("POST", self.base + "user/crop", {"x": 0.25, "y": 0, "w": 0.5, "h": 0.5})[1]["avatars"]
+        self.assertEqual(got["user"]["crop"], {"x": 0.25, "y": 0.0, "w": 0.5, "h": 0.5})
+        for bad in ({"x": 0.6, "y": 0, "w": 0.5, "h": 0.5}, {"x": 0, "y": 0, "w": 0, "h": 0}, {"x": "a"}):
+            with self.assertRaises(ApiError, msg=bad) as e:
+                self.c.call("POST", self.base + "user/crop", bad)
+            self.assertEqual(e.exception.code, 400)
+        self.c.call("POST", self.base + "user", {"data": data})  # a new picture starts uncropped
+        self.assertIsNone(self.c.call("GET", "/api/projects/proj/agents")[1]["avatars"]["user"]["crop"])
+        self.c.call("POST", "/api/profile", {"name": " Victor ", "about": "Prefers short answers."})
+        p = self.c.call("GET", "/api/profile")[1]
+        self.assertEqual((p["name"], p["for_agents"]),
+                         ("Victor", "The user's name is Victor. About the user: Prefers short answers."))
+        s = Session(self.c, str(self.tmp / "proj"))
+        init = handle(s, {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"clientInfo": {"name": "claude-code"}}})
+        self.assertIn("About the user: Prefers short answers.", init["result"]["instructions"])
+        with self.assertRaises(ApiError):
+            self.c.call("POST", "/api/profile", {"name": "x" * 40})
+
     def test_only_pictures(self):
         svg = base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg"><script>x</script></svg>').decode()
         for body, code in (({"data": svg}, 415), ({"data": "not base64!"}, 400), ({"data": 3}, 400)):

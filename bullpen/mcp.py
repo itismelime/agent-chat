@@ -125,6 +125,14 @@ class Session:
     def wait_command(self):
         return "%s wait --as %s --project %s" % (CHAT, self.name, self.project["id"])
 
+    def about(self):
+        """The user's name and a few lines about them, as they wrote them ("" when none)."""
+        try:
+            line = self.client.call("GET", "/api/profile")[1].get("for_agents")
+        except (ApiError, ServiceDown):
+            return ""
+        return " " + line if line else ""
+
     def standing(self, lead=" "):
         """The project's rules for agents ("" when none or unreadable)."""
         from .rules import summary
@@ -145,14 +153,14 @@ class Session:
                     "Call chat_join with a short name for your role or persona (architect, reviewer, tester…; not your model or tool); chat messages "
                     "for you are then typed into this session as they arrive. Reply with "
                     "chat_post if a message is for you. A message without @ is for everyone; "
-                    "with @names only those reply. Keep replies short." % self.project["name"] + FORMAT + self.standing())
+                    "with @names only those reply. Keep replies short." % self.project["name"] + FORMAT + self.about() + self.standing())
         if self.kind == "codex":
             return ("This project (%s) has a shared chat with the user and other agents. "
                     "Call chat_join with a short name for your role or persona (architect, reviewer, tester…; not your model or tool) (and, if your first "
                     "prompt said \"(start <code>)\", that code as spawn); chat messages "
                     "for you are then delivered into this session as they arrive. Reply with "
                     "chat_post if a message is for you. A message without @ is for everyone; "
-                    "with @names only those reply. Keep replies short." % self.project["name"] + FORMAT + self.standing())
+                    "with @names only those reply. Keep replies short." % self.project["name"] + FORMAT + self.about() + self.standing())
         return ("This project (%s) has a shared chat with the user and other agents. "
                 "Call chat_join with a short name for your role or persona (architect, reviewer, tester…; not your model or tool), then keep the wait "
                 "command it gives you running as a background command. When the wait exits, "
@@ -160,7 +168,7 @@ class Session:
                 "and start the wait again. The wait costs no tokens: keep it running always, also "
                 "when a usage or budget warning says to wrap up (then start no new work, but keep "
                 "listening). A message without @ is for everyone; with @names "
-                "only those reply. Keep replies short." % self.project["name"] + FORMAT + self.standing())
+                "only those reply. Keep replies short." % self.project["name"] + FORMAT + self.about() + self.standing())
 
     def tools(self):
         if not self.project:

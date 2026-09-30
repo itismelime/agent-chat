@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import avatars, mcp, pins, prs, reactions, removal, rules, spawn, talk, usage
+from . import avatars, mcp, pins, profile, prs, reactions, removal, rules, spawn, talk, usage
 from .board import Board
 from .client import Client
 from .codex import Deliverer
@@ -33,7 +33,7 @@ ASSETS = {"page.css": "text/css", "page.js": "text/javascript", "models.js": "te
           "format.js": "text/javascript", "rules.js": "text/javascript",
           "reactions.js": "text/javascript", "emoji-data.js": "text/javascript",
           "emoji.js": "text/javascript", "pins.js": "text/javascript",
-          "removal.js": "text/javascript", "avatars.js": "text/javascript",
+          "removal.js": "text/javascript", "avatars.js": "text/javascript", "profile.js": "text/javascript",
           "away.js": "text/javascript", "prchips.js": "text/javascript"}
 TCP_TABLE = "/proc/net/tcp"
 MAX_BODY = 20000
@@ -179,6 +179,11 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                 if project is None:
                     raise StoreError(404, "not in a registered project")
                 return 200, {"project": project}
+            if rest == ["profile"] and method == "GET":
+                return 200, dict(profile.get(store), for_agents=profile.for_agents(store))
+            if rest == ["profile"] and method == "POST":
+                data = self.body()
+                return 200, profile.save(store, data.get("name"), data.get("about"))
             if rest == ["pr"] and method == "GET":  # a PR link's chip: state and checks, via gh
                 return 200, prs.state(query.get("repo"), query.get("n", ""))
             if rest == ["tools"] and method == "GET":
@@ -245,6 +250,8 @@ def make_handler(store, port, wait_seconds, spawner, owner, models):
                         return 200, {"avatars": avatars.save_base64(store, pid, name, data.get("data"))}
                     if what[2:] == ["delete"] and method == "POST":
                         return 200, {"avatars": avatars.remove(store, pid, name)}
+                    if what[2:] == ["crop"] and method == "POST":
+                        return 200, {"avatars": avatars.set_crop(store, pid, name, self.body())}
                 if what == ["agents"] and method == "POST":
                     data = self.body()
                     agent = store.join(pid, self.field(data, "name"), self.field(data, "kind"),

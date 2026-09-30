@@ -3,6 +3,7 @@ Only PNG, JPEG and WebP, told apart by their first bytes, never SVG: the page
 shows them next to its own scripts."""
 import base64
 import binascii
+import json
 
 from .store import StoreError
 
@@ -37,6 +38,28 @@ def save(store, pid, name, data):
     tmp = f.with_name(f.name + ".tmp")
     tmp.write_bytes(data)
     tmp.replace(f)
+    _crop_file(f).unlink(missing_ok=True)  # a new picture starts uncropped (centered)
+    return versions(store, pid)
+
+
+def _crop_file(f):
+    return f.with_name(f.name + ".crop")
+
+
+def set_crop(store, pid, name, crop):
+    """Which part of the picture shows: x, y, w, h as fractions of its width
+    and height (the page makes w and h the same square on the picture)."""
+    f = _file(store, pid, name)
+    if not f.is_file():
+        raise StoreError(404, "no picture for %s" % name)
+    try:
+        c = {k: float(crop[k]) for k in ("x", "y", "w", "h")}
+    except (TypeError, KeyError, ValueError):
+        raise StoreError(400, "crop must have x, y, w and h") from None
+    if not (0 < c["w"] <= 1 and 0 < c["h"] <= 1 and 0 <= c["x"] <= 1 - c["w"] + 1e-9
+            and 0 <= c["y"] <= 1 - c["h"] + 1e-9):
+        raise StoreError(400, "the crop must lie inside the picture")
+    _crop_file(f).write_text(json.dumps(c))
     return versions(store, pid)
 
 
@@ -60,7 +83,9 @@ def load(store, pid, name):
 
 
 def remove(store, pid, name):
-    _file(store, pid, name).unlink(missing_ok=True)
+    f = _file(store, pid, name)
+    f.unlink(missing_ok=True)
+    _crop_file(f).unlink(missing_ok=True)
     return versions(store, pid)
 
 
@@ -68,14 +93,20 @@ def rename(store, pid, old, new):
     """An agent renamed: its picture follows."""
     f = _file(store, pid, old)
     if f.is_file():
-        f.replace(_file(store, pid, new))
+        new_f = _file(store, pid, new)
+        f.replace(new_f)
+        if _crop_file(f).is_file():
+            _crop_file(f).replace(_crop_file(new_f))
 
 
 def versions(store, pid):
-    """{name: version} of the pictures the page shows in this project (you included)."""
+    """{name: {"v": version, "crop": crop or None}} of the pictures the page shows
+    in this project (you included)."""
     out = {}
     for name in ["user", *store.agents(pid)]:
         f = _file(store, pid, name)
         if f.is_file():
-            out[name] = int(f.stat().st_mtime)
+            c = _crop_file(f)
+            out[name] = {"v": int(f.stat().st_mtime),
+                         "crop": json.loads(c.read_text()) if c.is_file() else None}
     return out
