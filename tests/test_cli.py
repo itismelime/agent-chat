@@ -11,6 +11,29 @@ from tests.helpers import start, stop
 CHAT = str(Path(__file__).resolve().parent.parent / "bin" / "bullpen")
 
 
+class QuietWaitTest(unittest.TestCase):
+    """A wait with no message ends by itself, before Claude Code's 10-minute limit."""
+
+    def test_ends_and_says_to_restart(self):
+        import contextlib, importlib.machinery, importlib.util, io
+        from bullpen.client import Client
+        store, server, port, tmp = start(wait_seconds=1)
+        self.addCleanup(stop, server)
+        (tmp / "proj").mkdir()
+        store.add_project(str(tmp / "proj"))
+        store.join("proj", "alice", "claude")
+        loader = importlib.machinery.SourceFileLoader("bullpen_cli", CHAT)
+        cli = importlib.util.module_from_spec(importlib.util.spec_from_loader("bullpen_cli", loader))
+        loader.exec_module(cli)
+        self.assertLess(cli.QUIET_SECONDS + cli.WAIT_TIMEOUT, 600)  # the real limits fit in 10 minutes
+        cli.QUIET_SECONDS = 1.5
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            cli.wait(Client(port), "proj", "alice")
+        self.assertIn("No message yet", out.getvalue())
+        self.assertIn("Restart the wait in the background", out.getvalue())
+
+
 class CliTest(unittest.TestCase):
     def setUp(self):
         self.store, self.server, self.port, self.tmp = start(wait_seconds=1)
