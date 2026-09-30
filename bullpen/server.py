@@ -17,8 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import models as models_mod
-from . import mcp, pins, reactions, rules, spawn, talk, usage
-from . import mcp, pins, reactions, removal, rules, spawn, talk
+from . import mcp, pins, reactions, removal, rules, spawn, talk, usage
 from .board import Board
 from .client import Client
 from .codex import Deliverer
