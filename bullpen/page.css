@@ -373,3 +373,6 @@ input[type=range]{accent-color:var(--proof)}
 #askextra .fat{font:12px var(--mono);color:var(--mute);overflow-wrap:anywhere}
 #askextra .flist{display:flex;flex-direction:column;max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:7px;padding:4px}
 #askextra .flist button{border:0;text-align:left;padding:5px 10px;font-weight:500}#askextra .flist .up{color:var(--mute)}
+.rosterhead .tools{display:flex;margin-left:auto;margin-right:6px}
+.rosterhead .tools .icon{padding:5px;display:grid;place-items:center}
+.rosterhead .tools svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
